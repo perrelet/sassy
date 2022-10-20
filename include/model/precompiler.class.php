@@ -12,7 +12,6 @@ class Precompiler {
 	protected $instance 	= null;
 	protected $src 			= null;
 	protected $handle 		= null;
-	protected $directory 	= null;
 	protected $formatter 	= 'ScssPhp\ScssPhp\Formatter\Expanded';
 	protected $compiler 	= null;
 	
@@ -24,8 +23,8 @@ class Precompiler {
 	
 	public function compile () {
 		
-		if (is_null($this->src) || is_null($this->directory)) {
-			$this->error('A source file and destination directory need to be set in order to run the compiler.');
+		if (is_null($this->src)) {
+			$this->error('A source file needs to be set in order to run the compiler.');
 			return $this->src;
 		}
 		
@@ -39,15 +38,14 @@ class Precompiler {
 			
 		}
 		
-		//$this->build_path = apply_filters('sassy-content-dir', WP_CONTENT_DIR) . $this->directory;
-
-		$build_path 	= $this->get_build_path();
-		$build_url 		= $this->get_build_url();
+		$build_dir		= $this->get_build_directory();
+		$build_path 	= $this->get_build_path() . $build_dir;
+		$build_url 		= $this->get_build_url() . $build_dir;
 		$build_name 	= $this->get_build_name();
 
 		$file = $build_path . $build_name;
 		
-		$run = apply_filters('sassy-force-compile', false, $this->src);
+		$run = apply_filters('sassy-force-compile', false, $this->src, $this->handle);
 		
 		if (!$run) {
 
@@ -97,7 +95,7 @@ class Precompiler {
 				'sourceMapBasepath' => rtrim(ABSPATH, '/'),					// ? - Partial path (server root) to create the relative URL
 				'sourceMapFilename' => $build_url . $build_name,			// (Optional) Full or relative URL to compiled .css file
 				'sourceRoot'        => $this->src,							// (Optional) Prepend the 'source' field entries to relocate source files
-			]);	
+			], $this->src, $this->handle);	
 			
 			try {
 			
@@ -163,19 +161,26 @@ class Precompiler {
 			if ($blog_details_path != PATH_CURRENT_SITE) $path = str_replace($blog_details_path, PATH_CURRENT_SITE, $path);
 		}
 		
-		return apply_filters('sassy-src-path', $path, $this->src);
+		return apply_filters('sassy-src-path', $path, $this->src, $this->handle);
+		
+	}
+
+	public function get_build_directory () {
+		
+		$suffix = is_multisite() ? get_current_blog_id() . '/' : '';
+		return apply_filters('sassy-build-directory', '/scss/' . $suffix, $this->src, $this->handle);
 		
 	}
 	
 	public function get_build_path () {
 		
-		return apply_filters('sassy-build-path', WP_CONTENT_DIR, $this->src, $this->handle) . $this->directory;
+		return apply_filters('sassy-build-path', WP_CONTENT_DIR, $this->src, $this->handle);
 		
 	}
 	
 	public function get_build_url () {
 		
-		return apply_filters('sassy-build-url', WP_CONTENT_URL, $this->src, $this->handle) . $this->directory;
+		return apply_filters('sassy-build-url', WP_CONTENT_URL, $this->src, $this->handle);
 		
 	}
 	
@@ -185,13 +190,13 @@ class Precompiler {
 		$name 		= basename($parts[0], '.scss');
 		$build_name = "{$name}.{$this->instance}.css";
 
-		return apply_filters('sassy-build-name', $build_name, $this->src);
+		return apply_filters('sassy-build-name', $build_name, $this->src, $this->handle);
 		
 	}
 	
 	public function get_formatter () {
 		
-		return apply_filters('sassy-formatter', $this->formatter);
+		return apply_filters('sassy-formatter', $this->formatter, $this->src, $this->handle);
 		
 	}
 	
@@ -200,7 +205,7 @@ class Precompiler {
 		return apply_filters('sassy-variables', [
 			'template_directory_uri'   => get_template_directory_uri(),
 			'stylesheet_directory_uri' => get_stylesheet_directory_uri()
-		]);
+		], $this->src, $this->handle);
 		
 	}
 	
@@ -211,13 +216,6 @@ class Precompiler {
 		$this->src = $src;
 		$this->handle = $handle;
 
-		return $this;
-		
-	}
-	
-	public function set_directory ($directory) {
-		
-		$this->directory = $directory;
 		return $this;
 		
 	}
