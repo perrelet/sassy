@@ -58,12 +58,13 @@ class Precompiler {
 		}
 		
 		// Compile if the variables have changed.
+
 		$variables = $this->get_variables();
 		if (!$run) {
 			$signature = sha1(serialize($variables));
-			if ($signature !== get_transient('sassy-variables-signature')) {
+			if ($signature !== get_transient('sassy-vars-sig-' . $this->handle)) {
 				$run = true;
-				set_transient('sassy-variables-signature', $signature);
+				set_transient('sassy-vars-sig-' . $this->handle, $signature);
 			}
 		}
 		
