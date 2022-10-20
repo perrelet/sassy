@@ -11,6 +11,7 @@
  */
 
 if (!defined('WPINC')) die;
+if (defined('SASSY_VERSION')) return;
 
 /* DEFINES */
  
