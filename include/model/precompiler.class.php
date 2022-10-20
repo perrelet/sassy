@@ -21,14 +21,10 @@ class Precompiler {
 
 	}
 	
-	public function compile ($src = null, $handle = null) {
+	public function compile ($src, $handle) {
 		
-		if ($src) $this->set_src($src, $handle);
-
-		if (is_null($this->src)) {
-			$this->error('A source file needs to be set in order to run the compiler.');
-			return $this->src;
-		}
+		$this->src = 	$src;
+		$this->handle = $handle;
 		
 		$src_path = $this->get_src_path();
 		$parse_src = parse_url($this->src);
@@ -209,17 +205,6 @@ class Precompiler {
 			'template_directory_uri'   => get_template_directory_uri(),
 			'stylesheet_directory_uri' => get_stylesheet_directory_uri()
 		], $this->src, $this->handle);
-		
-	}
-	
-	//SET
-	
-	public function set_src ($src, $handle = null) {
-		
-		$this->src = $src;
-		$this->handle = $handle;
-
-		return $this;
 		
 	}
 	
