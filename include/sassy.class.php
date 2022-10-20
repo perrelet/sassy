@@ -58,18 +58,18 @@ class Sassy {
 
 		$precompiler = new Precompiler();
 		
-		$build_folder = $this->get_build_folder();
-		$build_folder = apply_filters('sassy-build-folder', $build_folder, $src, $handle);
+		$build_directory = $this->get_build_directory();
+		$build_directory = apply_filters('sassy-build-directory', $build_directory, $src, $handle);
 
 		$precompiler->set_src($src);
-		$precompiler->set_folder($this->get_build_folder());
+		$precompiler->set_directory($this->get_build_directory());
 		
 		return $precompiler->compile();
 		
 		
 	}
 	
-	public function get_build_folder () {
+	public function get_build_directory () {
 		
 		$suffix = is_multisite() ? get_current_blog_id() . '/' : '';
 		return '/scss/' . $suffix;

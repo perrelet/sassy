@@ -11,9 +11,12 @@ class Precompiler {
 
 	protected $instance 	= null;
 	protected $src 			= null;
-	protected $folder 		= null;
+	protected $directory 	= null;
 	protected $formatter 	= 'ScssPhp\ScssPhp\Formatter\Expanded';
 	protected $compiler 	= null;
+	protected $build_path	= null;
+	protected $build_url	= null;
+	protected $build_name	= null;
 	
 	public function __construct () {
 		
@@ -23,8 +26,8 @@ class Precompiler {
 	
 	public function compile () {
 		
-		if (is_null($this->src) || is_null($this->folder)) {
-			$this->error('A source file and destination folder need to be set in order to run the compiler.');
+		if (is_null($this->src) || is_null($this->directory)) {
+			$this->error('A source file and destination directory need to be set in order to run the compiler.');
 			return $this->src;
 		}
 		
@@ -38,6 +41,8 @@ class Precompiler {
 			
 		}
 		
+		//$this->build_path = apply_filters('sassy-content-dir', WP_CONTENT_DIR) . $this->directory;
+
 		$build_path 	= $this->get_build_path();
 		$build_url 		= $this->get_build_url();
 		$build_name 	= $this->get_build_name();
@@ -166,13 +171,13 @@ class Precompiler {
 	
 	public function get_build_path () {
 		
-		return apply_filters('sassy-content-dir', WP_CONTENT_DIR) . $this->folder;
+		return apply_filters('sassy-content-dir', WP_CONTENT_DIR) . $this->directory;
 		
 	}
 	
 	public function get_build_url () {
 		
-		return apply_filters('sassy-content-url', WP_CONTENT_URL) . $this->folder;
+		return apply_filters('sassy-content-url', WP_CONTENT_URL) . $this->directory;
 		
 	}
 	
@@ -210,9 +215,9 @@ class Precompiler {
 		
 	}
 	
-	public function set_folder ($folder) {
+	public function set_directory ($directory) {
 		
-		$this->folder = $folder;
+		$this->directory = $directory;
 		return $this;
 		
 	}
