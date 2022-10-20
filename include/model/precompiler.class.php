@@ -11,12 +11,10 @@ class Precompiler {
 
 	protected $instance 	= null;
 	protected $src 			= null;
+	protected $handle 		= null;
 	protected $directory 	= null;
 	protected $formatter 	= 'ScssPhp\ScssPhp\Formatter\Expanded';
 	protected $compiler 	= null;
-	protected $build_path	= null;
-	protected $build_url	= null;
-	protected $build_name	= null;
 	
 	public function __construct () {
 		
@@ -171,13 +169,13 @@ class Precompiler {
 	
 	public function get_build_path () {
 		
-		return apply_filters('sassy-content-dir', WP_CONTENT_DIR) . $this->directory;
+		return apply_filters('sassy-build-path', WP_CONTENT_DIR, $this->src, $this->handle) . $this->directory;
 		
 	}
 	
 	public function get_build_url () {
 		
-		return apply_filters('sassy-content-url', WP_CONTENT_URL) . $this->directory;
+		return apply_filters('sassy-build-url', WP_CONTENT_URL, $this->src, $this->handle) . $this->directory;
 		
 	}
 	
@@ -208,9 +206,11 @@ class Precompiler {
 	
 	//SET
 	
-	public function set_src ($src) {
+	public function set_src ($src, $handle = null) {
 		
 		$this->src = $src;
+		$this->handle = $handle;
+
 		return $this;
 		
 	}

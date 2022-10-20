@@ -61,7 +61,7 @@ class Sassy {
 		$build_directory = $this->get_build_directory();
 		$build_directory = apply_filters('sassy-build-directory', $build_directory, $src, $handle);
 
-		$precompiler->set_src($src);
+		$precompiler->set_src($src, $handle);
 		$precompiler->set_directory($this->get_build_directory());
 		
 		return $precompiler->compile();
