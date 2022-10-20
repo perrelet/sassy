@@ -23,7 +23,7 @@ class Sassy {
 	
 	protected function load_vendors () {
 		
-		require_once(SASSY_PATH . "vendor/scssphp-1.4.1/scss.inc.php");
+		require_once(SASSY_PATH . "vendor/scssphp-1.11.0/scss.inc.php");
 		
 	}
 	
