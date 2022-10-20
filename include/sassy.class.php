@@ -53,9 +53,14 @@ class Sassy {
 		
 		$path_parts = pathinfo(parse_url($src)['path']);
 		if (!isset($path_parts['extension']) || ($path_parts['extension'] != 'scss')) return $src;
-		
+
+		if (!apply_filters('sassy-compile', true, $src, $handle)) return $src;
+
 		$precompiler = new Precompiler();
 		
+		$build_folder = $this->get_build_folder();
+		$build_folder = apply_filters('sassy-build-folder', $build_folder, $src, $handle);
+
 		$precompiler->set_src($src);
 		$precompiler->set_folder($this->get_build_folder());
 		
@@ -67,7 +72,7 @@ class Sassy {
 	public function get_build_folder () {
 		
 		$suffix = is_multisite() ? get_current_blog_id() . '/' : '';
-		return apply_filters('sassy-build-folder', '/scss/' . $suffix);
+		return '/scss/' . $suffix;
 		
 	}
 	

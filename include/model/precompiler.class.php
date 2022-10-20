@@ -44,7 +44,7 @@ class Precompiler {
 
 		$file = $build_path . $build_name;
 		
-		$run = apply_filters('sassy-run-compiler', false, $this->src);
+		$run = apply_filters('sassy-force-compile', false, $this->src);
 		
 		if (!$run) {
 
