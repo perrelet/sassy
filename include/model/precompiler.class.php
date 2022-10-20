@@ -21,8 +21,10 @@ class Precompiler {
 
 	}
 	
-	public function compile () {
+	public function compile ($src = null, $handle = null) {
 		
+		if ($src) $this->set_src($src, $handle);
+
 		if (is_null($this->src)) {
 			$this->error('A source file needs to be set in order to run the compiler.');
 			return $this->src;

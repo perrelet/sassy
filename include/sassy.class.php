@@ -57,10 +57,7 @@ class Sassy {
 		if (!apply_filters('sassy-compile', true, $src, $handle)) return $src;
 
 		$precompiler = new Precompiler();
-		$precompiler->set_src($src, $handle);
-		
-		return $precompiler->compile();
-		
+		return $precompiler->compile($src, $handle);
 		
 	}
 	
