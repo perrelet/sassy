@@ -107,7 +107,7 @@ class Updater {
 	
 	public function update ($transient) {
 		
-		dlog($transient);
+		//dlog($transient);
 		
 		$update = $this->check_for_updates(true);
 		
