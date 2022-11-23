@@ -7,7 +7,7 @@ class UI {
 	public function __construct () {
 		
 		add_action('admin_bar_menu', [$this, 'admin_bar_menu'], 100);
-		add_filter('sassy-run-compiler', [$this, 'run_compiler']);
+		add_filter('sassy-force-compile', [$this, 'run_compiler']);
 		
 	}
 	
