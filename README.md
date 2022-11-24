@@ -58,12 +58,12 @@ Source maps can be selectively generated via the `sassy-src-map` filter. The sou
 
 Sassy automatically converts the following global styles from Oxygen Builder's configuration into scss variables:
 
- - 🎨 Global Colors
- - 🔠 Global Fonts
- - 📱 Break Points
- - 📐 Section & Column Spacing
+ - 🎨 Global Colors (`$c-color-name`, `$c-another-color`, etc)
+ - 🔠 Global Fonts (`$f-text`, `$f-display`, etc)
+ - 📱 Break Points (`$b-page`, `$b-tablet`, `$b-phone-landscape`, `$b-phone-portrait`)
+ - 📐 Section & Column Spacing (`$sec-px`, `$sec-py`, `$col-px`)
 
-Sassy also generates a list of breakpoints as a sass map called `breakpoints`.
+Sassy also generates a list of breakpoints as a sass map called `$breakpoints`.
 
 ## Credits
 
