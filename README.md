@@ -34,6 +34,8 @@ Sassy will compile a source file if any of the following are met:
 | `sassy-build-name` | Same as source, appended with compiler index. | The name of the compiled files. |
 | `sassy-formatter` | `'ScssPhp\ScssPhp\Formatter\Expanded'` | Class of the scss formatter. |
 | `sassy-variables` | See [Variables](#variables) | Array of variables to be available. |
+| `sassy-src-map` | `true` | Whether to generate the source map. |
+| `sassy-src-map-data` | See [Source Maps](#source-maps) | Array of variables to be available. |
 
 ## Variables
 
@@ -48,6 +50,9 @@ By default only the following variables are defined, however others may be added
 
 >**Tip:** The 'Oxygen global variables in SCSS files' module in our [digitalis plugin](https://github.com/perrelet/digitalis) uses the `sassy-variables` filter to inject Oxygen Builder's global colors, fonts and breakpoints in this way.
 
+## Source Maps
+
+Source maps can be selectively generated via the `sassy-src-map` filter. The source map configuration can be hooked via the `sassy-src-map-data` filter. Refer to (https://scssphp.github.io/scssphp/docs/) for further information on these parameters. 
 ## Credits
 
 Inspired by Juan Echeverry's [SCSS-Library](https://wordpress.org/plugins/scss-library/?ref=commonninja).
