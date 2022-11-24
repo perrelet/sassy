@@ -7,6 +7,8 @@ class Sassy {
 	protected $build_dir;
 	protected $build_url;
 	protected $errors = [];
+	protected $ui;
+	protected $precompilers = [];
 	
 	public function __construct() {
 		
@@ -37,7 +39,7 @@ class Sassy {
 		
 		require_once(SASSY_PATH . "include/view/ui.class.php");
 		
-		new UI();
+		$this->ui = new UI();
 		
 	}
 	
@@ -57,6 +59,7 @@ class Sassy {
 		if (!apply_filters('sassy-compile', true, $src, $handle)) return $src;
 
 		$precompiler = new Precompiler();
+		$this->precompilers[] = $precompiler;
 		return $precompiler->compile($src, $handle);
 		
 	}
@@ -86,7 +89,17 @@ class Sassy {
 		echo "</div>";
 		
 	}
-	
 
+	public function get_ui () {
+
+		return $this->ui;
+
+	}
+	
+	public function get_precompilers () {
+
+		return $this->precompilers;
+
+	}
 	
 }

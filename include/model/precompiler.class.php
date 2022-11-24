@@ -14,6 +14,16 @@ class Precompiler {
 	protected $handle 		= null;
 	protected $formatter 	= 'ScssPhp\ScssPhp\Formatter\Expanded';
 	protected $compiler 	= null;
+
+	protected $build_dir;
+	protected $build_path;
+	protected $build_url;
+	protected $build_name;
+	protected $build_file;
+	protected $src_path;
+
+	protected $compiled = false;
+	protected $error = false;
 	
 	public function __construct () {
 		
@@ -22,9 +32,16 @@ class Precompiler {
 	}
 	
 	public function compile ($src, $handle) {
+
+		$this->build_dir	= null;
+		$this->build_path	= null;
+		$this->build_url	= null;
+		$this->build_name	= null;
+		$this->build_file	= null;
+		$this->src_path		= null;
 		
-		$this->src = 	$src;
-		$this->handle = $handle;
+		$this->src 			= $src;
+		$this->handle 		= $handle;
 		
 		$src_path = $this->get_src_path();
 		$parse_src = parse_url($this->src);
@@ -36,19 +53,17 @@ class Precompiler {
 			
 		}
 		
-		$build_dir		= $this->get_build_directory();
-		$build_path 	= $this->get_build_path() . $build_dir;
-		$build_url 		= $this->get_build_url() . $build_dir;
-		$build_name 	= $this->get_build_name();
-
-		$file = $build_path . $build_name;
+		$build_path = $this->get_build_path();
+		$build_url = $this->get_build_url();
+		$build_name = $this->get_build_name();
+		$build_file = $this->get_build_file();
 		
 		$run = apply_filters('sassy-force-compile', false, $this->src, $this->handle);
 		
 		if (!$run) {
 
 			if (($filemtimes = get_transient('sassy-filemtimes')) === false) $filemtimes = [];
-			if (isset($filemtimes[$file]) === false || $filemtimes[$file] < filemtime($src_path)) {
+			if (isset($filemtimes[$build_file]) === false || $filemtimes[$build_file] < filemtime($src_path)) {
 				$run = true;
 			}
 		}
@@ -64,7 +79,7 @@ class Precompiler {
 			}
 		}
 		
-		if (!$run && !file_exists($file)) $run = true;
+		if (!$run && !file_exists($build_file)) $run = true;
 		
 		if ($run) {
 			
@@ -96,9 +111,9 @@ class Precompiler {
 
 					$source_map_data = apply_filters('sassy-src-map-data', [
 						'sourceMapWriteTo'	=> str_replace('\\', '/', $build_path) . $build_name . '.map',	// Absolute path where the .map file will be written
-						'sourceMapURL'		=> $build_url . $build_name . '.map',							// Full or relative URL to archive .map
+						'sourceMapURL'		=> $build_url . '.map',											// Full or relative URL to archive .map
 						'sourceMapBasepath'	=> rtrim(str_replace('\\', '/', ABSPATH), '/'),					// Configures the base path to replace (for instance C:/www/domain/wp-content/themes/theme-name/classes/../scss/ or C:/www/domain/wp-content/ in your cases (notice that we have a weird thing where this options must use / instead of \ on Windows) (https://github.com/scssphp/scssphp/issues/35) // ? - Partial path (server root) to create the relative URL
-						'sourceMapFilename'	=> $build_url . $build_name,									// (Optional) Full or relative URL to compiled .css file
+						'sourceMapFilename'	=> $build_url,													// (Optional) Full or relative URL to compiled .css file
 						'sourceMapRootpath'	=> trailingslashit(site_url()),									
 						//'sourceRoot'		=> $this->src,													// (Optional) Prepend the 'source' field entries to relocate source files
 					], $this->src, $this->handle);	
@@ -129,15 +144,16 @@ class Precompiler {
 			//Transform the relative paths to work correctly
 			$css = preg_replace('#(url\((?![\'"]?(?:https?:|/))[\'"]?)#miu', '$1' . dirname($parse_src['path']) . '/', $css);
 			
-			file_put_contents($file, $css);
+			file_put_contents($build_file, $css);
 			
-			$filemtimes[$file] = filemtime($file);
+			$filemtimes[$build_file] = filemtime($build_file);
 
 			set_transient('sassy-filemtimes', $filemtimes);
+			$this->compiled = true;
 			
 		}
 		
-		$output = $build_url . $build_name;
+		$output = $build_url;
 		if (!empty($parse_src['query'])) $output .= '?' . $parse_src['query'];
 		return $output;
 		
@@ -145,57 +161,126 @@ class Precompiler {
 	
 	protected function error ($e) {
 		
+		$this->error = true;
 		$e = "Precompiler -> " . $e;
 		SASSY()->error($e);
 		
 	}
 	
+	//HAS
+
+	public function has_compiled () {
+
+		return $this->compiled;
+
+	}
+
+	public function has_error () {
+
+		return $this->error;
+
+	}
+
 	//GET
 
+	public function get_instance () {
+
+		return $this->instance;
+
+	}
+
+	public function get_src () {
+
+		return $this->src;
+
+	}
+
+	public function get_handle () {
+
+		return $this->handle;
+
+	}
+
+	public function get_compiler () {
+
+		return $this->compiler;
+
+	}
+
 	public function get_src_path () {
-		
-		$abs = preg_replace('/^' . preg_quote(site_url(), '/') . '/i', '', $this->src); 	// Convert the URL to absolute paths.
-		if (preg_match('#^//#', $abs) || strpos($abs, '/') !== 0) return $this->src;		// Ignore SCSS from CDNs, other domains, and relative paths
-		
-		$path = rtrim($_SERVER['DOCUMENT_ROOT'], '/') . parse_url($this->src)['path'];		// TODO: Switch $_SERVER['DOCUMENT_ROOT']
-		
-		// If it is part of a multi-site then the 'domain' must be removed
-		if (is_multisite()) {
-			$blog_details_path = get_blog_details()->path;
-			if ($blog_details_path != PATH_CURRENT_SITE) $path = str_replace($blog_details_path, PATH_CURRENT_SITE, $path);
+
+		if (is_null($this->src_path)) {
+
+			$abs = preg_replace('/^' . preg_quote(site_url(), '/') . '/i', '', $this->src); 	// Convert the URL to absolute paths.
+			if (preg_match('#^//#', $abs) || strpos($abs, '/') !== 0) return $this->src;		// Ignore SCSS from CDNs, other domains, and relative paths
+			
+			$path = rtrim($_SERVER['DOCUMENT_ROOT'], '/') . parse_url($this->src)['path'];		// TODO: Switch $_SERVER['DOCUMENT_ROOT']
+			
+			// If it is part of a multi-site then the 'domain' must be removed
+			if (is_multisite()) {
+				$blog_details_path = get_blog_details()->path;
+				if ($blog_details_path != PATH_CURRENT_SITE) $path = str_replace($blog_details_path, PATH_CURRENT_SITE, $path);
+			}
+
+			$this->src_path = apply_filters('sassy-src-path', $path, $this->src, $this->handle);
+
 		}
 		
-		return apply_filters('sassy-src-path', $path, $this->src, $this->handle);
+		return $this->src_path;
 		
 	}
 
 	public function get_build_directory () {
-		
-		$suffix = is_multisite() ? get_current_blog_id() . '/' : '';
-		return apply_filters('sassy-build-directory', '/scss/' . $suffix, $this->src, $this->handle);
+
+		if (is_null($this->build_dir)) {
+
+			$suffix = is_multisite() ? get_current_blog_id() . '/' : '';
+			$this->build_dir = apply_filters('sassy-build-directory', '/scss/' . $suffix, $this->src, $this->handle);
+
+		}
+
+		return $this->build_dir;
 		
 	}
 	
 	public function get_build_path () {
 		
-		return apply_filters('sassy-build-path', WP_CONTENT_DIR, $this->src, $this->handle);
+		if (is_null($this->build_path)) $this->build_path = apply_filters('sassy-build-path', WP_CONTENT_DIR, $this->src, $this->handle) . $this->get_build_directory();
+
+		return $this->build_path;
 		
 	}
 	
 	public function get_build_url () {
 		
-		return apply_filters('sassy-build-url', WP_CONTENT_URL, $this->src, $this->handle);
+		if (is_null($this->build_url)) $this->build_url = apply_filters('sassy-build-url', WP_CONTENT_URL, $this->src, $this->handle) . $this->get_build_directory() . $this->get_build_name();
+
+		return $this->build_url;
 		
 	}
 	
 	public function get_build_name () {
 		
-		$parts 		= explode('?', $this->src);
-		$name 		= basename($parts[0], '.scss');
-		$build_name = "{$name}.{$this->instance}.css";
+		if (is_null($this->build_name)) {
 
-		return apply_filters('sassy-build-name', $build_name, $this->src, $this->handle);
+			$parts 		= explode('?', $this->src);
+			$name 		= basename($parts[0], '.scss');
+			$build_name = "{$name}.{$this->instance}.css";
+
+			$this->build_name = apply_filters('sassy-build-name', $build_name, $this->src, $this->handle);
+
+		}
+
+		return $this->build_name;
 		
+	}
+
+	public function get_build_file () {
+
+		if (is_null($this->build_file)) $this->build_file = $this->get_build_path() . $this->get_build_name();
+
+		return $this->build_file;
+
 	}
 	
 	public function get_formatter () {
