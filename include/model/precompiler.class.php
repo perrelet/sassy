@@ -63,7 +63,7 @@ class Precompiler {
 		
 		if (!$run) {
 
-			if (($filemtimes = get_transient('sassy-filemtimes')) === false) $filemtimes = [];
+			if (($filemtimes = get_transient('sassy-filemtimes-' . $this->handle)) === false) $filemtimes = [];
 			if (isset($filemtimes[$build_file]) === false || $filemtimes[$build_file] < filemtime($src_path)) {
 				$run = true;
 			}
@@ -89,7 +89,7 @@ class Precompiler {
 				if (wp_mkdir_p($build_path) === false) {
 					
 					$this->error('File Permissions Error, unable to create cache directory: ' . $build_path);
-					delete_transient('sassy-filemtimes');
+					delete_transient('sassy-filemtimes-' . $this->handle);
 					return $this->src;
 					
 				}
@@ -99,7 +99,7 @@ class Precompiler {
 			if (is_writable($build_path) === false) {
 				
 				$this->error('File Permissions Error, permission denied. Please make the directory writable: ' . $build_path);
-				delete_transient('sassy-filemtimes');
+				delete_transient('sassy-filemtimes-' . $this->handle);
 				return $this->src;
 				
 			}
@@ -149,7 +149,7 @@ class Precompiler {
 			
 			$filemtimes[$build_file] = filemtime($build_file);
 
-			set_transient('sassy-filemtimes', $filemtimes);
+			set_transient('sassy-filemtimes-' . $this->handle, $filemtimes);
 			$this->compiled = true;
 			
 		}
