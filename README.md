@@ -53,6 +53,18 @@ By default only the following variables are defined, however others may be added
 ## Source Maps
 
 Source maps can be selectively generated via the `sassy-src-map` filter. The source map configuration can be hooked via the `sassy-src-map-data` filter. Refer to (https://scssphp.github.io/scssphp/docs/) for further information on these parameters. 
+
+## Integrations
+
+### Oxygen Builder
+
+Sassy automatically converts the following global styles from Oxygen Builder's configuration into scss variables:
+
+ - 🎨 Global Colors
+ - 🔠 Global Fonts
+ - 📱 Break Points
+ - 📐 Section & Column Spacing
+
 ## Credits
 
 Inspired by Juan Echeverry's [SCSS-Library](https://wordpress.org/plugins/scss-library/?ref=commonninja).
