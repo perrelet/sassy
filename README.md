@@ -1,10 +1,10 @@
 # SASSY
 
-A rather saucy way of implementing SCSS on your WordPress install. This plugin was written due to the limitations of similar plugins in the wp repository and was heavbily inspired by Juan Echeverry's [SCSS-Library](https://wordpress.org/plugins/scss-library/?ref=commonninja) plugin.
+A rather saucy way of implementing SCSS on your WordPress install. This plugin was written due to the limitations of similar plugins in the wp repository and was heavily inspired by Juan Echeverry's [SCSS-Library](https://wordpress.org/plugins/scss-library/?ref=commonninja) plugin.
 
 ## Usage
 
-Enqueue your sass files as if they were css and sassy will handle the rest. Example:
+Enqueue your sass files as if they were css and sassy will take care of the rest.
 
 ```php
 wp_enqueue_style('your-scss', plugin_dir_url(__FILE__) . 'style.scss');
@@ -19,7 +19,7 @@ By default, compiled css and scss source map files are saved to `wp-content\scss
 Sassy will compile a source file if any of the following are met:
 
 1. The file has changed since it was last checked.
-2. Any sass varaibles have been added, removed or changed value.
+2. Any sass variables have been added, removed or changed value.
 3. Compilation is forced via the `sassy-run-compiler` filter.
 
 ## Hooks
