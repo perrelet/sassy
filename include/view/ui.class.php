@@ -8,8 +8,16 @@ class UI {
 		
 		add_action('admin_bar_menu', [$this, 'admin_bar_menu'], 100);
 		add_filter('sassy-force-compile', [$this, 'run_compiler']);
+
+		if (isset($_GET['sassy-vars'])) add_action('wp_footer', [$this, 'print_variables']);
 		
 	}
+
+	public function print_variables () {
+		
+        echo "<script>console.log('SCSS Variables:');console.log(" . json_encode(SASSY()->get_all_variables()) . ");</script>";
+
+    }
 	
 
 	public function admin_bar_menu ($admin_bar) {

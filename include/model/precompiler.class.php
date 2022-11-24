@@ -14,6 +14,7 @@ class Precompiler {
 	protected $handle 		= null;
 	protected $formatter 	= 'ScssPhp\ScssPhp\Formatter\Expanded';
 	protected $compiler 	= null;
+	protected $variables 	= null;
 
 	protected $build_dir;
 	protected $build_path;
@@ -291,10 +292,16 @@ class Precompiler {
 	
 	public function get_variables () {
 		
-		return apply_filters('sassy-variables', [
-			'template_directory_uri'   => get_template_directory_uri(),
-			'stylesheet_directory_uri' => get_stylesheet_directory_uri()
-		], $this->src, $this->handle);
+		if (is_null($this->variables)) {
+
+			$this->variables = apply_filters('sassy-variables', [
+				'template_directory_uri'   => get_template_directory_uri(),
+				'stylesheet_directory_uri' => get_stylesheet_directory_uri()
+			], $this->src, $this->handle);
+
+		}
+
+		return $this->variables;
 		
 	}
 	

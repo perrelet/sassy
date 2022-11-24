@@ -117,5 +117,21 @@ class Sassy {
 		return $this->precompilers;
 
 	}
+
+	public function get_all_variables () {
+
+		if (!$this->get_precompilers()) return [];
+
+		$variables = [];
+
+		foreach ($this->get_precompilers() as $precompiler) {
+
+			$variables = array_merge($variables, $precompiler->get_variables());
+
+		}
+
+		return $variables;
+
+	}
 	
 }

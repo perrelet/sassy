@@ -4,7 +4,13 @@ namespace Sassy;
 
 class Oxygen extends Integration {
 
-    protected $variables = [];
+    protected $variables;
+
+    protected $colors;
+    protected $breakpoints;
+    protected $fonts;
+    protected $sections;
+    protected $columns;
 
     public function condition() {
 
@@ -14,156 +20,176 @@ class Oxygen extends Integration {
 
     public function run () {
 
-        add_filter('scsslib_compiler_variables', [$this, 'compiler_variables'], 10, 1);
         add_filter('sassy-variables', [$this, 'compiler_variables'], 10, 1);
-
-        if (isset($_GET['sassy-vars'])) add_action('wp_footer', [$this, 'print_variables']);
-
-    }
-
-    public function print_variables () {
-
-        $variables = json_encode($this->variables);
-        echo "<script>console.log($variables);</script>";
 
     }
 
     public function compiler_variables ($variables) {
 
-        //error_log(print_r(oxy_get_global_colors(), true));
-
-        $variables = $this->colors($variables);
-        $variables = $this->breakpoints($variables);
-        $variables = $this->fonts($variables);
-        $variables = $this->sections($variables);
-        $variables = $this->columns($variables);
-		
-        $this->variables = $variables;
-
-        //error_log(print_r($variables, true));
-
+        $variables = array_merge($variables, $this->get_variables());
         return $variables;
 
     }
 
-    protected function colors ($variables) {
+    public function get_variables () {
 
-        if (!is_callable('oxy_get_global_colors')) return $variables;
+        if (is_null($this->variables)) {
 
-        $colors = oxy_get_global_colors()['colors'];
-        
-        foreach ($colors as $color) {
+            $this->variables = [];
 
-            $name = $this->slug($color['name']);
-
-            $variables["c-" . $color['id']] = $color['value'];
-            $variables["c-" . $name] = $color['value'];
+            $this->variables = array_merge($this->variables, $this->get_colors());
+            $this->variables = array_merge($this->variables, $this->get_breakpoints());
+            $this->variables = array_merge($this->variables, $this->get_fonts());
+            $this->variables = array_merge($this->variables, $this->get_sections());
+            $this->variables = array_merge($this->variables, $this->get_columns());
 
         }
 
-        return $variables;
+        return $this->variables;
 
     }
 
-    protected function breakpoints ($variables) {
+    protected function get_colors () {
+
+        if (!is_callable('oxy_get_global_colors')) return [];
+
+        if (is_null($this->colors)) {
+
+            $this->colors = [];
+            $colors = oxy_get_global_colors()['colors'];
+        
+            foreach ($colors as $color) {
+    
+                $name = $this->slug($color['name']);
+    
+                $this->colors["c-" . $color['id']] = $color['value'];
+                $this->colors["c-" . $name] = $color['value'];
+    
+            }
+
+        }
+
+        return $this->colors;
+
+    }
+
+    protected function get_breakpoints () {
 
         if (
             (!is_callable('ct_get_global_settings')) ||
             (!is_callable('oxygen_vsb_get_breakpoint_width')) ||
             (!is_callable('oxygen_vsb_get_page_width'))
-        ) return $variables;
+        ) return [];
 
-        //error_log(print_r(ct_get_global_settings(), true))
-        
-        $default_breakpoints = ct_get_global_settings(true)['breakpoints'];
-        asort($default_breakpoints);
+        if (is_null($this->breakpoints)) {
 
-        $breakpoints = [];
+            $this->breakpoints = [];
+            $default_breakpoints = ct_get_global_settings(true)['breakpoints'];
+            asort($default_breakpoints);
 
-        $i = 1;
-        foreach ($default_breakpoints as $name => $default_width) {
+            $breakpoints = [];
 
-            $name = $this->slug($name);
+            $i = 1;
+            foreach ($default_breakpoints as $name => $default_width) {
 
-            $width = oxygen_vsb_get_breakpoint_width($name);
+                $name = $this->slug($name);
 
-            $variables['b-' . $name]    = $width;
-            $variables['b-' . $i]       = $width;
-            $breakpoints[$name]         = $width . "px";
-            $breakpoints['b-' . $i]     = $width . "px";
+                $width = oxygen_vsb_get_breakpoint_width($name);
 
-            $i++;
+                $this->breakpoints['b-' . $name]    = $width;
+                $this->breakpoints['b-' . $i]       = $width;
+                $breakpoints[$name]         = $width . "px";
+                $breakpoints['b-' . $i]     = $width . "px";
+
+                $i++;
+
+            }
+
+            $page_width = oxygen_vsb_get_page_width();
+
+            $this->breakpoints['b-page']        = $page_width;
+            $this->breakpoints['b-' . $i]       = $page_width;
+            $breakpoints['page']        = $page_width . "px";
+            $breakpoints['b-' . $i]     = $page_width . "px";       
+
+            $this->breakpoints['breakpoints'] = $this->array_to_sass_map($breakpoints);
 
         }
 
-        $page_width = oxygen_vsb_get_page_width();
-
-        $variables['b-page']        = $page_width;
-        $variables['b-' . $i]       = $page_width;
-        $breakpoints['page']        = $page_width . "px";
-        $breakpoints['b-' . $i]     = $page_width . "px";       
-
-        $variables['breakpoints'] = $this->array_to_sass_map($breakpoints);
-
-        return $variables;
+        return $this->breakpoints;
 
     }
 
-    protected function fonts ($variables) {
+    protected function get_fonts () {
 
-        if (!is_callable('ct_get_global_settings')) return $variables;
+        if (!is_callable('ct_get_global_settings')) return [];
 
-        $fonts = ct_get_global_settings()['fonts'];
+        if (is_null($this->fonts)) {
 
-        $i = 1;
-        foreach ($fonts as $name => $font) {
+            $this->fonts = [];
+            $fonts = ct_get_global_settings()['fonts'];
 
-            $name = $this->slug($name);
-            
-            $variables['f-' . $i]       = $font;
-            $variables['f-' . $name]    = $font;
+            $i = 1;
+            foreach ($fonts as $name => $font) {
 
-            $i++;
+                $name = $this->slug($name);
+                
+                $this->fonts['f-' . $i]       = $font;
+                $this->fonts['f-' . $name]    = $font;
+
+                $i++;
+
+            }
 
         }
 
-        return $variables;
+        return $this->fonts;
 
     }
 	
-	protected function sections ($variables) {
+	protected function get_sections () {
 		
-		if (!is_callable('ct_get_global_settings')) return $variables;
+		if (!is_callable('ct_get_global_settings')) return [];
 		
-		$sections = ct_get_global_settings()['sections'];
+        if (is_null($this->sections)) {
+
+            $this->sections = [];
+            $sections = ct_get_global_settings()['sections'];
+            
+            if (isset($sections['container-padding-left']) && $sections['container-padding-left']) {
+                $this->sections['sec-px'] = $sections['container-padding-left'] . $sections['container-padding-left-unit'];
+            }
+            
+            if (isset($sections['container-padding-top']) && $sections['container-padding-top']) {
+                $this->sections['sec-py'] = $sections['container-padding-top'] . $sections['container-padding-top-unit'];
+            }
+
+        }
 		
-		if (isset($sections['container-padding-left']) && $sections['container-padding-left']) {
-			$variables['sec-px'] = $sections['container-padding-left'] . $sections['container-padding-left-unit'];
-		}
-		
-		if (isset($sections['container-padding-top']) && $sections['container-padding-top']) {
-			$variables['sec-py'] = $sections['container-padding-top'] . $sections['container-padding-top-unit'];
-		}
-		
-		return $variables;
+		return $this->sections;
 		
 	}
 	
-	protected function columns ($variables) {
+	protected function get_columns () {
 		
-		if (!is_callable('ct_get_global_settings')) return $variables;
+		if (!is_callable('ct_get_global_settings')) return [];
 		
-		$columns = ct_get_global_settings()['columns'];
+        if (is_null($this->columns)) {
+
+            $this->columns = [];
+            $columns = ct_get_global_settings()['columns'];
+            
+            if (isset($columns['padding-left']) && $columns['padding-left']) {
+                $this->columns['col-px'] = $columns['padding-left'] . $columns['padding-left-unit'];
+            }
+            
+            if (isset($columns['padding-top']) && $columns['padding-top']) {
+                $this->columns['col-py'] = $columns['padding-top'] . $columns['padding-top-unit'];
+            }
+
+        }
 		
-		if (isset($columns['padding-left']) && $columns['padding-left']) {
-			$variables['col-px'] = $columns['padding-left'] . $columns['padding-left-unit'];
-		}
-		
-		if (isset($columns['padding-top']) && $columns['padding-top']) {
-			$variables['col-py'] = $columns['padding-top'] . $columns['padding-top-unit'];
-		}
-		
-		return $variables;
+		return $this->columns;
 		
 	}
 

@@ -39,7 +39,7 @@ Sassy will compile a source file if any of the following are met:
 
 ## Variables
 
-By default only the following variables are defined, however others may be added via the `sassy-variables` filter.
+By default only the following variables are defined, however others may be added via the `sassy-variables` filter. See [Integrations](#integrations) below.
 
 ```php
 [
@@ -47,8 +47,6 @@ By default only the following variables are defined, however others may be added
     'stylesheet_directory_uri' => get_stylesheet_directory_uri(),
 ]
 ```
-
->**Tip:** The 'Oxygen global variables in SCSS files' module in our [digitalis plugin](https://github.com/perrelet/digitalis) uses the `sassy-variables` filter to inject Oxygen Builder's global colors, fonts and breakpoints in this way.
 
 ## Source Maps
 
