@@ -63,6 +63,8 @@ Sassy automatically converts the following global styles from Oxygen Builder's c
  - 📱 Break Points
  - 📐 Section & Column Spacing
 
+Sassy also generates a list of breakpoints as a sass map called `breakpoints`.
+
 ## Credits
 
 Inspired by Juan Echeverry's [SCSS-Library](https://wordpress.org/plugins/scss-library/?ref=commonninja).
