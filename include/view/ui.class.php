@@ -14,8 +14,13 @@ class UI {
 	}
 
 	public function print_variables () {
+
+		$variables = SASSY()->get_all_variables();
+		$sass_variables = [];
+
+		if ($variables) foreach ($variables as $key => $value) $sass_variables['$' . $key] = $value;
 		
-        echo "<script>console.log('SCSS Variables:');console.log(" . json_encode(SASSY()->get_all_variables()) . ");</script>";
+        echo "<script>console.log('SCSS Variables:');console.log(" . json_encode($sass_variables) . ");</script>";
 
     }
 	
