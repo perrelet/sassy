@@ -15,6 +15,7 @@ class UI {
 	public function admin_bar_menu ($admin_bar) {
 		
 		if (!current_user_can('edit_theme_options')) return;
+		if (!SASSY()->get_precompilers()) return;
 		
 		$precompiler_menus = [
 			'get_src' => 'Source SCSS',
@@ -43,66 +44,61 @@ class UI {
 
 		do_action('sassy-admin-bar', $admin_bar);
 
-		if (SASSY()->get_precompilers()) {
+		$horizontal_line = "<span style='width: 100%;border-bottom: 1px solid currentColor;display: block;padding-top: 1em;opacity: 0.5;'></span>";
 
-			$line = "<span style='width: 100%;border-bottom: 1px solid currentColor;display: block;padding-top: 1em;opacity: 0.5;'></span>";
+		$admin_bar->add_menu([
+			'id'		=> "sassy-line-1",
+			'parent'	=> 'sassy',
+			'title'		=> $horizontal_line,
+			'href'		=> false,
+		]);
+
+		foreach (SASSY()->get_precompilers() as $i => $precompiler) {
+
+			$icon = $precompiler->has_error() ? '❌' : ($precompiler->has_compiled() ? '✔️' : '💾');
+			$title = $icon . " " . basename(explode('?', $precompiler->get_src())[0]);
 
 			$admin_bar->add_menu([
-				'id'		=> "sassy-line-1",
+				'id'		=> "sassy-{$i}",
 				'parent'	=> 'sassy',
-				'title'		=> $line,
-				'href'		=> false,
+				'title'		=> $title,
+				'href'		=> $precompiler->get_src(),
+				'meta'		=> ['target' => '_blank'],
 			]);
 
-			foreach (SASSY()->get_precompilers() as $i => $precompiler) {
+			//
 
-				$title = basename(explode('?', $precompiler->get_src())[0]) . " ";
-				$title .= " ";
-				$title .= $precompiler->has_error() ? '❌' : ($precompiler->has_compiled() ? '✔️' : '💾');
+			foreach ($precompiler_menus as $method => $label) {
 
 				$admin_bar->add_menu([
-					'id'		=> "sassy-{$i}",
-					'parent'	=> 'sassy',
-					'title'		=> $title,
-					'href'		=> $precompiler->get_src(),
+					'id'     => "sassy-{$i}-{$method}",
+					'parent' => "sassy-{$i}",
+					'title'  => $label,
+					'href'		=> $precompiler->$method(),
 					'meta'		=> ['target' => '_blank'],
 				]);
 
-				//
+			}
 
-				foreach ($precompiler_menus as $method => $label) {
+			if ($precompiler->get_compiler()) {
+
+				$compile_options = $precompiler->get_compiler()->getCompileOptions();
+
+				if (isset($compile_options['sourceMapOptions']) && isset($compile_options['sourceMapOptions']['sourceMapURL'])) {
 
 					$admin_bar->add_menu([
-						'id'     => "sassy-{$i}-{$method}",
+						'id'     => "sassy-{$i}-map-url",
 						'parent' => "sassy-{$i}",
-						'title'  => $label,
-						'href'		=> $precompiler->$method(),
+						'title'  => 'Source Map',
+						'href'		=> $compile_options['sourceMapOptions']['sourceMapURL'],
 						'meta'		=> ['target' => '_blank'],
 					]);
 
 				}
 
-				if ($precompiler->get_compiler()) {
-
-					$compile_options = $precompiler->get_compiler()->getCompileOptions();
-
-					if (isset($compile_options['sourceMapOptions']) && isset($compile_options['sourceMapOptions']['sourceMapURL'])) {
-	
-						$admin_bar->add_menu([
-							'id'     => "sassy-{$i}-map-url",
-							'parent' => "sassy-{$i}",
-							'title'  => 'Source Map',
-							'href'		=> $compile_options['sourceMapOptions']['sourceMapURL'],
-							'meta'		=> ['target' => '_blank'],
-						]);
-	
-					}
-
-				}
-
 			}
 
-		}
+		}		
 		
 	}
 	
