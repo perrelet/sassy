@@ -3,7 +3,7 @@
 namespace Sassy;
 
 class UI {
-	
+
 	public function __construct () {
 		
 		add_action('admin_bar_menu', [$this, 'admin_bar_menu'], 100);
@@ -71,17 +71,21 @@ class UI {
 
 				}
 
-				$compile_options = $precompiler->get_compiler()->getCompileOptions();
+				if ($precompiler->get_compiler()) {
 
-				if (isset($compile_options['sourceMapOptions']) && isset($compile_options['sourceMapOptions']['sourceMapURL'])) {
+					$compile_options = $precompiler->get_compiler()->getCompileOptions();
 
-					$admin_bar->add_menu([
-						'id'     => "sassy-{$i}-map-url",
-						'parent' => "sassy-{$i}",
-						'title'  => 'Source Map',
-						'href'		=> $compile_options['sourceMapOptions']['sourceMapURL'],
-						'meta'		=> ['target' => '_blank'],
-					]);
+					if (isset($compile_options['sourceMapOptions']) && isset($compile_options['sourceMapOptions']['sourceMapURL'])) {
+	
+						$admin_bar->add_menu([
+							'id'     => "sassy-{$i}-map-url",
+							'parent' => "sassy-{$i}",
+							'title'  => 'Source Map',
+							'href'		=> $compile_options['sourceMapOptions']['sourceMapURL'],
+							'meta'		=> ['target' => '_blank'],
+						]);
+	
+					}
 
 				}
 
