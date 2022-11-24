@@ -89,11 +89,12 @@ class Precompiler {
 			}
 			
 			$src_map_data = apply_filters('sassy-src-map-data', [
-				'sourceMapWriteTo'  => $build_path . $build_name . '.map',	// Absolute path where the .map file will be written
-				'sourceMapURL'      => $build_url . $build_name . '.map',	// Full or relative URL to archive .map
-				'sourceMapBasepath' => rtrim(ABSPATH, '/'),					// ? - Partial path (server root) to create the relative URL
-				'sourceMapFilename' => $build_url . $build_name,			// (Optional) Full or relative URL to compiled .css file
-				'sourceRoot'        => $this->src,							// (Optional) Prepend the 'source' field entries to relocate source files
+				'sourceMapWriteTo'	=> str_replace('\\', '/', $build_path) . $build_name . '.map',	// Absolute path where the .map file will be written
+				'sourceMapURL'		=> $build_url . $build_name . '.map',							// Full or relative URL to archive .map
+				'sourceMapBasepath'	=> rtrim(str_replace('\\', '/', ABSPATH), '/'),					// Configures the base path to replace (for instance C:/www/domain/wp-content/themes/theme-name/classes/../scss/ or C:/www/domain/wp-content/ in your cases (notice that we have a weird thing where this options must use / instead of \ on Windows) (https://github.com/scssphp/scssphp/issues/35) // ? - Partial path (server root) to create the relative URL
+				'sourceMapFilename'	=> $build_url . $build_name,									// (Optional) Full or relative URL to compiled .css file
+				'sourceMapRootpath'	=> trailingslashit(site_url()),									
+				//'sourceRoot'		=> $this->src,													// (Optional) Prepend the 'source' field entries to relocate source files
 			], $this->src, $this->handle);	
 			
 			try {
