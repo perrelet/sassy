@@ -30,16 +30,27 @@ class UI {
 		$admin_bar->add_menu([
 			'id'		=> 'sassy-recompile',
 			'parent'	=> 'sassy',
-			'title'		=> !isset($_GET['sassy-recompile']) ? __('Force Recompile', 'sassy') : __('Normal Compile', 'sassy'),
+			'title'		=> !isset($_GET['sassy-recompile']) ? __('🤖 Force Recompile', 'sassy') : __('🤖 Normal Compile', 'sassy'),
 			'href'		=> add_query_arg('sassy-recompile', !isset($_GET['sassy-recompile']))
 		]);
 
+		$admin_bar->add_menu([
+            'id'     => 'sassy-vars',
+            'parent' => 'sassy',
+            'title'  => !isset($_GET['sassy-vars']) ? __('📝 Log Variables', 'sassy') : __('📝 Don\'t Log Variables', 'sassy'),
+            'href'   => add_query_arg('sassy-vars', !isset($_GET['sassy-vars'])),
+        ]);
+
+		do_action('sassy-admin-bar', $admin_bar);
+
 		if (SASSY()->get_precompilers()) {
+
+			$line = "<span style='width: 100%;border-bottom: 1px solid currentColor;display: block;padding-top: 1em;opacity: 0.5;'></span>";
 
 			$admin_bar->add_menu([
 				'id'		=> "sassy-line-1",
 				'parent'	=> 'sassy',
-				'title'		=> '---',
+				'title'		=> $line,
 				'href'		=> false,
 			]);
 

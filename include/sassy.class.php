@@ -12,15 +12,22 @@ class Sassy {
 	
 	public function __construct() {
 		
+		add_action('plugins_loaded', [$this, 'boot']);
+
+	}
+
+	public function boot () {
+
 		$this->load_vendors();
 		$this->load_models();
+		$this->load_integrations();
 		$this->load_views();
-		
+
 		if (is_admin()) $this->load_admin();
-		
+	
 		add_filter('style_loader_src', [$this, 'style_loader_src'], 10, 2);
 		add_action('wp_footer', [$this, 'print_errors']);
-		
+
 	}
 	
 	protected function load_vendors () {
@@ -33,6 +40,15 @@ class Sassy {
 		
 		require_once(SASSY_PATH . "include/model/precompiler.class.php");
 		
+	}
+	
+	public function load_integrations () {
+
+		require_once(SASSY_PATH . "include/integrations/integration.abstract.php");
+		require_once(SASSY_PATH . "include/integrations/oxygen.integration.php");
+
+		new Oxygen();
+
 	}
 	
 	protected function load_views () {
