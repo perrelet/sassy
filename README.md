@@ -35,7 +35,7 @@ Sassy will compile a source file if any of the following are met:
 | `sassy-formatter` | `'ScssPhp\ScssPhp\Formatter\Expanded'` | Class of the scss formatter. |
 | `sassy-variables` | See [Variables](#variables) | Array of variables to be available. |
 | `sassy-src-map` | `true` | Whether to generate the source map. |
-| `sassy-src-map-data` | See [Source Maps](#source-maps) | Array of variables to be available. |
+| `sassy-src-map-options` | See [Source Maps](#source-maps) | Source map options array. |
 
 ## Variables
 
