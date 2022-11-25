@@ -95,8 +95,6 @@ class UI {
 				'meta'		=> ['target' => '_blank'],
 			]);
 
-			//
-
 			foreach ($precompiler_menus as $method => $label) {
 
 				$admin_bar->add_menu([
@@ -143,8 +141,8 @@ class UI {
 			$admin_bar->add_menu([
 				'id'		=> 'sassy-variables',
 				'parent'	=> 'sassy',
-				'title'		=> 'Variables',
-				'href'		=> false,
+				'title'		=> '⭐ Variables',
+				'href'		=> '#',
 			]);
 
 			foreach ($variables as $key => $value) {
