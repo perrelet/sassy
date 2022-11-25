@@ -22,25 +22,38 @@ class Precompiler {
 	protected $build_name;
 	protected $build_file;
 	protected $src_path;
+	protected $src_map_options;
 
-	protected $compiled = false;
-	protected $error = false;
+	protected $compiled;
+	protected $error;
+	protected $src_map;
 	
 	public function __construct () {
 		
 		$this->instance = ++static::$count;
 
 	}
+
+	public function init () {
+
+		$this->build_dir		= null;
+		$this->build_path		= null;
+		$this->build_url		= null;
+		$this->build_name		= null;
+		$this->build_file		= null;
+		$this->src_path			= null;
+		$this->src_map_options	= null;
+
+		$this->compiled = false;
+		$this->error = false;
+		$this->src_map = false;
+
+	}
 	
 	public function compile ($src, $handle) {
-
-		$this->build_dir	= null;
-		$this->build_path	= null;
-		$this->build_url	= null;
-		$this->build_name	= null;
-		$this->build_file	= null;
-		$this->src_path		= null;
 		
+		$this->init();
+
 		$this->src 			= $src;
 		$this->handle 		= $handle;
 		
@@ -110,17 +123,10 @@ class Precompiler {
 
 				if (apply_filters('sassy-src-map', true, $this->src, $this->handle)) {
 
-					$source_map_data = apply_filters('sassy-src-map-data', [
-						'sourceMapWriteTo'	=> str_replace('\\', '/', $build_path) . $build_name . '.map',	// Absolute path where the .map file will be written
-						'sourceMapURL'		=> $build_url . '.map',											// Full or relative URL to archive .map
-						'sourceMapBasepath'	=> rtrim(str_replace('\\', '/', ABSPATH), '/'),					// Configures the base path to replace (for instance C:/www/domain/wp-content/themes/theme-name/classes/../scss/ or C:/www/domain/wp-content/ in your cases (notice that we have a weird thing where this options must use / instead of \ on Windows) (https://github.com/scssphp/scssphp/issues/35) // ? - Partial path (server root) to create the relative URL
-						'sourceMapFilename'	=> $build_url,													// (Optional) Full or relative URL to compiled .css file
-						'sourceMapRootpath'	=> trailingslashit(site_url()),									
-						//'sourceRoot'		=> $this->src,													// (Optional) Prepend the 'source' field entries to relocate source files
-					], $this->src, $this->handle);	
-
 					$this->compiler->setSourceMap(Compiler::SOURCE_MAP_FILE);
-					$this->compiler->setSourceMapOptions($source_map_data);
+					$this->compiler->setSourceMapOptions($this->get_src_map_options());
+
+					$this->src_map = true;
 					
 				}
 				
@@ -182,6 +188,12 @@ class Precompiler {
 
 	}
 
+	public function has_src_map () {
+
+		return $this->src_map;
+
+	}
+
 	//GET
 
 	public function get_instance () {
@@ -229,6 +241,31 @@ class Precompiler {
 		
 		return $this->src_path;
 		
+	}
+
+	public function get_src_map_options () {
+
+		if (is_null($this->src_map_options)) {
+
+			$this->src_map_options = apply_filters('sassy-src-map-data', [
+				'sourceMapWriteTo'	=> str_replace('\\', '/', $this->get_build_path()) . $this->get_build_name() . '.map',	// Absolute path where the .map file will be written
+				'sourceMapURL'		=> $this->get_build_url() . '.map',														// Full or relative URL to archive .map
+				'sourceMapBasepath'	=> rtrim(str_replace('\\', '/', ABSPATH), '/'),											// Configures the base path to replace (for instance C:/www/domain/wp-content/themes/theme-name/classes/../scss/ or C:/www/domain/wp-content/ in your cases (notice that we have a weird thing where this options must use / instead of \ on Windows) (https://github.com/scssphp/scssphp/issues/35) // ? - Partial path (server root) to create the relative URL
+				'sourceMapFilename'	=> $this->get_build_url(),																// (Optional) Full or relative URL to compiled .css file
+				'sourceMapRootpath'	=> trailingslashit(site_url()),									
+				//'sourceRoot'		=> $this->src,																			// (Optional) Prepend the 'source' field entries to relocate source files
+			], $this->src, $this->handle);
+
+		}
+
+		return $this->src_map_options;
+
+	}
+
+	public function get_src_url () {
+
+		return isset($this->get_src_map_options()['sourceMapURL']) ? $this->get_src_map_options()['sourceMapURL'] : null;
+
 	}
 
 	public function get_build_directory () {
