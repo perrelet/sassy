@@ -144,16 +144,43 @@ class UI {
 
 								if (strpos($precompiler->get_src(), $source) !== false) continue;
 
+								$basename = basename($source);
+								$find = "{$basename} on line ";
+
+								if ($precompiler->has_error() && strpos($precompiler->get_error(), $find) !== false) {
+
+									$prefix = '❌ ';
+									$start = strpos($precompiler->get_error(), $find) + strlen($find);
+									$end = strpos($precompiler->get_error(), ",", $start);
+
+									if ($end !== false) {
+
+										$line_number = substr($precompiler->get_error(), $start, $end - $start);
+										$suffix = ':' . $line_number;
+
+									} else {
+
+										$suffix = '';
+
+									}
+
+								} else {
+
+									$prefix = '';
+									$suffix = '';
+									
+								}
+
 								$admin_bar->add_menu([
 									'id'		=> "sassy-{$i}-map-source-{$j}",
 									'parent'	=> "sassy-{$i}",
-									'title'		=> basename($source),
+									'title'		=> $prefix . $basename . $suffix,
 									'href'		=> $source,
 									'meta'		=> ['target' => '_blank'],
 								]);
 
 							}
-							
+
 						}
 
 					}
