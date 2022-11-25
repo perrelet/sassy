@@ -62,7 +62,6 @@ class Oxygen extends Integration {
     
                 $name = $this->slug($color['name']);
     
-                $this->colors["c-" . $color['id']] = $color['value'];
                 $this->colors["c-" . $name] = $color['value'];
     
             }
@@ -97,9 +96,9 @@ class Oxygen extends Integration {
                 $width = oxygen_vsb_get_breakpoint_width($name);
 
                 $this->breakpoints['b-' . $name]    = $width;
-                $this->breakpoints['b-' . $i]       = $width;
+                //$this->breakpoints['b-' . $i]       = $width;
                 $breakpoints[$name]         = $width . "px";
-                $breakpoints['b-' . $i]     = $width . "px";
+                //$breakpoints['b-' . $i]     = $width . "px";
 
                 $i++;
 
@@ -108,9 +107,9 @@ class Oxygen extends Integration {
             $page_width = oxygen_vsb_get_page_width();
 
             $this->breakpoints['b-page']        = $page_width;
-            $this->breakpoints['b-' . $i]       = $page_width;
+            //$this->breakpoints['b-' . $i]       = $page_width;
             $breakpoints['page']        = $page_width . "px";
-            $breakpoints['b-' . $i]     = $page_width . "px";       
+            //$breakpoints['b-' . $i]     = $page_width . "px";       
 
             $this->breakpoints['breakpoints'] = $this->array_to_sass_map($breakpoints);
 
@@ -134,8 +133,7 @@ class Oxygen extends Integration {
 
                 $name = $this->slug($name);
                 
-                $this->fonts['f-' . $i]       = $font;
-                $this->fonts['f-' . $name]    = $font;
+                $this->fonts['f-' . $name] = $font;
 
                 $i++;
 
@@ -195,7 +193,7 @@ class Oxygen extends Integration {
 
     protected function slug ($string) {
 
-        return trim(strtolower(str_replace(" ", "_", $string)));
+        return trim(strtolower(str_replace(" ", "-", $string)));
 
     }
 
