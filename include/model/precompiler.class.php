@@ -295,8 +295,8 @@ class Precompiler {
 		if (is_null($this->variables)) {
 
 			$this->variables = apply_filters('sassy-variables', [
-				'template_directory_uri'   => get_template_directory_uri(),
-				'stylesheet_directory_uri' => get_stylesheet_directory_uri()
+				'template-directory-uri'   => get_template_directory_uri(),
+				'stylesheet-directory-uri' => get_stylesheet_directory_uri()
 			], $this->src, $this->handle);
 
 		}
