@@ -1,0 +1,19 @@
+#sassy-errors {
+
+    background: #ffc82e;
+    border: 10px solid #ff8400;
+    width: 100%;
+    padding: 10px;
+    position: fixed;
+    left: 0;
+    bottom: 0; 
+    z-index: 999;
+
+    .sassy-error {
+
+        white-space: normal;
+
+    }
+
+}
+

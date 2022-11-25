@@ -25,6 +25,7 @@ class Sassy {
 
 		if (is_admin()) $this->load_admin();
 	
+		add_action('wp_enqueue_scripts', [$this, 'style']);
 		add_filter('style_loader_src', [$this, 'style_loader_src'], 10, 2);
 		add_action('wp_footer', [$this, 'print_errors']);
 
@@ -66,6 +67,14 @@ class Sassy {
 		new Admin();
 		
 	}
+
+	public function style () {
+
+		if (!current_user_can('edit_theme_options')) return;
+
+		wp_enqueue_style('sassy', SASSY_URI . 'assets/css/sassy.css', [], SASSY_VERSION);
+
+	}
 	
 	public function style_loader_src ($src, $handle) {
 		
@@ -93,15 +102,14 @@ class Sassy {
 		
 		if (!$this->errors) return;
 		
-		$proceed = current_user_can('administrator');
+		$proceed = current_user_can('edit_theme_options');
 		$proceed = apply_filters('sassy-print-errors', $proceed);
+		if (!$proceed) return;
 
-		echo "<style>#sassy-errors { background: #ffc82e; border: 10px solid #ff8400; width: 100%; padding: 10px; position: absolute; left: 0; top: 0; z-index: 999; }</style>";
-		
 		echo "<div id='sassy-errors'>";
-		foreach ($this->errors as $i => $error) {
-			echo "<pre class='sassy-error'>$error</pre>";
-		}
+
+			foreach ($this->errors as $i => $error) echo "<pre class='sassy-error'>$error</pre>";
+
 		echo "</div>";
 		
 	}
