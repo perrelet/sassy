@@ -17,3 +17,61 @@
 
 }
 
+.sassy-clipboard {
+
+    position: relative !important;
+
+    &:before,
+    &:after {
+
+        position: absolute;
+        top: 0;
+        left: 0;
+        pointer-events: none;
+        opacity: 0;
+
+    }
+
+    &:before {
+
+        content: "";
+        width: 0;
+        height: 0;
+        border: 4px solid transparent;
+        box-sizing: content-box;
+        border-top-color: #111;
+        transform: translate(1em, -0.2em);
+
+    }
+
+    &:after {
+
+        display: inline-block;
+        content: "copy";
+        position: absolute;
+        transform: translate(0, -1.75em);
+        border-radius: 2px;
+        line-height: 1;
+        padding: 0.25rem 0.5rem;
+        background: #111;
+        color: rgba(240,246,252,.7);
+
+    }
+
+    &:hover:before,
+    &:hover:after,
+    &:active:before,
+    &:active:after {
+
+        opacity: 1;
+
+    }
+
+    &:active:after {
+
+        content: "🚀";
+        color: white;
+
+    }
+
+}
