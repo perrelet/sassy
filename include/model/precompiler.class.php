@@ -143,7 +143,7 @@ class Precompiler {
 				
 			} catch (Exception $e) {
 				
-				$this->error('A SCSS compiler error occurred: ' . $e->getMessage());
+				$this->error('A compiler error occurred: ' . $e->getMessage());
 				return $this->src;
 				
 			}
@@ -168,7 +168,7 @@ class Precompiler {
 	
 	protected function error ($e) {
 		
-		$this->error = true;
+		$this->error = $e;
 		$e = "Precompiler -> " . $e;
 		SASSY()->error($e);
 		
@@ -340,6 +340,12 @@ class Precompiler {
 
 		return $this->variables;
 		
+	}
+
+	public function get_error () {
+
+		return $this->error;
+
 	}
 	
 }
