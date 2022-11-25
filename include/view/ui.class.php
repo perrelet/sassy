@@ -107,21 +107,15 @@ class UI {
 
 			}
 
-			if ($precompiler->get_compiler()) {
+			if ($precompiler->has_src_map()) {
 
-				$compile_options = $precompiler->get_compiler()->getCompileOptions();
-
-				if (isset($compile_options['sourceMapOptions']) && isset($compile_options['sourceMapOptions']['sourceMapURL'])) {
-
-					$admin_bar->add_menu([
-						'id'     => "sassy-{$i}-map-url",
-						'parent' => "sassy-{$i}",
-						'title'  => 'Source Map',
-						'href'		=> $compile_options['sourceMapOptions']['sourceMapURL'],
-						'meta'		=> ['target' => '_blank'],
-					]);
-
-				}
+				$admin_bar->add_menu([
+					'id'     => "sassy-{$i}-map-url",
+					'parent' => "sassy-{$i}",
+					'title'  => 'Source Map',
+					'href'		=> $precompiler->get_src_url(),
+					'meta'		=> ['target' => '_blank'],
+				]);
 
 			}
 
