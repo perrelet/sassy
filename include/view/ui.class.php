@@ -125,7 +125,9 @@ class UI {
 
 				if (isset($src_map_options['sourceMapWriteTo'])) {
 
-					if ($src_map = file_get_contents($src_map_options['sourceMapWriteTo'])) {
+					$src_map_path = $src_map_options['sourceMapWriteTo'];
+
+					if (file_exists($src_map_path) && $src_map = file_get_contents($src_map_path)) {
 
 						$src_map = json_decode($src_map);
 
@@ -151,6 +153,7 @@ class UI {
 								]);
 
 							}
+							
 						}
 
 					}
