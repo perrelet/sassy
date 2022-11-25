@@ -59,6 +59,8 @@ class UI {
 
 		$horizontal_line = "<span style='width: 100%;border-bottom: 1px solid currentColor;display: block;padding-top: 1em;opacity: 0.5;'></span>";
 
+		//
+
 		$admin_bar->add_menu([
 			'id'		=> "sassy-line-1",
 			'parent'	=> 'sassy',
@@ -111,7 +113,46 @@ class UI {
 
 			}
 
-		}		
+		}
+		
+		//
+
+		if ($variables = SASSY()->get_all_variables()) {
+
+			$admin_bar->add_menu([
+				'id'		=> "sassy-line-2",
+				'parent'	=> 'sassy',
+				'title'		=> $horizontal_line,
+				'href'		=> false,
+			]);
+
+			$admin_bar->add_menu([
+				'id'		=> 'sassy-variables',
+				'parent'	=> 'sassy',
+				'title'		=> 'Variables',
+				'href'		=> false,
+			]);
+
+			foreach ($variables as $key => $value) {
+
+				$admin_bar->add_menu([
+					'id'		=> "sassy-variables-{$key}",
+					'parent'	=> 'sassy-variables',
+					'title'		=> '$' . $key,
+					'href'		=> false,
+				]);
+
+				$admin_bar->add_menu([
+					'id'		=> "sassy-variables-{$key}-value",
+					'parent'	=> "sassy-variables-{$key}",
+					'title'		=> $value,
+					'href'		=> false,
+				]);
+
+			}
+
+		}
+
 		
 	}
 	
