@@ -51,7 +51,7 @@ class UI {
 
 		$admin_bar->add_menu([
 			'id'    => 'sassy',
-			'title' => __('SCSS', 'scsslib'),
+			'title' => SASSY()->has_error() ? '❌ SCSS' : 'SCSS',
 			'href'  => '#',
 		]);
 		

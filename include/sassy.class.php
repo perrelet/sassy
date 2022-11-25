@@ -114,6 +114,12 @@ class Sassy {
 		
 	}
 
+	public function has_error () {
+
+		return $this->errors ? true : false;
+
+	}
+
 	public function get_ui () {
 
 		return $this->ui;
