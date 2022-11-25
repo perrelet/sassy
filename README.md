@@ -43,8 +43,9 @@ By default only the following variables are defined, however others may be added
 
 ```php
 [
-    'template_directory_uri'   => get_template_directory_uri(),
-    'stylesheet_directory_uri' => get_stylesheet_directory_uri(),
+    'wp-content-url' => WP_CONTENT_URL,
+    'template_directory_url'   => get_template_directory_uri(),
+    'stylesheet_directory_url' => get_stylesheet_directory_uri(),
 ]
 ```
 
