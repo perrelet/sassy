@@ -109,13 +109,53 @@ class UI {
 
 			if ($precompiler->has_src_map()) {
 
-				$admin_bar->add_menu([
-					'id'     => "sassy-{$i}-map-url",
-					'parent' => "sassy-{$i}",
-					'title'  => 'Source Map',
-					'href'		=> $precompiler->get_src_url(),
-					'meta'		=> ['target' => '_blank'],
-				]);
+				$src_map_options = $precompiler->get_src_map_options();
+
+				if (isset($src_map_options['sourceMapURL'])) {
+
+					$admin_bar->add_menu([
+						'id'		=> "sassy-{$i}-map-url",
+						'parent'	=> "sassy-{$i}",
+						'title'		=> 'Source Map',
+						'href'		=> $src_map_options['sourceMapURL'],
+						'meta'		=> ['target' => '_blank'],
+					]);
+
+				}
+
+				if (isset($src_map_options['sourceMapWriteTo'])) {
+
+					if ($src_map = file_get_contents($src_map_options['sourceMapWriteTo'])) {
+
+						$src_map = json_decode($src_map);
+
+						if ($src_map->sources && ($src_map->sources > 1)) {
+
+							$admin_bar->add_menu([
+								'id'		=> "sassy-{$i}-map-line-1",
+								'parent'	=> "sassy-{$i}",
+								'title'		=> $horizontal_line,
+								'href'		=> false,
+							]);
+							
+							foreach ($src_map->sources as $j => $source) {
+
+								if (strpos($precompiler->get_src(), $source) !== false) continue;
+
+								$admin_bar->add_menu([
+									'id'		=> "sassy-{$i}-map-source-{$j}",
+									'parent'	=> "sassy-{$i}",
+									'title'		=> basename($source),
+									'href'		=> $source,
+									'meta'		=> ['target' => '_blank'],
+								]);
+
+							}
+						}
+
+					}
+
+				}
 
 			}
 
