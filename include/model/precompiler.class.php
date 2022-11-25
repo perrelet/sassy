@@ -332,9 +332,9 @@ class Precompiler {
 		if (is_null($this->variables)) {
 
 			$this->variables = apply_filters('sassy-variables', [
-				'wp-content-url' => WP_CONTENT_URL,
-				'template-directory-url'   => get_template_directory_uri(),
-				'stylesheet-directory-url' => get_stylesheet_directory_uri(),
+				'wp-content-url' => '"'. WP_CONTENT_URL . '"',
+				'template-directory-url'   => '"'. get_template_directory_uri() . '"',
+				'stylesheet-directory-url' => '"'. get_stylesheet_directory_uri() . '"',
 			], $this->src, $this->handle);
 
 		}
