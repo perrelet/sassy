@@ -11,6 +11,20 @@ class UI {
 
 		if (isset($_GET['sassy-vars'])) add_action('wp_footer', [$this, 'print_variables']);
 		
+		add_action('wp_enqueue_scripts', [$this, 'scripts']);
+		add_action('admin_enqueue_scripts', [$this, 'scripts']);
+		
+	}
+
+	public function scripts () {
+
+		if (current_user_can('edit_theme_options')) {
+			wp_enqueue_script('clipboard');
+			add_action('wp_footer', function () {
+				echo "<script>new ClipboardJS('.sassy-clipboard');</script>";
+			}, PHP_INT_MAX);
+		}
+
 	}
 
 	public function print_variables () {
@@ -135,18 +149,20 @@ class UI {
 
 			foreach ($variables as $key => $value) {
 
+				$sass_key = "\${$key}";
+
 				$admin_bar->add_menu([
 					'id'		=> "sassy-variables-{$key}",
 					'parent'	=> 'sassy-variables',
-					'title'		=> '$' . $key,
-					'href'		=> false,
+					'title'		=> "<span class='sassy-clipboard' data-clipboard-text='{$sass_key}'>{$sass_key}</span>",
+					'href'		=> "#",
 				]);
 
 				$admin_bar->add_menu([
 					'id'		=> "sassy-variables-{$key}-value",
 					'parent'	=> "sassy-variables-{$key}",
-					'title'		=> $value,
-					'href'		=> false,
+					'title'		=> "<span class='sassy-clipboard' data-clipboard-text='{$value}'>{$value}</span>",
+					'href'		=> "#",
 				]);
 
 			}
