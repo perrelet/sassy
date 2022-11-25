@@ -91,7 +91,7 @@ class UI {
 				'id'		=> "sassy-{$i}",
 				'parent'	=> 'sassy',
 				'title'		=> $title,
-				'href'		=> $precompiler->get_src(),
+				'href'		=> $precompiler->get_build_url(),
 				'meta'		=> ['target' => '_blank'],
 			]);
 
