@@ -4,7 +4,7 @@
  * Plugin Name:       Sassy
  * Plugin URI:        http://digitalis.ca/
  * Description:       “So ripeness climbs the bells of Digitalis, flower by flower, undistracted by a Mind, or a Design, or by desire.
- * Version:           1.1.0
+ * Version:           1.2.0
  * Author:            Digitalis Web Build Co.
  * Author URI:        http://digitalis.ca/
  * Text Domain:       digitalis
@@ -15,7 +15,7 @@ if (defined('SASSY_VERSION')) return;
 
 /* DEFINES */
  
-define('SASSY_VERSION', 		'1.1.0');
+define('SASSY_VERSION', 		'1.2.0');
 define('SASSY_PATH', 			plugin_dir_path( __FILE__));
 define('SASSY_URI',				plugin_dir_url( __FILE__));
 define('SASSY_ROOT_FILE',		__FILE__);

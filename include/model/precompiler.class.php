@@ -51,7 +51,7 @@ class Precompiler {
 	}
 	
 	public function compile ($src, $handle) {
-		
+
 		$this->init();
 
 		$this->src 			= $src;

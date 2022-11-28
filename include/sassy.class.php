@@ -14,6 +14,9 @@ class Sassy {
 		
 		add_action('plugins_loaded', [$this, 'boot']);
 
+		add_action('wp_ajax_sassy_compile', [$this, 'compile_all']);
+		add_action('wp_ajax_nopriv_sassy_compile', [$this, 'compile_all']);
+
 	}
 
 	public function boot () {
@@ -25,7 +28,7 @@ class Sassy {
 
 		if (is_admin()) $this->load_admin();
 	
-		add_action('wp_enqueue_scripts', [$this, 'style']);
+		add_action('wp_enqueue_scripts', [$this, 'enqueue_scripts']);
 		add_filter('style_loader_src', [$this, 'style_loader_src'], 10, 2);
 		add_action('wp_footer', [$this, 'print_errors']);
 
@@ -68,16 +71,34 @@ class Sassy {
 		
 	}
 
-	public function style () {
+	public function enqueue_scripts () {
 
 		if (!current_user_can('edit_theme_options')) return;
 
 		wp_enqueue_style('sassy', SASSY_URI . 'assets/css/sassy.css', [], SASSY_VERSION);
 
+		if (defined("OXYGEN_IFRAME")) {
+
+			$builder = false;
+			if (defined('CT_VERSION')) $builder = 'oxygen';
+
+			$backend = false;
+			if (($builder == 'oxygen') && defined("SHOW_CT_BUILDER")) $backend = true;
+
+			wp_enqueue_script('sassy', SASSY_URI . 'assets/js/sassy.js', [], SASSY_VERSION, true);
+			wp_localize_script('sassy', 'sass_params', [
+				'ajax_url'				=> admin_url('admin-ajax.php'),
+				'sassy_compile_nonce'	=> wp_create_nonce('sassy_compile'),
+				'builder'				=> $builder,
+				'backend'				=> $backend,
+			]);      
+
+		}  
+
 	}
 	
 	public function style_loader_src ($src, $handle) {
-		
+
 		$path_parts = pathinfo(parse_url($src)['path']);
 		if (!isset($path_parts['extension']) || ($path_parts['extension'] != 'scss')) return $src;
 
@@ -88,6 +109,41 @@ class Sassy {
 		return $precompiler->compile($src, $handle);
 		
 	}
+
+	public function compile_all () {
+
+		if (!wp_verify_nonce($_REQUEST['nonce'], 'sassy_compile')) {
+			wp_send_json_error('Sassy. But no sassy enough.');
+			wp_die(); 
+		}
+
+		do_action('wp_enqueue_scripts');
+
+		global $digitalis_styles;
+
+		$response = [];
+
+		$styles = wp_styles()->registered;
+		if ($digitalis_styles) $styles = array_merge($styles, $digitalis_styles->registered);
+		
+		if ($styles) foreach ($styles as $style) {
+
+			$path_parts = pathinfo(parse_url($style->src)['path']);
+			if (!isset($path_parts['extension']) || ($path_parts['extension'] != 'scss')) continue;
+
+			$precompiler = new Precompiler();
+			$this->precompilers[] = $precompiler;
+			$response[$style->handle] = $precompiler->compile($style->src, $style->handle);
+
+		}
+
+		wp_send_json_success($response);
+
+		wp_die(); 
+
+	}
+
+	//
 	
 	public function error ($e) {
 		
@@ -113,6 +169,8 @@ class Sassy {
 		echo "</div>";
 		
 	}
+
+	//
 
 	public function has_error () {
 

@@ -54,9 +54,16 @@ class UI {
 			'title' => SASSY()->has_error() ? '❌ SCSS' : 'SCSS',
 			'href'  => '#',
 		]);
+
+		$admin_bar->add_menu([
+			'id'		=> 'sassy-live-compile',
+			'parent'	=> 'sassy',
+			'title'		=> '⚡ Live Compile',
+			'href'		=> '#',
+		]);
 		
 		$admin_bar->add_menu([
-			'id'		=> 'sassy-recompile',
+			'id'		=> 'sassy-force-recompile',
 			'parent'	=> 'sassy',
 			'title'		=> !isset($_GET['sassy-recompile']) ? __('🤖 Force Recompile', 'sassy') : __('🤖 Normal Compile', 'sassy'),
 			'href'		=> add_query_arg('sassy-recompile', !isset($_GET['sassy-recompile']))
