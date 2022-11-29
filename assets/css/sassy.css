@@ -11,6 +11,7 @@
 }
 #sassy-errors .sassy-error {
   white-space: normal;
+  text-transform: none;
 }
 
 .sassy-clipboard {
