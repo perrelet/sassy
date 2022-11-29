@@ -7,7 +7,13 @@
   position: fixed;
   left: 0;
   bottom: 0;
-  z-index: 999;
+  z-index: 99999;
+  opacity: 0;
+  pointer-events: none;
+}
+#sassy-errors.show {
+  opacity: 1;
+  pointer-events: all;
 }
 #sassy-errors .sassy-error {
   white-space: normal;

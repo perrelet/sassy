@@ -3,10 +3,16 @@
     var sassy = {
 
         params: null,
+        els: {
+            errors: null
+        },
 
         init: function (params) {
 
             this.params = params;
+
+            this.els.errors = document.getElementById('sassy-errors');
+            this.els.admin_menu = document.querySelector('#wp-admin-bar-sassy > a');
 
             this.add_event_listeners();
 
@@ -66,20 +72,42 @@
 
                 if (http.readyState == XMLHttpRequest.DONE) {
 
-                    if (http.status == 200) {
+                    let error = null;
 
-                        let response = JSON.parse(http.responseText);
+                    switch (http.status) {
 
-                        if (response.success) {
-                            this.reload_styles(response.data);
-                        } else {
-                            console.error('Sassy: Oops, something went wrong.', response);
-                        }                        
+                        case 200:
 
-                    } else {
+                            let response = JSON.parse(http.responseText);
 
-                        console.error('Sassy: Oops, something went wrong.');
-                        
+                            if (response.success) {
+
+                                this.reload_styles(response.data);
+                                this.clear_errors();
+
+                            } else {
+
+                                console.error('Sassy: Oops, something went wrong.');
+                                console.error(response.data);
+                                this.error(response.data);
+
+                            }
+
+                            break;
+
+                        case 401:
+
+                            error = 'Sassy: 401 Unauthorized Access.';
+                            console.error(error);
+                            this.error([error]);
+                            break;
+
+                        default:
+
+                            error = 'Sassy: An unexpected error occurred.';
+                            console.error(error);
+                            this.error([error]);
+
                     }
 
                 }
@@ -92,7 +120,7 @@
         },
 
         reload_styles: function (styles = false) {
-
+            
             let links = document.getElementsByTagName("link");
 
             for (const cl in links) {
@@ -120,6 +148,53 @@
                     }
 
                 }
+
+            }
+
+        },
+
+        error: function (errors) {
+
+            if (this.els.admin_menu) {
+
+                this.els.admin_menu.innerHTML = "❌ SCSS";
+
+            }
+
+            if (this.els.errors) {
+
+                this.els.errors.innerHTML = "";
+
+                for (const e in errors) {
+
+                    let error = errors[e];
+
+                    const error_node = document.createElement("pre");
+                    error_node.classList.add('sassy-error');
+                    error_node.appendChild(document.createTextNode(error));
+
+                    this.els.errors.appendChild(error_node);
+
+                }
+
+                this.els.errors.classList.add('show');
+
+            }
+
+        },
+
+        clear_errors: function () {
+
+            if (this.els.admin_menu) {
+
+                this.els.admin_menu.innerHTML = "SCSS";
+
+            }
+
+            if (this.els.errors) {
+
+                this.els.errors.classList.remove('show');
+                this.els.errors.innerHTML = "";
 
             }
 

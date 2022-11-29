@@ -113,7 +113,7 @@ class Sassy {
 	public function compile_all () {
 
 		if (!wp_verify_nonce($_REQUEST['nonce'], 'sassy_compile')) {
-			wp_send_json_error('Sassy. But no sassy enough.');
+			wp_send_json_error('Sassy. But no sassy enough.', 401);
 			wp_die(); 
 		}
 
@@ -137,8 +137,16 @@ class Sassy {
 
 		}
 
-		wp_send_json_success($response);
+		if ($this->has_error()) {
 
+			wp_send_json_error($this->errors);
+
+		} else {
+
+			wp_send_json_success($response);
+
+		}
+		
 		wp_die(); 
 
 	}
@@ -155,16 +163,13 @@ class Sassy {
 	}
 	
 	public function print_errors () {
-		
-		if (!$this->errors) return;
-		
-		$proceed = current_user_can('edit_theme_options');
-		$proceed = apply_filters('sassy-print-errors', $proceed);
-		if (!$proceed) return;
 
-		echo "<div id='sassy-errors'>";
+		if (!current_user_can('edit_theme_options')) return;
+		if (!apply_filters('sassy-print-errors', true)) return;
 
-			foreach ($this->errors as $i => $error) echo "<pre class='sassy-error'>$error</pre>";
+		echo "<div id='sassy-errors' class='" . ($this->has_error() ? 'show' : '') . "'>";
+
+			if ($this->has_error()) foreach ($this->errors as $i => $error) echo "<pre class='sassy-error'>$error</pre>";
 
 		echo "</div>";
 		

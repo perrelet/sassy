@@ -103,7 +103,7 @@ class Precompiler {
 					
 					$this->error('File Permissions Error, unable to create cache directory: ' . $build_path);
 					delete_transient('sassy-filemtimes-' . $this->handle);
-					return $this->src;
+					return $this->get_build_url(); //$this->src;
 					
 				}
 				
@@ -113,7 +113,7 @@ class Precompiler {
 				
 				$this->error('File Permissions Error, permission denied. Please make the directory writable: ' . $build_path);
 				delete_transient('sassy-filemtimes-' . $this->handle);
-				return $this->src;
+				return $this->get_build_url(); //$this->src;
 				
 			}
 			
@@ -144,7 +144,7 @@ class Precompiler {
 			} catch (Exception $e) {
 				
 				$this->error('A compiler error occurred: ' . $e->getMessage());
-				return $this->src;
+				return $this->get_build_url(); //$this->src;
 				
 			}
 			
