@@ -77,13 +77,13 @@ class Sassy {
 
 		wp_enqueue_style('sassy', SASSY_URI . 'assets/css/sassy.css', [], SASSY_VERSION);
 
-		if (defined("OXYGEN_IFRAME")) {
+		$builder = false;
+		if (defined('CT_VERSION')) $builder = 'oxygen';
 
-			$builder = false;
-			if (defined('CT_VERSION')) $builder = 'oxygen';
+		$backend = false;
+		if (($builder == 'oxygen') && defined("SHOW_CT_BUILDER")) $backend = true;
 
-			$backend = false;
-			if (($builder == 'oxygen') && defined("SHOW_CT_BUILDER")) $backend = true;
+		if (!$backend || ($backend && defined("OXYGEN_IFRAME"))) {
 
 			wp_enqueue_script('sassy', SASSY_URI . 'assets/js/sassy.js', [], SASSY_VERSION, true);
 			wp_localize_script('sassy', 'sass_params', [
