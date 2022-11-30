@@ -91,8 +91,9 @@ class UI {
 
 		foreach (SASSY()->get_precompilers() as $i => $precompiler) {
 
-			$icon = $precompiler->has_error() ? '❌' : ($precompiler->has_compiled() ? '✔️' : '💾');
-			$title = $icon . " " . basename(explode('?', $precompiler->get_src())[0]);
+			//$icon = $precompiler->has_error() ? '❌' : ($precompiler->has_compiled() ? '✔️' : '💾');
+			$class = $precompiler->has_error() ? 'state-error' : ($precompiler->has_compiled() ? 'state-compiled' : 'state-cache');
+			$title = basename(explode('?', $precompiler->get_src())[0]);
 
 			$admin_bar->add_menu([
 				'id'		=> "sassy-{$i}",
@@ -100,6 +101,7 @@ class UI {
 				'title'		=> $title,
 				'href'		=> $precompiler->get_build_url(),
 				'meta'		=> ['target' => '_blank'],
+				'class'		=> $class,
 			]);
 
 			foreach ($precompiler_menus as $method => $label) {
@@ -151,37 +153,10 @@ class UI {
 
 								if (strpos($precompiler->get_src(), $source) !== false) continue;
 
-								$basename = basename($source);
-								$find = "{$basename} on line ";
-
-								if ($precompiler->has_error() && strpos($precompiler->get_error(), $find) !== false) {
-
-									$prefix = '❌ ';
-									$start = strpos($precompiler->get_error(), $find) + strlen($find);
-									$end = strpos($precompiler->get_error(), ",", $start);
-
-									if ($end !== false) {
-
-										$line_number = substr($precompiler->get_error(), $start, $end - $start);
-										$suffix = ':' . $line_number;
-
-									} else {
-
-										$suffix = '';
-
-									}
-
-								} else {
-
-									$prefix = '';
-									$suffix = '';
-									
-								}
-
 								$admin_bar->add_menu([
 									'id'		=> "sassy-{$i}-map-source-{$j}",
 									'parent'	=> "sassy-{$i}",
-									'title'		=> $prefix . $basename . $suffix,
+									'title'		=> basename($source),
 									'href'		=> $source,
 									'meta'		=> ['target' => '_blank'],
 								]);
