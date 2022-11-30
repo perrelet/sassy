@@ -83,7 +83,6 @@
                             if (response.success) {
 
                                 this.reload_styles(response.data);
-                                this.clear_errors();
 
                             } else {
 
@@ -116,6 +115,7 @@
         
             http.open('GET', this.params.ajax_url + "?action=sassy_compile&nonce=" + this.params.sassy_compile_nonce + "&sassy-recompile=1", true);
             http.send();
+            this.clear_errors();
 
         },
 
@@ -165,15 +165,18 @@
 
                 this.els.errors.innerHTML = "";
 
-                for (const e in errors) {
+                for (const instance in errors) {
 
-                    let error = errors[e];
+                    let error = errors[instance];
 
                     const error_node = document.createElement("pre");
                     error_node.classList.add('sassy-error');
                     error_node.appendChild(document.createTextNode(error));
 
                     this.els.errors.appendChild(error_node);
+
+                    let menu_item = document.querySelector('#wp-admin-bar-sassy-' + instance + ' [data-state]');
+                    if (menu_item) menu_item.setAttribute('data-state', 'error');
 
                 }
 
@@ -197,6 +200,9 @@
                 this.els.errors.innerHTML = "";
 
             }
+
+            let menu_items = document.querySelectorAll('#wpadminbar .sassy-file [data-state]');
+            if (menu_items.length > 0) for (var i = 0, menu_item; menu_item = menu_items[i]; i++) menu_item.setAttribute('data-state', 'compiled');
 
         },
 

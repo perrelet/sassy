@@ -6,9 +6,9 @@ class Sassy {
 	
 	protected $build_dir;
 	protected $build_url;
-	protected $errors = [];
 	protected $ui;
 	protected $precompilers = [];
+	protected $errors;
 	
 	public function __construct() {
 		
@@ -139,7 +139,7 @@ class Sassy {
 
 		if ($this->has_error()) {
 
-			wp_send_json_error($this->errors);
+			wp_send_json_error($this->get_errors());
 
 		} else {
 
@@ -153,15 +153,6 @@ class Sassy {
 
 	//
 	
-	public function error ($e) {
-		
-		$e = "Sassy -> " . $e;
-		
-		$this->errors[] = $e;
-		error_log($e);
-		
-	}
-	
 	public function print_errors () {
 
 		if (!current_user_can('edit_theme_options')) return;
@@ -169,7 +160,7 @@ class Sassy {
 
 		echo "<div id='sassy-errors' class='" . ($this->has_error() ? 'show' : '') . "'>";
 
-			if ($this->has_error()) foreach ($this->errors as $i => $error) echo "<pre class='sassy-error'>$error</pre>";
+			if ($this->has_error()) foreach ($this->get_errors() as $i => $error) echo "<pre class='sassy-error'>{$error}</pre>";
 
 		echo "</div>";
 		
@@ -179,7 +170,30 @@ class Sassy {
 
 	public function has_error () {
 
-		return $this->errors ? true : false;
+		return $this->get_errors() ? true : false;
+
+	}
+
+	public function get_errors () {
+
+		if (is_null($this->errors)) {
+
+			$this->errors = [];
+
+			if ($this->precompilers) foreach ($this->precompilers as $precompiler) {
+
+				if ($precompiler->has_error()) {
+				
+					$basename = basename(explode('?', $precompiler->get_src())[0]);
+					$this->errors[$precompiler->get_instance()] = "SASSY -> {$basename} -> " . $precompiler->get_error();
+
+				}
+	
+			}
+
+		}
+
+		return $this->errors;
 
 	}
 

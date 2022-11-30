@@ -20,6 +20,16 @@
   text-transform: none;
 }
 
+#wpadminbar [data-state][data-state=compiled]:before {
+  content: "✔️ ";
+}
+#wpadminbar [data-state][data-state=error]:before {
+  content: "❌ ";
+}
+#wpadminbar [data-state][data-state=cache]:before {
+  content: "💾 ";
+}
+
 .sassy-clipboard {
   position: relative !important;
 }

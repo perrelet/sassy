@@ -25,6 +25,32 @@
 
 }
 
+#wpadminbar {
+
+    [data-state] {
+
+        &[data-state='compiled']:before {
+
+            content: '✔️ ';
+
+        }
+
+        &[data-state='error']:before {
+
+            content: '❌ ';
+
+        }
+
+        &[data-state='cache']:before {
+
+            content: '💾 ';
+
+        }
+
+    }
+
+}
+
 .sassy-clipboard {
 
     position: relative !important;

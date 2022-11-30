@@ -91,24 +91,28 @@ class UI {
 
 		foreach (SASSY()->get_precompilers() as $i => $precompiler) {
 
+			$instance = $precompiler->get_instance();
+
 			//$icon = $precompiler->has_error() ? '❌' : ($precompiler->has_compiled() ? '✔️' : '💾');
-			$class = $precompiler->has_error() ? 'state-error' : ($precompiler->has_compiled() ? 'state-compiled' : 'state-cache');
-			$title = basename(explode('?', $precompiler->get_src())[0]);
+			$state = $precompiler->has_error() ? 'error' : ($precompiler->has_compiled() ? 'compiled' : 'cache');
+			$title = "<span data-state='{$state}'>" . basename(explode('?', $precompiler->get_src())[0]). "</span>";
 
 			$admin_bar->add_menu([
-				'id'		=> "sassy-{$i}",
+				'id'		=> "sassy-{$instance}",
 				'parent'	=> 'sassy',
 				'title'		=> $title,
 				'href'		=> $precompiler->get_build_url(),
-				'meta'		=> ['target' => '_blank'],
-				'class'		=> $class,
+				'meta'		=> [
+					'target'	=> '_blank',
+					'class'		=> 'sassy-file',
+				],
 			]);
 
 			foreach ($precompiler_menus as $method => $label) {
 
 				$admin_bar->add_menu([
-					'id'     => "sassy-{$i}-{$method}",
-					'parent' => "sassy-{$i}",
+					'id'     => "sassy-{$instance}-{$method}",
+					'parent' => "sassy-{$instance}",
 					'title'  => $label,
 					'href'		=> $precompiler->$method(),
 					'meta'		=> ['target' => '_blank'],
@@ -123,8 +127,8 @@ class UI {
 				if (isset($src_map_options['sourceMapURL'])) {
 
 					$admin_bar->add_menu([
-						'id'		=> "sassy-{$i}-map-url",
-						'parent'	=> "sassy-{$i}",
+						'id'		=> "sassy-{$instance}-map-url",
+						'parent'	=> "sassy-{$instance}",
 						'title'		=> 'Source Map',
 						'href'		=> $src_map_options['sourceMapURL'],
 						'meta'		=> ['target' => '_blank'],
@@ -143,8 +147,8 @@ class UI {
 						if ($src_map->sources && ($src_map->sources > 1)) {
 
 							$admin_bar->add_menu([
-								'id'		=> "sassy-{$i}-map-line-1",
-								'parent'	=> "sassy-{$i}",
+								'id'		=> "sassy-{$instance}-map-line-1",
+								'parent'	=> "sassy-{$instance}",
 								'title'		=> $horizontal_line,
 								'href'		=> false,
 							]);
@@ -154,8 +158,8 @@ class UI {
 								if (strpos($precompiler->get_src(), $source) !== false) continue;
 
 								$admin_bar->add_menu([
-									'id'		=> "sassy-{$i}-map-source-{$j}",
-									'parent'	=> "sassy-{$i}",
+									'id'		=> "sassy-{$instance}-map-source-{$j}",
+									'parent'	=> "sassy-{$instance}",
 									'title'		=> basename($source),
 									'href'		=> $source,
 									'meta'		=> ['target' => '_blank'],
@@ -217,7 +221,7 @@ class UI {
 	}
 	
 	public function run_compiler ($run) {
-		
+
 		if (isset($_GET['sassy-recompile']) && $_GET['sassy-recompile']) return true;
 		
 		return $run;

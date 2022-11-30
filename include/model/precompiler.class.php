@@ -94,7 +94,7 @@ class Precompiler {
 		}
 		
 		if (!$run && !file_exists($build_file)) $run = true;
-		
+
 		if ($run) {
 			
 			if (is_dir($build_path) === false) {
@@ -170,7 +170,7 @@ class Precompiler {
 		
 		$this->error = $e;
 		$e = "Precompiler -> " . $e;
-		SASSY()->error($e);
+		//SASSY()->error($e);
 		
 	}
 	
@@ -183,6 +183,12 @@ class Precompiler {
 	}
 
 	public function has_error () {
+
+		return $this->error ? true : false;
+
+	}
+
+	public function get_error () {
 
 		return $this->error;
 
@@ -341,12 +347,6 @@ class Precompiler {
 
 		return $this->variables;
 		
-	}
-
-	public function get_error () {
-
-		return $this->error;
-
 	}
 	
 }
