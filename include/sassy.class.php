@@ -117,7 +117,9 @@ class Sassy {
 			wp_die(); 
 		}
 
+		ob_start();
 		do_action('wp_enqueue_scripts');
+		ob_end_clean();
 
 		global $digitalis_styles;
 
