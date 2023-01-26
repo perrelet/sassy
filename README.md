@@ -21,6 +21,7 @@ Sassy will compile a source file if any of the following are met:
 1. The file has changed since it was last checked.
 2. Any sass variables have been added, removed or changed value.
 3. Compilation is forced via the `sassy-run-compiler` filter.
+4. `CTRL + SPACE` is pressed in a relevant browser window (See [Live Compile](#live-compile))
 
 ## Hooks
 
@@ -54,7 +55,7 @@ Variable keys and values can be accessed via the SCSS admin bar menu:
 ![screenshot](https://digitalis.ca/static/screenshots/sassy-menu.jpg)
 ## Live Compile
 
-Fed up of refreshing the page to see your changes? Us too. Simply press `CTRL + SPACE` to recompile & reload your stylesheets at any time. **Tip:** This also works inside the Oxygen Builder. 🚀
+Fed up of refreshing the page to see your changes? Us too. Simply press `CTRL + SPACE` to recompile & reload your stylesheets at any time. This also works inside the Oxygen Builder. 🚀
 
 ## Source Maps
 
