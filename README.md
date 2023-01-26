@@ -1,6 +1,6 @@
 # SASSY
 
-A rather saucy way of implementing SCSS on your WordPress install. This plugin was written due to the limitations of similar plugins in the wp repository and was heavily inspired by Juan Echeverry's [SCSS-Library](https://wordpress.org/plugins/scss-library/?ref=commonninja) plugin.
+A rather saucy way of implementing SCSS on your WordPress install. This plugin was written due to the limitations of similar plugins in the wp repository and was inspired by Juan Echeverry's [SCSS-Library](https://wordpress.org/plugins/scss-library/?ref=commonninja) plugin.
 
 ## Usage
 
@@ -48,6 +48,13 @@ By default only the following variables are defined, however others may be added
     'stylesheet_directory_url' => get_stylesheet_directory_uri(),
 ]
 ```
+
+Variable keys and values can be accessed via the SCSS admin bar menu:
+
+![screenshot](https://digitalis.ca/static/screenshots/sassy-menu.jpg)
+## Live Compile
+
+Fed up of refreshing the page to see your changes? Us too. Simply press `CTRL + SPACE` to recompile & reload your stylesheets at any time. **Tip:** This also works inside the Oxygen Builder. 🚀
 
 ## Source Maps
 
