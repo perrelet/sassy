@@ -28,9 +28,12 @@ class Sassy {
 
 		if (is_admin()) $this->load_admin();
 	
-		add_action('wp_enqueue_scripts', [$this, 'enqueue_scripts']);
+		add_action('wp_enqueue_scripts', [$this, 'enqueue_scripts']);	
 		add_filter('style_loader_src', [$this, 'style_loader_src'], 10, 2);
 		add_action('wp_footer', [$this, 'print_errors']);
+
+		add_action('admin_enqueue_scripts', [$this, 'enqueue_scripts']);
+		add_action('admin_footer', [$this, 'print_errors']);
 
 	}
 	
