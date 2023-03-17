@@ -233,8 +233,8 @@ class Precompiler {
 			$abs = preg_replace('/^' . preg_quote(site_url(), '/') . '/i', '', $this->src); 	// Convert the URL to absolute paths.
 			if (preg_match('#^//#', $abs) || strpos($abs, '/') !== 0) return $this->src;		// Ignore SCSS from CDNs, other domains, and relative paths
 			
-			//$path = rtrim($_SERVER['DOCUMENT_ROOT'], '/') . parse_url($this->src)['path'];		// TODO: Switch $_SERVER['DOCUMENT_ROOT']
 			$path = ABSPATH . parse_url($this->src)['path'];
+			if (!file_exists($path)) $path = rtrim($_SERVER['DOCUMENT_ROOT'], '/') . parse_url($this->src)['path'];		// TODO: Switch $_SERVER['DOCUMENT_ROOT']
 			
 			// If it is part of a multi-site then the 'domain' must be removed
 			if (is_multisite()) {
