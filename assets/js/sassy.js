@@ -120,7 +120,7 @@
         },
 
         reload_styles: function (styles = false) {
-            
+
             let links = document.getElementsByTagName("link");
 
             for (const cl in links) {
@@ -138,7 +138,10 @@
 
                             if (link.href.includes(styles[property])) {
                                 
-                                link.href += "";
+                                let href = new URL(link.href);
+                                href.searchParams.set('sassy', Math.random());
+                                link.href = href;
+
                                 console.log("Successfully Recompiled: " + styles[property]);
 
                             }
