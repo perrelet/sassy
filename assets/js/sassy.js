@@ -119,7 +119,7 @@
 
         },
 
-        reload_styles: function (styles = false) {
+        reload_styles: function (styles) {
 
             let links = document.getElementsByTagName("link");
 
@@ -128,24 +128,16 @@
                 let link = links[cl];
                 if (link.rel === "stylesheet") {
 
-                    if (styles === false) {
+                    if (styles) for (const property in styles) {
 
-                        link.href += "";
+                        if (link.href.includes(styles[property])) {
+                            
+                            let href = new URL(link.href);
+                            href.searchParams.set('sassy', Math.random());
+                            link.href = href;
 
-                    } else {
+                            console.log("Successfully Recompiled: " + styles[property]);
 
-                        if (styles) for (const property in styles) {
-
-                            if (link.href.includes(styles[property])) {
-                                
-                                let href = new URL(link.href);
-                                href.searchParams.set('sassy', Math.random());
-                                link.href = href;
-
-                                console.log("Successfully Recompiled: " + styles[property]);
-
-                            }
-    
                         }
 
                     }
