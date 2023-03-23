@@ -6,142 +6,124 @@ use stdClass;
 
 class Updater {
 	
-	private $api = 'https://digitaliswebdesign.com/update/sassy.json';
-	private $transient_name = 'sassy_upgrade';
-	private $slug = SASSY_PLUGIN_SLUG;
-	private $plugin = SASSY_PLUGIN_BASE;
-	private $version = SASSY_VERSION;
-	
-	function __construct() {
-		
-		//add_filter('plugins_api', [$this, 'update_info'], 20, 3); //No longer works 'plugin not found'
-		add_filter('pre_set_site_transient_update_plugins', [$this, 'update'] );
-		add_action('upgrader_process_complete', [$this, 'after_update'], 10, 2 );
-		
+	protected $remote_json 		= 'https://digitalis.ca/plugins/update/sassy/info';
+	protected $plugin_slug 		= SASSY_PLUGIN_SLUG;
+	protected $plugin_base 		= SASSY_PLUGIN_BASE;
+	protected $version 			= SASSY_VERSION;
+
+	protected $cache_key;
+	protected $cache_allowed = true;
+
+	public function __construct () {
+
+		$this->cache_key = $this->plugin_slug . '_updater';
+
+		add_filter('plugins_api', [$this, 'info'], 20, 3);
+		add_filter('site_transient_update_plugins', [$this, 'update']);
+		add_action('upgrader_process_complete', [$this, 'purge'], 10, 2);
+
 	}
-	
-	public function get_remote ($use_transient = true) {
-		
-		/*if ( empty($transient->checked ) ) {
-			return $transient;
-		} else {
-			remove_filter('pre_set_site_transient_update_plugins', [$this, 'update'] );
-		}*/
-		
-		$remote = get_transient($this->transient_name);
-		
-		if((false == $remote) || !$use_transient) {
-			
-			//set_transient($this->transient_name, false, 0 );
-			
+
+	public function request () {
+
+		$remote = get_transient($this->cache_key);
+
+		if ($remote === false || !$this->cache_allowed) {
+
 			$remote = wp_remote_get(
-				$this->api,
-				array(
+				$this->remote_json,
+				[
 					'timeout' => 10,
 					'headers' => array(
 						'Accept' => 'application/json'
 					)
-				)
+				]
 			);
-			
-			if (is_wp_error( $remote )) {
-				
-				return false;
-				
-			} else {
-				
-				if (isset( $remote['response']['code'] ) && $remote['response']['code'] == 200 && !empty( $remote['body'] ) ) {
-					set_transient($this->transient_name, $remote, 10800 );
-				}
 
-			}
+			if(is_wp_error($remote) || 200 !== wp_remote_retrieve_response_code($remote) || empty( wp_remote_retrieve_body($remote))) return false;
+
+			set_transient($this->cache_key, $remote, HOUR_IN_SECONDS * 12);
 
 		}
-		
-		if (isset( $remote['response']['code'] ) && $remote['response']['code'] == 200 && !empty( $remote['body'] ) ) {
-			return $remote;
-		} else {
-			return false;
-		}
-		
+
+		$remote = json_decode(wp_remote_retrieve_body($remote));
+
+		return $remote;
+
 	}
-	
-	public function is_new_version ($json) {
-		
-		if (!$json) return false;
-		if (!property_exists($json, "version")) return false;
-		if (!property_exists($json, "requires")) return false;
-		
-		if (version_compare($this->version, $json->version, '<' ) && version_compare($json->requires, get_bloginfo('version'), '<' )) {
-			return true;
-		} else {
-			return false;
-		}
-		
+
+	public function info ($res, $action, $args) {
+
+		// print_r( $action );
+		// print_r( $args );
+
+		// do nothing if you're not getting plugin information right now
+		if ('plugin_information' !== $action) return $res;
+
+		// do nothing if it is not our plugin
+		if ($this->plugin_slug !== $args->slug) return $res;
+
+		// get updates
+
+		if (!$remote = $this->request()) return $res;
+
+		if (property_exists($remote, 'sections')) $remote->sections = json_decode(json_encode($remote->sections), true); 	// obj -> array
+		if (property_exists($remote, 'banners')) $remote->banners = json_decode(json_encode($remote->banners), true);		// obj -> array
+
+		/* echo "<pre>";
+		var_dump($remote);
+		exit;  */
+
+		return $remote;
+
 	}
-	
-	public function remote_to_json ($remote) {
-		
-		return json_decode($remote['body']);
-	}
-	
-	public function check_for_updates ($use_transient = true, $delete_transient = false) {
-		
-		if ($delete_transient) delete_transient($this->transient_name);
-		
-		$remote = $this->get_remote($use_transient);
-		
-		if(!$remote) return false;
-		
-		$json = $this->remote_to_json($remote);
-		if (!$json) return false;
-		
-		if ($this->is_new_version($json)) {
-					
-			return $json;
-		} else {
-			return false;
-		}
-		
-	}
-	
+
 	public function update ($transient) {
-		
-		//dlog($transient);
-		
-		$update = $this->check_for_updates(true);
-		
-		if ( $update ) {
 
-			$res = new stdClass();
-			
-			$res->slug = $this->slug;
-			$res->plugin = $this->plugin;
-			$res->new_version = $update->version;
-			$res->tested = $update->tested;
-			$res->package = $update->download_url;
-			/* $res->sections = [
-				'description'		=> 'heloo',
-				'installation'		=> '',
-				'changelog'			=> 'asd',
-				'upgrade_notice'	=> ''
-			]; */
-			
+		if (empty($transient->checked)) return $transient;
+
+		$remote = $this->request();
+
+		if(
+			$remote
+			&& version_compare($this->version, $remote->version, '<')
+			&& (!property_exists($remote, 'requires') || version_compare($remote->requires, get_bloginfo('version'), '<='))
+			&& (!property_exists($remote, 'requires_php') || version_compare($remote->requires_php, PHP_VERSION, '<'))
+		) {
+
+			$res 				= new \stdClass();
+			$res->slug 			= $this->plugin_slug;
+			$res->plugin 		= $this->plugin_base;
+			$res->new_version 	= $remote->version;
+			$res->package 		= $remote->download_link;
+
+			if (property_exists($remote, 'tested')) $res->tested = $remote->tested;
+
 			$transient->response[$res->plugin] = $res;
-			//$transient->checked[$res->plugin] = $update->version;
 
 		}
-		
+
 		return $transient;
-		
+
 	}
-	
-	function after_update ($upgrader_object, $options) {
-		
-		if ( $options['action'] == 'update' && $options['type'] === 'plugin' )  {
-			delete_transient($this->transient_name);
+
+	public function purge ($upgrader, $options) {
+
+		if (
+			$this->cache_allowed
+			&& 'update' === $options['action']
+			&& 'plugin' === $options[ 'type' ]
+		) {
+			// just clean the cache when new plugin version is installed
+			$this->delete_transient();
 		}
-		
+
 	}
-	
+
+	public function delete_transient () {
+
+		delete_transient( $this->cache_key );
+
+	}
+
 }
