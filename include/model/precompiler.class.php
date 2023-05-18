@@ -151,6 +151,8 @@ class Precompiler {
 			//Transform the relative paths to work correctly
 			$css = preg_replace('#(url\((?![\'"]?(?:https?:|/))[\'"]?)#miu', '$1' . dirname($parse_src['path']) . '/', $css);
 			
+			$css = apply_filters('sassy-css', $css, $this->src, $this->handle);
+
 			file_put_contents($build_file, $css);
 			
 			$filemtimes[$build_file] = filemtime($build_file);

@@ -37,6 +37,7 @@ Sassy will compile a source file if any of the following are met:
 | `sassy-variables` | See [Variables](#variables) | Array of variables to be available. |
 | `sassy-src-map` | `true` | Whether to generate the source map. |
 | `sassy-src-map-options` | See [Source Maps](#source-maps) | Source map options array. |
+| `sassy-css` | N/A | The compiled css. |
 
 ## Variables
 
