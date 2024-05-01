@@ -144,11 +144,11 @@ class Oxygen extends Integration {
         return $this->fonts;
 
     }
-	
-	protected function get_sections () {
-		
-		if (!is_callable('ct_get_global_settings')) return [];
-		
+    
+    protected function get_sections () {
+        
+        if (!is_callable('ct_get_global_settings')) return [];
+        
         if (is_null($this->sections)) {
 
             $this->sections = [];
@@ -163,15 +163,15 @@ class Oxygen extends Integration {
             }
 
         }
-		
-		return $this->sections;
-		
-	}
-	
-	protected function get_columns () {
-		
-		if (!is_callable('ct_get_global_settings')) return [];
-		
+        
+        return $this->sections;
+        
+    }
+    
+    protected function get_columns () {
+        
+        if (!is_callable('ct_get_global_settings')) return [];
+        
         if (is_null($this->columns)) {
 
             $this->columns = [];
@@ -186,33 +186,14 @@ class Oxygen extends Integration {
             }
 
         }
-		
-		return $this->columns;
-		
-	}
+
+        return $this->columns;
+
+    }
 
     protected function slug ($string) {
 
         return trim(strtolower(str_replace(" ", "-", $string)));
-
-    }
-
-    protected function array_to_sass_map ($a) {
-
-        $map = "(";
-        $i = 0;
-
-        foreach ($a as $k => $v) {
-
-            $map .= "'" . $k . "': " . $v;
-            if ($i < count($a) - 1) $map .= ", ";
-
-            $i++;
-
-        }
-
-        $map .= ")";
-        return $map;
 
     }
 
