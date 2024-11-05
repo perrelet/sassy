@@ -72,7 +72,7 @@ class Precompiler {
 		$build_name = $this->get_build_name();
 		$build_file = $this->get_build_file();
 		
-		$run = apply_filters('sassy-force-compile', false, $this->src, $this->handle);
+		$run = apply_filters('sassy-force-compile', false, $this->src, $this->handle, $this);
 		
 		if (!$run) {
 
@@ -121,7 +121,7 @@ class Precompiler {
 			
 				if (is_null($this->compiler)) $this->compiler = new Compiler();
 
-				if (apply_filters('sassy-src-map', true, $this->src, $this->handle)) {
+				if (apply_filters('sassy-src-map', true, $this->src, $this->handle, $this)) {
 
 					$this->compiler->setSourceMap(Compiler::SOURCE_MAP_FILE);
 					$this->compiler->setSourceMapOptions($this->get_src_map_options());
@@ -151,7 +151,7 @@ class Precompiler {
 			//Transform the relative paths to work correctly
 			$css = preg_replace('#(url\((?![\'"]?(?:https?:|/))[\'"]?)#miu', '$1' . dirname($parse_src['path']) . '/', $css);
 			
-			$css = apply_filters('sassy-css', $css, $this->src, $this->handle);
+			$css = apply_filters('sassy-css', $css, $this->src, $this->handle, $this);
 
 			file_put_contents($build_file, $css);
 			
@@ -244,7 +244,7 @@ class Precompiler {
 				if ($blog_details_path != PATH_CURRENT_SITE) $path = str_replace($blog_details_path, PATH_CURRENT_SITE, $path);
 			}
 
-			$this->src_path = apply_filters('sassy-src-path', $path, $this->src, $this->handle);
+			$this->src_path = apply_filters('sassy-src-path', $path, $this->src, $this->handle, $this);
 
 		}
 
@@ -263,7 +263,7 @@ class Precompiler {
 				'sourceMapFilename'	=> $this->get_build_url(),																// (Optional) Full or relative URL to compiled .css file
 				'sourceMapRootpath'	=> trailingslashit(site_url()),									
 				//'sourceRoot'		=> $this->src,																			// (Optional) Prepend the 'source' field entries to relocate source files
-			], $this->src, $this->handle);
+			], $this->src, $this->handle, $this);
 
 		}
 
@@ -282,7 +282,7 @@ class Precompiler {
 		if (is_null($this->build_dir)) {
 
 			$suffix = is_multisite() ? get_current_blog_id() . '/' : '';
-			$this->build_dir = apply_filters('sassy-build-directory', '/scss/' . $suffix, $this->src, $this->handle);
+			$this->build_dir = apply_filters('sassy-build-directory', '/scss/' . $suffix, $this->src, $this->handle, $this);
 
 		}
 
@@ -292,7 +292,7 @@ class Precompiler {
 	
 	public function get_build_path () {
 		
-		if (is_null($this->build_path)) $this->build_path = apply_filters('sassy-build-path', WP_CONTENT_DIR, $this->src, $this->handle) . $this->get_build_directory();
+		if (is_null($this->build_path)) $this->build_path = apply_filters('sassy-build-path', WP_CONTENT_DIR, $this->src, $this->handle, $this) . $this->get_build_directory();
 
 		return $this->build_path;
 		
@@ -300,7 +300,7 @@ class Precompiler {
 	
 	public function get_build_url () {
 		
-		if (is_null($this->build_url)) $this->build_url = apply_filters('sassy-build-url', WP_CONTENT_URL, $this->src, $this->handle) . $this->get_build_directory() . $this->get_build_name();
+		if (is_null($this->build_url)) $this->build_url = apply_filters('sassy-build-url', WP_CONTENT_URL, $this->src, $this->handle, $this) . $this->get_build_directory() . $this->get_build_name();
 
 		return $this->build_url;
 		
@@ -314,7 +314,7 @@ class Precompiler {
 			$name 		= basename($parts[0], '.scss');
 			$build_name = "{$name}.css";
 
-			$this->build_name = apply_filters('sassy-build-name', $build_name, $this->src, $this->handle);
+			$this->build_name = apply_filters('sassy-build-name', $build_name, $this->src, $this->handle, $this);
 
 		}
 
@@ -332,7 +332,7 @@ class Precompiler {
 	
 	public function get_formatter () {
 		
-		return apply_filters('sassy-formatter', $this->formatter, $this->src, $this->handle);
+		return apply_filters('sassy-formatter', $this->formatter, $this->src, $this->handle, $this);
 		
 	}
 	
@@ -344,7 +344,7 @@ class Precompiler {
 				'wp-content-url' => '"'. WP_CONTENT_URL . '"',
 				'template-directory-url'   => '"'. get_template_directory_uri() . '"',
 				'stylesheet-directory-url' => '"'. get_stylesheet_directory_uri() . '"',
-			], $this->src, $this->handle);
+			], $this->src, $this->handle, $this);
 
 		}
 
