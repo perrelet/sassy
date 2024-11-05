@@ -312,7 +312,7 @@ class Precompiler {
 
 			$parts 		= explode('?', $this->src);
 			$name 		= basename($parts[0], '.scss');
-			$build_name = "{$name}.{$this->instance}.css";
+			$build_name = "{$name}.css";
 
 			$this->build_name = apply_filters('sassy-build-name', $build_name, $this->src, $this->handle);
 
