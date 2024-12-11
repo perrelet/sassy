@@ -23,8 +23,9 @@ class Sassy {
 
 		$this->load_vendors();
 		$this->load_models();
-		$this->load_integrations();
 		$this->load_views();
+
+		add_action('after_setup_theme', [$this, 'load_integrations']);
 
 		if (is_admin()) $this->load_admin();
 	
@@ -52,8 +53,10 @@ class Sassy {
 	public function load_integrations () {
 
 		require_once(SASSY_PATH . "include/integrations/integration.abstract.php");
+		require_once(SASSY_PATH . "include/integrations/bricks.integration.php");
 		require_once(SASSY_PATH . "include/integrations/oxygen.integration.php");
 
+		new Bricks();
 		new Oxygen();
 
 	}
