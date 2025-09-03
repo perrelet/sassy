@@ -80,7 +80,15 @@ class Bricks extends Integration {
 
     protected function get_theme_styles () {
 
-        $styles = Theme_Styles::$active_settings;
+        if (property_exists(Theme_Styles::class, 'active_settings')) { 
+
+            $styles = Theme_Styles::$active_settings;
+
+        } else {
+
+            $styles = reset(Theme_Styles::$settings_by_id); // Styles sorted 'score' (highest first)
+
+        }
 
         $col_px  = $styles['block']['_columnGap'] ?? ($styles['container']['_columnGap'] ?? ($styles['section']['_columnGap'] ?? '0px'));
         $sec_px = $styles['section']['padding']['left'] ?? ($styles['section']['padding']['right'] ?? '0px');
