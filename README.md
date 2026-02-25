@@ -33,7 +33,7 @@ Sassy will compile a source file if any of the following are met:
 | `sassy-build-url` | `WP_CONTENT_URL` | URL to the compile directory. |
 | `sassy-build-directory` | `'/scss/'` or `'/scss/' . get_current_blog_id()` on multi_site. | The subdirectory to compile to.  |
 | `sassy-build-name` | Same as source, appended with compiler index. | The name of the compiled files. |
-| `sassy-formatter` | `'ScssPhp\ScssPhp\Formatter\Expanded'` | Class of the scss formatter. |
+| `sassy-style` | `'ScssPhp\ScssPhp\OutputStyle::EXPANDED'` | Class of the scss formatter. |
 | `sassy-variables` | See [Variables](#variables) | Array of variables to be available. |
 | `sassy-src-map` | `true` | Whether to generate the source map. |
 | `sassy-src-map-options` | See [Source Maps](#source-maps) | Source map options array. |

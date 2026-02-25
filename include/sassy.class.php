@@ -39,9 +39,9 @@ class Sassy {
 	}
 	
 	protected function load_vendors () {
-		
-		require_once(SASSY_PATH . "vendor/scssphp-1.11.0/scss.inc.php");
-		
+
+		require __DIR__ . '/../vendor/autoload.php';
+	
 	}
 	
 	protected function load_models () {

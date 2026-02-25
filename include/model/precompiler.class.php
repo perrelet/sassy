@@ -3,18 +3,19 @@
 namespace Sassy;
 
 use ScssPhp\ScssPhp\Compiler;
+use ScssPhp\ScssPhp\OutputStyle;
 use Exception;
 
 class Precompiler {
 	
 	static $count = 0;
 
-	protected $instance 	= null;
-	protected $src 			= null;
-	protected $handle 		= null;
-	protected $formatter 	= 'ScssPhp\ScssPhp\Formatter\Expanded';
-	protected $compiler 	= null;
-	protected $variables 	= null;
+	protected $instance	 = null;
+	protected $src 		 = null;
+	protected $handle 	 = null;
+	protected $style 	 = OutputStyle::EXPANDED;
+	protected $compiler	 = null;
+	protected $variables = null;
 
 	protected $build_dir;
 	protected $build_path;
@@ -85,6 +86,7 @@ class Precompiler {
 		// Compile if the variables have changed.
 
 		$variables = $this->get_variables();
+
 		if (!$run) {
 			$signature = sha1(serialize($variables));
 			if ($signature !== get_transient('sassy-vars-sig-' . $this->handle)) {
@@ -118,6 +120,8 @@ class Precompiler {
 			}
 			
 			try {
+
+				foreach ($variables as &$value) $value = \ScssPhp\ScssPhp\ValueConverter::parseValue($value);
 			
 				if (is_null($this->compiler)) $this->compiler = new Compiler();
 
@@ -130,16 +134,17 @@ class Precompiler {
 					
 				}
 				
-				$this->compiler->setFormatter($this->get_formatter());
-				$this->compiler->setVariables($variables);
+				$this->compiler->setOutputStyle($this->get_style());
+				$this->compiler->addVariables($variables);
 				$this->compiler->addImportPath(dirname($src_path));
 				$this->compiler->addImportPath(SASSY_PATH);
+				$this->compiler->addImportPath(DIGITALIS_FRAMEWORK_PATH);
 
 				//$this->compiler->addImportPath(dirname($src_path));
 				
 				do_action('sassy-compiler', $this->compiler, $this);
 
-				$css = $this->compiler->compile(file_get_contents($src_path), $src_path);
+				$css = $this->compiler->compileString(file_get_contents($src_path), $src_path)->getCss();
 				
 			} catch (Exception $e) {
 				
@@ -330,9 +335,9 @@ class Precompiler {
 
 	}
 	
-	public function get_formatter () {
+	public function get_style () {
 		
-		return apply_filters('sassy-formatter', $this->formatter, $this->src, $this->handle, $this);
+		return apply_filters('sassy-style', $this->style, $this->src, $this->handle, $this);
 		
 	}
 	
@@ -340,11 +345,20 @@ class Precompiler {
 		
 		if (is_null($this->variables)) {
 
-			$this->variables = apply_filters('sassy-variables', [
+			$variables = [
 				'wp-content-url' => '"'. WP_CONTENT_URL . '"',
 				'template-directory-url'   => '"'. get_template_directory_uri() . '"',
 				'stylesheet-directory-url' => '"'. get_stylesheet_directory_uri() . '"',
-			], $this->src, $this->handle, $this);
+			];
+
+			if (defined(DIGITALIS_FRAMEWORK_PATH)) {
+
+				$variables['digitalis_path'] = '"' . str_replace('\\', '/', DIGITALIS_FRAMEWORK_PATH) . '"';
+				$variables['digitalis_uri']  = '"' . str_replace('\\', '/', DIGITALIS_FRAMEWORK_URI) . '"';
+
+			}
+
+			$this->variables = apply_filters('sassy-variables', $variables, $this->src, $this->handle, $this);
 
 		}
 
