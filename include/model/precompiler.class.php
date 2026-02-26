@@ -138,7 +138,7 @@ class Precompiler {
 				$this->compiler->addVariables($variables);
 				$this->compiler->addImportPath(dirname($src_path));
 				$this->compiler->addImportPath(SASSY_PATH);
-				$this->compiler->addImportPath(DIGITALIS_FRAMEWORK_PATH);
+				if (defined('DIGITALIS_FRAMEWORK_PATH')) $this->compiler->addImportPath(DIGITALIS_FRAMEWORK_PATH);
 
 				//$this->compiler->addImportPath(dirname($src_path));
 				
