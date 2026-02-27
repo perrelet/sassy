@@ -91,14 +91,14 @@ class UI {
 
 		foreach (SASSY()->get_precompilers() as $i => $precompiler) {
 
-			$instance = $precompiler->get_instance();
+			$index = $precompiler->get_index();
 
 			//$icon = $precompiler->has_error() ? '❌' : ($precompiler->has_compiled() ? '✔️' : '💾');
 			$state = $precompiler->has_error() ? 'error' : ($precompiler->has_compiled() ? 'compiled' : 'cache');
 			$title = "<span data-state='{$state}'>" . basename(explode('?', $precompiler->get_src())[0]). "</span>";
 
 			$admin_bar->add_menu([
-				'id'		=> "sassy-{$instance}",
+				'id'		=> "sassy-{$index}",
 				'parent'	=> 'sassy',
 				'title'		=> $title,
 				'href'		=> $precompiler->get_build_url(),

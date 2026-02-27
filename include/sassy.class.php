@@ -193,7 +193,7 @@ class Sassy {
 				if ($precompiler->has_error()) {
 				
 					$basename = basename(explode('?', $precompiler->get_src())[0]);
-					$this->errors[$precompiler->get_instance()] = "SASSY -> {$basename} -> " . $precompiler->get_error();
+					$this->errors[$precompiler->get_index()] = "SASSY -> {$basename} -> " . $precompiler->get_error();
 
 				}
 	
