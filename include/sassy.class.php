@@ -45,9 +45,13 @@ class Sassy {
 	}
 	
 	protected function load_models () {
-		
-		require_once(SASSY_PATH . "include/model/precompiler.class.php");
-		
+
+		require_once(SASSY_PATH . 'include/model/compile-result.class.php');
+		require_once(SASSY_PATH . 'include/engines/compiler-engine.interface.php');
+		require_once(SASSY_PATH . 'include/engines/scssphp-engine.compiler-engine.php');
+		require_once(SASSY_PATH . 'include/engines/dart-sass-engine.compiler-engine.php');
+		require_once(SASSY_PATH . 'include/model/scss-compiler.class.php');
+
 	}
 	
 	public function load_integrations () {
@@ -110,9 +114,9 @@ class Sassy {
 
 		if (!apply_filters('sassy-compile', true, $src, $handle)) return $src;
 
-		$precompiler = new Precompiler();
-		$this->precompilers[] = $precompiler;
-		return $precompiler->compile($src, $handle);
+		$compiler = new SCSS_Compiler();
+		$this->precompilers[] = $compiler;
+		return $compiler->compile($src, $handle);
 		
 	}
 
@@ -139,9 +143,9 @@ class Sassy {
 			$path_parts = pathinfo(parse_url($style->src)['path']);
 			if (!isset($path_parts['extension']) || ($path_parts['extension'] != 'scss')) continue;
 
-			$precompiler = new Precompiler();
-			$this->precompilers[] = $precompiler;
-			$response[$style->handle] = $precompiler->compile($style->src, $style->handle);
+			$compiler = new SCSS_Compiler();
+			$this->precompilers[] = $compiler;
+			$response[$style->handle] = $compiler->compile($style->src, $style->handle);
 
 		}
 

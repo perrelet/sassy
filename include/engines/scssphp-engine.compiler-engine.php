@@ -4,12 +4,18 @@ namespace Sassy;
 
 use ScssPhp\ScssPhp\Compiler;
 use ScssPhp\ScssPhp\OutputStyle;
+use ScssPhp\ScssPhp\ValueConverter;
 use Exception;
 
+/**
+ * Compiler engine using the ScssPhp (scssphp) library.
+ *
+ * Accepts $args['variables'] as key => string (Sass expression, e.g. quoted URLs);
+ * parses them to Value instances for the compiler.
+ */
 class Scssphp_Engine implements Compiler_Engine {
 
     protected $compiler;
-    protected $style = OutputStyle::EXPANDED;
 
     public function __construct () {
 
@@ -17,12 +23,12 @@ class Scssphp_Engine implements Compiler_Engine {
 
     }
 
-    public function get_style () {
-
-        return apply_filters('sassy-style', $this->style, $this->src, $this->handle, $this);
-
-    }
-
+    /**
+     * Compile SCSS to CSS using ScssPhp.
+     *
+     * @param array $args Must include scss, src_path; variables as Value[]; optional source_map, source_map_options, style, import_paths.
+     * @return Compile_Result
+     */
     public function compile (array $args) : Compile_Result {
 
         try {
@@ -32,8 +38,21 @@ class Scssphp_Engine implements Compiler_Engine {
                 $this->compiler->setSourceMapOptions($args['source_map_options'] ?? []);
             }
 
-            $this->compiler->setFormatter($args['formatter'] ?? 'ScssPhp\ScssPhp\Formatter\Expanded');
-            $this->compiler->setVariables($args['variables'] ?? []);
+            $style = $args['style'] ?? 'expanded';
+            if (is_string($style)) {
+                $style = OutputStyle::fromString($style);
+            }
+            $this->compiler->setOutputStyle($style);
+
+            if (!empty($args['variables'])) {
+                $parsed = [];
+                foreach ($args['variables'] as $name => $value) {
+                    $parsed[$name] = $value instanceof \ScssPhp\ScssPhp\Value\Value
+                        ? $value
+                        : ValueConverter::parseValue($value);
+                }
+                $this->compiler->addVariables($parsed);
+            }
 
             foreach (($args['import_paths'] ?? []) as $path) {
                 $this->compiler->addImportPath($path);
@@ -41,9 +60,11 @@ class Scssphp_Engine implements Compiler_Engine {
 
             do_action('sassy-compiler', $this->compiler, $args);
 
-            $css = $this->compiler->compile($args['scss'], $args['src_path']);
+            $result = $this->compiler->compileString($args['scss'], $args['src_path'] ?? null);
+            $css = $result->getCss();
+            $map = $result->getSourceMap();
 
-            return new Compile_Result($css);
+            return new Compile_Result($css, $map);
 
         } catch (Exception $e) {
 

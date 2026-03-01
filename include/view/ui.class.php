@@ -111,8 +111,8 @@ class UI {
 			foreach ($precompiler_menus as $method => $label) {
 
 				$admin_bar->add_menu([
-					'id'     => "sassy-{$instance}-{$method}",
-					'parent' => "sassy-{$instance}",
+					'id'     => "sassy-{$index}-{$method}",
+					'parent' => "sassy-{$index}",
 					'title'  => $label,
 					'href'		=> $precompiler->$method(),
 					'meta'		=> ['target' => '_blank'],
@@ -127,8 +127,8 @@ class UI {
 				if (isset($src_map_options['sourceMapURL'])) {
 
 					$admin_bar->add_menu([
-						'id'		=> "sassy-{$instance}-map-url",
-						'parent'	=> "sassy-{$instance}",
+						'id'		=> "sassy-{$index}-map-url",
+						'parent'	=> "sassy-{$index}",
 						'title'		=> 'Source Map',
 						'href'		=> $src_map_options['sourceMapURL'],
 						'meta'		=> ['target' => '_blank'],
@@ -144,11 +144,11 @@ class UI {
 
 						$src_map = json_decode($src_map);
 
-						if ($src_map->sources && ($src_map->sources > 1)) {
+						if (!empty($src_map->sources) && count($src_map->sources) > 1) {
 
 							$admin_bar->add_menu([
-								'id'		=> "sassy-{$instance}-map-line-1",
-								'parent'	=> "sassy-{$instance}",
+								'id'		=> "sassy-{$index}-map-line-1",
+								'parent'	=> "sassy-{$index}",
 								'title'		=> $horizontal_line,
 								'href'		=> false,
 							]);
@@ -158,8 +158,8 @@ class UI {
 								if (strpos($precompiler->get_src(), $source) !== false) continue;
 
 								$admin_bar->add_menu([
-									'id'		=> "sassy-{$instance}-map-source-{$j}",
-									'parent'	=> "sassy-{$instance}",
+									'id'		=> "sassy-{$index}-map-source-{$j}",
+									'parent'	=> "sassy-{$index}",
 									'title'		=> basename($source),
 									'href'		=> $source,
 									'meta'		=> ['target' => '_blank'],
