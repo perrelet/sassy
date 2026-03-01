@@ -39,8 +39,9 @@ class Dart_Sass_Engine implements Compiler_Engine {
         if ($this->sass_bin !== null && $this->sass_bin !== '') {
             return $this->sass_bin;
         }
-        $default = defined('SASSY_DART_SASS_BIN') ? SASSY_DART_SASS_BIN : 'sass';
-        return apply_filters('sassy-dart-sass-binary', $default);
+
+        return apply_filters('sassy-dart-sass-binary', defined('SASSY_DART_SASS_BIN') ? SASSY_DART_SASS_BIN : null);
+
     }
 
     /**
@@ -51,8 +52,7 @@ class Dart_Sass_Engine implements Compiler_Engine {
      */
     public function compile (array $args) : Compile_Result {
 
-        $sass_bin = $this->get_sass_bin();
-        if ($sass_bin === '') {
+        if (!$sass_bin = $this->get_sass_bin()) {
             return new Compile_Result(null, null, 'Dart Sass binary path not set. Define SASSY_DART_SASS_BIN or use the sassy-dart-sass-binary filter.');
         }
 
@@ -68,11 +68,12 @@ class Dart_Sass_Engine implements Compiler_Engine {
         if (!empty($args['variables'])) {
             $scss = SCSS_Compiler::prepend_variables($scss, $args['variables']);
         }
+
         file_put_contents($tmp_in, $scss);
 
         $cmd = [];
 
-        $cmd[] = escapeshellcmd($sass_bin);
+        $cmd[] = escapeshellarg($sass_bin);
         $cmd[] = escapeshellarg($tmp_in);
         $cmd[] = escapeshellarg($tmp_out);
 
