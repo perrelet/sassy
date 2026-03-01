@@ -7,7 +7,7 @@ class Sassy {
 	protected $build_dir;
 	protected $build_url;
 	protected $ui;
-	protected $precompilers = [];
+	protected $compilers = [];
 	protected $errors;
 	
 	public function __construct() {
@@ -115,7 +115,7 @@ class Sassy {
 		if (!apply_filters('sassy-compile', true, $src, $handle)) return $src;
 
 		$compiler = new SCSS_Compiler();
-		$this->precompilers[] = $compiler;
+		$this->compilers[] = $compiler;
 		return $compiler->compile($src, $handle);
 		
 	}
@@ -144,7 +144,7 @@ class Sassy {
 			if (!isset($path_parts['extension']) || ($path_parts['extension'] != 'scss')) continue;
 
 			$compiler = new SCSS_Compiler();
-			$this->precompilers[] = $compiler;
+			$this->compilers[] = $compiler;
 			$response[$style->handle] = $compiler->compile($style->src, $style->handle);
 
 		}
@@ -192,12 +192,12 @@ class Sassy {
 
 			$this->errors = [];
 
-			if ($this->precompilers) foreach ($this->precompilers as $precompiler) {
+			if ($this->compilers) foreach ($this->compilers as $compiler) {
 
-				if ($precompiler->has_error()) {
+				if ($compiler->has_error()) {
 				
-					$basename = basename(explode('?', $precompiler->get_src())[0]);
-					$this->errors[$precompiler->get_index()] = "SASSY -> {$basename} -> " . $precompiler->get_error();
+					$basename = basename(explode('?', $compiler->get_src())[0]);
+					$this->errors[$compiler->get_index()] = "SASSY -> {$basename} -> " . $compiler->get_error();
 
 				}
 	
@@ -215,21 +215,21 @@ class Sassy {
 
 	}
 	
-	public function get_precompilers () {
+	public function get_compilers () {
 
-		return $this->precompilers;
+		return $this->compilers;
 
 	}
 
 	public function get_all_variables () {
 
-		if (!$this->get_precompilers()) return [];
+		if (!$this->get_compilers()) return [];
 
 		$variables = [];
 
-		foreach ($this->get_precompilers() as $precompiler) {
+		foreach ($this->get_compilers() as $compiler) {
 
-			$variables = array_merge($variables, $precompiler->get_variables());
+			$variables = array_merge($variables, $compiler->get_variables());
 
 		}
 

@@ -42,9 +42,9 @@ class UI {
 	public function admin_bar_menu ($admin_bar) {
 		
 		if (!current_user_can('edit_theme_options')) return;
-		if (!SASSY()->get_precompilers()) return;
+		if (!SASSY()->get_compilers()) return;
 		
-		$precompiler_menus = [
+		$compiler_menus = [
 			'get_src' => 'Source SCSS',
 			'get_build_url' => 'Compiled CSS',
 		];
@@ -89,40 +89,40 @@ class UI {
 			'href'		=> false,
 		]);
 
-		foreach (SASSY()->get_precompilers() as $i => $precompiler) {
+		foreach (SASSY()->get_compilers() as $i => $compiler) {
 
-			$index = $precompiler->get_index();
+			$index = $compiler->get_index();
 
-			//$icon = $precompiler->has_error() ? '❌' : ($precompiler->has_compiled() ? '✔️' : '💾');
-			$state = $precompiler->has_error() ? 'error' : ($precompiler->has_compiled() ? 'compiled' : 'cache');
-			$title = "<span data-state='{$state}'>" . basename(explode('?', $precompiler->get_src())[0]). "</span>";
+			//$icon = $compiler->has_error() ? '❌' : ($compiler->has_compiled() ? '✔️' : '💾');
+			$state = $compiler->has_error() ? 'error' : ($compiler->has_compiled() ? 'compiled' : 'cache');
+			$title = "<span data-state='{$state}'>" . basename(explode('?', $compiler->get_src())[0]). "</span>";
 
 			$admin_bar->add_menu([
 				'id'		=> "sassy-{$index}",
 				'parent'	=> 'sassy',
 				'title'		=> $title,
-				'href'		=> $precompiler->get_build_url(),
+				'href'		=> $compiler->get_build_url(),
 				'meta'		=> [
 					'target'	=> '_blank',
 					'class'		=> 'sassy-file',
 				],
 			]);
 
-			foreach ($precompiler_menus as $method => $label) {
+			foreach ($compiler_menus as $method => $label) {
 
 				$admin_bar->add_menu([
 					'id'     => "sassy-{$index}-{$method}",
 					'parent' => "sassy-{$index}",
 					'title'  => $label,
-					'href'		=> $precompiler->$method(),
+					'href'		=> $compiler->$method(),
 					'meta'		=> ['target' => '_blank'],
 				]);
 
 			}
 
-			if ($precompiler->has_src_map()) {
+			if ($compiler->has_src_map()) {
 
-				$src_map_options = $precompiler->get_src_map_options();
+				$src_map_options = $compiler->get_src_map_options();
 
 				if (isset($src_map_options['sourceMapURL'])) {
 
@@ -155,7 +155,7 @@ class UI {
 							
 							foreach ($src_map->sources as $j => $source) {
 
-								if (strpos($precompiler->get_src(), $source) !== false) continue;
+								if (strpos($compiler->get_src(), $source) !== false) continue;
 
 								$admin_bar->add_menu([
 									'id'		=> "sassy-{$index}-map-source-{$j}",
