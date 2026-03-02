@@ -15,20 +15,6 @@ class Bricks extends Integration {
 
     }
 
-    public function run () {
-
-        add_filter('sassy-variables', [$this, 'compiler_variables'], 10, 1);
-
-    }
-
-    public function compiler_variables ($variables) {
-
-        $variables = array_merge($variables, $this->get_variables());
-
-        return $variables;
-
-    }
-
     public function get_variables () {
 
         if (is_null($this->variables)) {

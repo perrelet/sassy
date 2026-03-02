@@ -11,7 +11,8 @@ abstract class Integration {
         if (!$this->condition()) return false;
 
         $this->loaded = true;
-        $this->run();
+
+        add_filter('sassy-variables', [$this, 'compiler_variables'], 10, 1);
 
     }
 
@@ -23,7 +24,7 @@ abstract class Integration {
     
     public function run () {
 
-        // ..
+
 
     }
     
@@ -32,5 +33,18 @@ abstract class Integration {
         return $this->loaded;
         
     }
+
+    public function compiler_variables ($variables) {
+
+        return array_merge($variables, $this->get_variables());
+
+    }
+
+    /**
+     * Return integration-specific SCSS variables as key => value.
+     *
+     * @return array
+     */
+    abstract public function get_variables ();
 
 }
