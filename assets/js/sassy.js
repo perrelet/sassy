@@ -160,15 +160,24 @@
                         newHref.searchParams.set('sassy', Math.random().toString());
                         link.href = newHref.toString();
 
-                        console.log(`Successfully Recompiled: ${href}`);
-
                         if (meta) {
                             console.info(`Sassy compile info for ${property}:`, meta);
                         }
 
                         if (warnings.length) {
-                            const block = warnings.join('\n');
-                            console.warn(`Sassy warnings for ${property}:\n${block}`);
+                            const lines = warnings.map(w => String(w));
+                            const block = lines.join('\n');
+                            const hasError = lines.some(line => /^error:/i.test(line.trim()));
+
+                            if (hasError) {
+                                console.error(`Sassy compile error for ${property}:\n${block}`);
+                                this.error([block]);
+                            } else {
+                                console.log(`Successfully Recompiled: ${href}`);
+                                console.warn(`Sassy warnings for ${property}:\n${block}`);
+                            }
+                        } else {
+                            console.log(`Successfully Recompiled: ${href}`);
                         }
 
                     }
