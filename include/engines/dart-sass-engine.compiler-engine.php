@@ -98,18 +98,24 @@ class Dart_Sass_Engine implements Compiler_Engine {
             $cmd[] = '--style=expanded';
         }
 
+        // Prevent Dart Sass from writing "error CSS" into the output file on failure.
+        $cmd[] = '--no-error-css';
+
         $full = implode(' ', $cmd) . ' 2>&1';
 
-        $out = shell_exec($full);
+        $output_lines = [];
+        $exit_code    = 0;
+        exec($full, $output_lines, $exit_code);
+        $out = implode("\n", $output_lines);
 
         error_log('Dart_Sass_Engine -> compile() -> ' . $out);
 
-        if (!file_exists($tmp_out)) {
+        if ($exit_code !== 0 || !file_exists($tmp_out)) {
             @unlink($tmp_in);
             @unlink($tmp_out);
             @unlink($tmp_map);
 
-            $msg = is_string($out) ? trim($out) : 'Dart Sass compile failed.';
+            $msg = is_string($out) && $out !== '' ? trim($out) : 'Dart Sass compile failed.';
             return new Compile_Result(null, null, $msg, null);
         }
 
