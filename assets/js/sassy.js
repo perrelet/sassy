@@ -4,18 +4,14 @@
 
     const sassy = {
 
-        params: null,
-        els: {
-            errors: null,
-            adminMenu: null,
-        },
-
         init (params) {
 
             this.params = params;
 
-            this.els.errors = document.getElementById('sassy-errors');
-            this.els.adminMenu = document.querySelector('#wp-admin-bar-sassy > a');
+            this.els = {
+                errors: document.getElementById('sassy-errors'),
+                adminMenu: document.querySelector('#wp-admin-bar-sassy > a'),
+            };
 
             this.addEventListeners();
 
