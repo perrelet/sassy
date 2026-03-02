@@ -33,25 +33,4 @@ abstract class Integration {
         
     }
 
-    //
-
-    protected function array_to_sass_map ($a) {
-
-        $map = "(";
-        $i = 0;
-
-        foreach ($a as $k => $v) {
-
-            $map .= "'" . $k . "': " . $v;
-            if ($i < count($a) - 1) $map .= ", ";
-
-            $i++;
-
-        }
-
-        $map .= ")";
-        return $map;
-
-    }
-
 }

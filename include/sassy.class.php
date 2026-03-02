@@ -47,6 +47,7 @@ class Sassy {
 	protected function load_models () {
 
 		require_once(SASSY_PATH . 'include/model/compile-result.class.php');
+		require_once(SASSY_PATH . 'include/model/scss-map.class.php');
 		require_once(SASSY_PATH . 'include/engines/compiler-engine.interface.php');
 		require_once(SASSY_PATH . 'include/engines/scssphp-engine.compiler-engine.php');
 		require_once(SASSY_PATH . 'include/engines/dart-sass-engine.compiler-engine.php');

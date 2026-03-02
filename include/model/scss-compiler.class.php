@@ -446,6 +446,12 @@ class SCSS_Compiler {
 
             $this->variables = apply_filters('sassy-variables', $variables, $this->src, $this->handle, $this);
 
+            foreach ($this->variables as $key => $value) {
+                if (is_array($value)) {
+                    $this->variables[$key] = Scss_Map::from_array($value);
+                }
+            }
+
         }
 
         return $this->variables;

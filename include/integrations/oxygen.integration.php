@@ -111,7 +111,7 @@ class Oxygen extends Integration {
             $breakpoints['page']        = $page_width . "px";
             //$breakpoints['b-' . $i]     = $page_width . "px";       
 
-            $this->breakpoints['breakpoints'] = $this->array_to_sass_map($breakpoints);
+            $this->breakpoints['breakpoints'] = Scss_Map::from_array($breakpoints);
 
         }
 
