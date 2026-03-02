@@ -59,6 +59,7 @@ class Sassy {
 
 		require_once(SASSY_PATH . "include/integrations/integration.abstract.php");
 		require_once(SASSY_PATH . "include/integrations/bricks.integration.php");
+		require_once(SASSY_PATH . "include/integrations/digitalis.integration.php");
 		require_once(SASSY_PATH . "include/integrations/oxygen.integration.php");
 
 		new Bricks();

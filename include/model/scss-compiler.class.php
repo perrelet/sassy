@@ -451,13 +451,6 @@ class SCSS_Compiler {
                 'stylesheet-directory-url' => '"'. wp_normalize_path(get_stylesheet_directory_uri()) . '"',
             ];
 
-            if (defined('DIGITALIS_FRAMEWORK_PATH')) {
-
-                $variables['digitalis_path'] = '"' . wp_normalize_path(DIGITALIS_FRAMEWORK_PATH) . '"';
-                $variables['digitalis_uri']  = '"' . wp_normalize_path(DIGITALIS_FRAMEWORK_URI) . '"';
-
-            }
-
             $this->variables = apply_filters('sassy-variables', $variables, $this->src, $this->handle, $this);
 
             foreach ($this->variables as $key => $value) {
