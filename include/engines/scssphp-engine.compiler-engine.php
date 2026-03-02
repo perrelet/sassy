@@ -64,11 +64,11 @@ class Scssphp_Engine implements Compiler_Engine {
             $css = $result->getCss();
             $map = $result->getSourceMap();
 
-            return new Compile_Result($css, $map);
+            return new Compile_Result($css, $map, null, null);
 
         } catch (Exception $e) {
 
-            return new Compile_Result(null, null, $e->getMessage());
+            return new Compile_Result(null, null, $e->getMessage(), null);
 
         }
 

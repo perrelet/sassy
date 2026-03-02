@@ -83,7 +83,7 @@
                             if (response.success) {
 
                                 this.reload_styles(response.data);
-
+                            
                             } else {
 
                                 console.error('Sassy: Oops, something went wrong.');
@@ -130,13 +130,32 @@
 
                     if (styles) for (const property in styles) {
 
-                        if (link.href.includes(styles[property])) {
-                            
-                            let href = new URL(link.href);
-                            href.searchParams.set('sassy', Math.random());
-                            link.href = href;
+                        let entry = styles[property];
+                        let href = entry;
+                        let warnings = null;
 
-                            console.log("Successfully Recompiled: " + styles[property]);
+                        if (entry && typeof entry === "object") {
+                            href = entry.href || null;
+                            if (Array.isArray(entry.warnings) && entry.warnings.length > 0) {
+                                warnings = entry.warnings;
+                            }
+                        }
+
+                        if (!href) {
+                            continue;
+                        }
+
+                        if (link.href.includes(href)) {
+                            
+                            let newHref = new URL(link.href);
+                            newHref.searchParams.set('sassy', Math.random());
+                            link.href = newHref;
+
+                            console.log("Successfully Recompiled: " + href);
+                            if (warnings && warnings.length) {
+                                var block = warnings.join("\n");
+                                console.warn("Sassy warnings for " + property + ":\n" + block);
+                            }
 
                         }
 

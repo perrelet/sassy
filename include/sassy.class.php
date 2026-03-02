@@ -143,9 +143,20 @@ class Sassy {
 			$path_parts = pathinfo(parse_url($style->src)['path']);
 			if (!isset($path_parts['extension']) || ($path_parts['extension'] != 'scss')) continue;
 
-			$compiler = new SCSS_Compiler();
-			$this->compilers[] = $compiler;
-			$response[$style->handle] = $compiler->compile($style->src, $style->handle);
+            $compiler = new SCSS_Compiler();
+            $this->compilers[] = $compiler;
+
+            $href = $compiler->compile($style->src, $style->handle);
+            $warnings = $compiler->get_warnings();
+
+            if ($warnings) {
+                $response[$style->handle] = [
+                    'href'      => $href,
+                    'warnings'  => $warnings,
+                ];
+            } else {
+                $response[$style->handle] = $href;
+            }
 
 		}
 

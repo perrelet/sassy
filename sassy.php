@@ -15,7 +15,7 @@ if (defined('SASSY_VERSION')) return;
 
 /* DEFINES */
  
-define('SASSY_VERSION', 		'1.2.8');
+define('SASSY_VERSION', 		'2.0.10');
 define('SASSY_PATH', 			plugin_dir_path( __FILE__));
 define('SASSY_URI',				plugin_dir_url( __FILE__));
 define('SASSY_ROOT_FILE',		__FILE__);

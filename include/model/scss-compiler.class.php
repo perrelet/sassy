@@ -34,6 +34,7 @@ class SCSS_Compiler {
     protected $compiled;
     protected $error;
     protected $src_map;
+    protected $warnings = [];
 
     public function __construct () {
 
@@ -55,8 +56,9 @@ class SCSS_Compiler {
         $this->src_map_options  = null;
 
         $this->compiled = false;
-        $this->error = false;
-        $this->src_map = false;
+        $this->error    = false;
+        $this->src_map  = false;
+        $this->warnings = [];
 
     }
 
@@ -122,6 +124,15 @@ class SCSS_Compiler {
             if (!$result->ok()) {
                 $this->error('A compiler error occurred: ' . $result->error);
                 return $this->get_build_url();
+            }
+
+            $this->warnings = [];
+            if (isset($result->info) && $result->info !== null) {
+                if (is_array($result->info)) {
+                    $this->warnings = $result->info;
+                } else {
+                    $this->warnings = [$result->info];
+                }
             }
 
             $this->src_map = !empty($args['source_map']);
@@ -267,6 +278,12 @@ class SCSS_Compiler {
     public function get_error () {
 
         return $this->error;
+
+    }
+
+    public function get_warnings () {
+
+        return $this->warnings;
 
     }
 

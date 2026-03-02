@@ -19,11 +19,15 @@ class Compile_Result {
     /** @var string|null Error message when compilation failed. */
     public $error;
 
-    public function __construct ($css = null, $map = null, $error = null) {
+    /** @var mixed Additional information about the compile (e.g. warnings). */
+    public $info;
+
+    public function __construct ($css = null, $map = null, $error = null, $info = null) {
 
         $this->css   = $css;
         $this->map   = $map;
         $this->error = $error;
+        $this->info  = $info;
 
     }
 

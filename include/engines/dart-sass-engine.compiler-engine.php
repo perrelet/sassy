@@ -53,7 +53,7 @@ class Dart_Sass_Engine implements Compiler_Engine {
     public function compile (array $args) : Compile_Result {
 
         if (!$sass_bin = $this->get_sass_bin()) {
-            return new Compile_Result(null, null, 'Dart Sass binary path not set. Define SASSY_DART_SASS_BIN or use the sassy-dart-sass-binary filter.');
+            return new Compile_Result(null, null, 'Dart Sass binary path not set. Define SASSY_DART_SASS_BIN or use the sassy-dart-sass-binary filter.', null);
         }
 
         $tmp_in  = wp_tempnam('sassy-in.scss');
@@ -61,7 +61,7 @@ class Dart_Sass_Engine implements Compiler_Engine {
         $tmp_map = $tmp_out . '.map';
 
         if (!$tmp_in || !$tmp_out) {
-            return new Compile_Result(null, null, 'Unable to create temp files.');
+            return new Compile_Result(null, null, 'Unable to create temp files.', null);
         }
 
         $scss = $args['scss'] ?? '';
@@ -110,17 +110,28 @@ class Dart_Sass_Engine implements Compiler_Engine {
             @unlink($tmp_map);
 
             $msg = is_string($out) ? trim($out) : 'Dart Sass compile failed.';
-            return new Compile_Result(null, null, $msg);
+            return new Compile_Result(null, null, $msg, null);
         }
 
         $css = file_get_contents($tmp_out);
         $map = file_exists($tmp_map) ? file_get_contents($tmp_map) : null;
 
+        $warnings = null;
+        if (is_string($out)) {
+            $trimmed = trim($out);
+            if ($trimmed !== '') {
+                $lines = preg_split('/\R/', $trimmed);
+                $warnings = array_values(array_filter($lines, static function ($line) {
+                    return trim($line) !== '';
+                }));
+            }
+        }
+
         @unlink($tmp_in);
         @unlink($tmp_out);
         @unlink($tmp_map);
 
-        return new Compile_Result($css, $map);
+        return new Compile_Result($css, $map, null, $warnings);
 
     }
 
