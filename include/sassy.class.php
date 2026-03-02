@@ -146,17 +146,28 @@ class Sassy {
             $compiler = new SCSS_Compiler();
             $this->compilers[] = $compiler;
 
-            $href = $compiler->compile($style->src, $style->handle);
+            $href     = $compiler->compile($style->src, $style->handle);
             $warnings = $compiler->get_warnings();
 
-            if ($warnings) {
-                $response[$style->handle] = [
-                    'href'      => $href,
-                    'warnings'  => $warnings,
-                ];
-            } else {
-                $response[$style->handle] = $href;
-            }
+            $meta = [
+                'engine'         => $compiler->get_engine_class(),
+                'compiled_file'  => $compiler->get_build_file(),
+                'compiled_url'   => $compiler->get_build_url(),
+                'src'            => $compiler->get_src(),
+                'src_path'       => $compiler->get_src_path(),
+                'src_url'        => $compiler->get_src_url(),
+                'handle'         => $compiler->get_handle(),
+                'index'          => $compiler->get_index(),
+                'style'          => $compiler->get_style(),
+                'variables'      => $compiler->get_variables(),
+                'has_source_map' => $compiler->has_src_map(),
+            ];
+
+            $response[$style->handle] = [
+                'href'      => $href,
+                'warnings'  => $warnings ?: [],
+                'meta'      => $meta,
+            ];
 
 		}
 

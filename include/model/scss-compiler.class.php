@@ -414,6 +414,12 @@ class SCSS_Compiler {
         return $this->build_file;
 
     }
+
+    public function get_engine_class () {
+
+        return get_class($this->get_engine());
+
+    }
     
     public function get_style () {
         

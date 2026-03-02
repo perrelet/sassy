@@ -133,11 +133,15 @@
                         let entry = styles[property];
                         let href = entry;
                         let warnings = null;
+                        let meta = null;
 
                         if (entry && typeof entry === "object") {
                             href = entry.href || null;
                             if (Array.isArray(entry.warnings) && entry.warnings.length > 0) {
                                 warnings = entry.warnings;
+                            }
+                            if (entry.meta) {
+                                meta = entry.meta;
                             }
                         }
 
@@ -152,6 +156,9 @@
                             link.href = newHref;
 
                             console.log("Successfully Recompiled: " + href);
+                            if (meta) {
+                                console.info("Sassy compile info for " + property + ":", meta);
+                            }
                             if (warnings && warnings.length) {
                                 var block = warnings.join("\n");
                                 console.warn("Sassy warnings for " + property + ":\n" + block);
