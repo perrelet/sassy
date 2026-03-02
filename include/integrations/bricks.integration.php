@@ -72,7 +72,7 @@ class Bricks extends Integration {
 
         }
 
-        $breakpoints['breakpoints'] = Scss_Map::from_array($sass_map);
+        $breakpoints['breakpoints'] = $sass_map;
 
         return $breakpoints;
 
