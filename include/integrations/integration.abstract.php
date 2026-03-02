@@ -14,6 +14,8 @@ abstract class Integration {
 
         add_filter('sassy-variables', [$this, 'compiler_variables'], 10, 1);
 
+        $this->run();
+
     }
 
     public function condition () {
@@ -24,7 +26,7 @@ abstract class Integration {
     
     public function run () {
 
-
+        // ...
 
     }
     

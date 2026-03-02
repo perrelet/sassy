@@ -446,15 +446,15 @@ class SCSS_Compiler {
         if (is_null($this->variables)) {
 
             $variables = [
-                'wp-content-url' => '"'. WP_CONTENT_URL . '"',
-                'template-directory-url'   => '"'. get_template_directory_uri() . '"',
-                'stylesheet-directory-url' => '"'. get_stylesheet_directory_uri() . '"',
+                'wp-content-url'           => '"'. wp_normalize_path(WP_CONTENT_URL) . '"',
+                'template-directory-url'   => '"'. wp_normalize_path(get_template_directory_uri()) . '"',
+                'stylesheet-directory-url' => '"'. wp_normalize_path(get_stylesheet_directory_uri()) . '"',
             ];
 
             if (defined('DIGITALIS_FRAMEWORK_PATH')) {
 
-                $variables['digitalis_path'] = '"' . str_replace('\\', '/', DIGITALIS_FRAMEWORK_PATH) . '"';
-                $variables['digitalis_uri']  = '"' . str_replace('\\', '/', DIGITALIS_FRAMEWORK_URI) . '"';
+                $variables['digitalis_path'] = '"' . wp_normalize_path(DIGITALIS_FRAMEWORK_PATH) . '"';
+                $variables['digitalis_uri']  = '"' . wp_normalize_path(DIGITALIS_FRAMEWORK_URI) . '"';
 
             }
 
