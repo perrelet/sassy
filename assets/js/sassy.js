@@ -1,59 +1,64 @@
-(function(params) {
+(() => {
 
-    var sassy = {
+    'use strict';
+
+    const sassy = {
 
         params: null,
         els: {
-            errors: null
+            errors: null,
+            adminMenu: null,
         },
 
-        init: function (params) {
+        init (params) {
 
             this.params = params;
 
             this.els.errors = document.getElementById('sassy-errors');
-            this.els.admin_menu = document.querySelector('#wp-admin-bar-sassy > a');
+            this.els.adminMenu = document.querySelector('#wp-admin-bar-sassy > a');
 
-            this.add_event_listeners();
+            this.addEventListeners();
 
         },
 
-        add_event_listeners: function () {
+        addEventListeners () {
 
-            let live_compile = document.getElementById('wp-admin-bar-sassy-live-compile');
-            if (live_compile) live_compile.addEventListener('click', this.live_compile.bind(this));
+            const liveCompileButton = document.getElementById('wp-admin-bar-sassy-live-compile');
+            if (liveCompileButton) {
+                liveCompileButton.addEventListener('click', () => this.liveCompile());
+            }
 
-            //
+            const keydownCallback = this.debounce(this.onKeyDown.bind(this), 250);
 
-            var keydown_callback = this.debounce(this.onkeydown.bind(this), 250);
+            if ((this.params.builder === 'oxygen') && this.params.backend) {
 
-            if ((this.params.builder == 'oxygen') && this.params.backend) {
-
-                angular.element('body').on('keydown', keydown_callback);            // iframe
-                parent.angular.element('body').on('keydown', keydown_callback);     // builder
+                // Oxygen builder uses Angular in both iframe and builder window.
+                angular.element('body').on('keydown', keydownCallback);            // iframe
+                parent.angular.element('body').on('keydown', keydownCallback);     // builder
 
             } else {
 
-                document.addEventListener('keydown', keydown_callback);
+                document.addEventListener('keydown', keydownCallback);
 
             }
 
         },
 
-        onkeydown: function (event) {
+        onKeyDown (event) {
 
-            if ((this.params.builder == 'oxygen') && this.params.backend && event.originalEvent.repeat) return;
+            if ((this.params.builder === 'oxygen') && this.params.backend && event.originalEvent && event.originalEvent.repeat) return;
             if (!event.ctrlKey && !event.metaKey) return;
-            if (event.target.nodeName != 'BODY') return;
+            if (event.target && event.target.nodeName !== 'BODY') return;
 
-            var processed = false;
-            var key = event.key.toLowerCase();
+            let processed = false;
+            const key = (event.key || '').toLowerCase();
 
             switch (key) {
 
-                case " ":
-                    this.live_compile();
+                case ' ':
+                    this.liveCompile();
                     processed = true;
+                    break;
 
             }
 
@@ -64,106 +69,106 @@
 
         },
 
-        live_compile: function () {
+        liveCompile () {
 
-            var http = new XMLHttpRequest();
+            const url = `${this.params.ajax_url}?action=sassy_compile&nonce=${this.params.sassy_compile_nonce}&sassy-recompile=1`;
 
-            http.onreadystatechange = function() {
+            this.clearErrors();
 
-                if (http.readyState == XMLHttpRequest.DONE) {
+            fetch(url, { credentials: 'same-origin' })
+                .then(response => {
 
-                    let error = null;
+                    if (response.status === 401) {
+                        const error = 'Sassy: 401 Unauthorized Access.';
+                        console.error(error);
+                        this.error([error]);
+                        return null;
+                    }
 
-                    switch (http.status) {
+                    if (!response.ok) {
+                        const error = 'Sassy: An unexpected error occurred.';
+                        console.error(error);
+                        this.error([error]);
+                        return null;
+                    }
 
-                        case 200:
+                    return response.json();
 
-                            let response = JSON.parse(http.responseText);
+                })
+                .then(payload => {
 
-                            if (response.success) {
+                    if (!payload) return;
 
-                                this.reload_styles(response.data);
-                            
-                            } else {
+                    if (payload.success) {
 
-                                console.error('Sassy: Oops, something went wrong.');
-                                console.error(response.data);
-                                this.error(response.data);
+                        this.reloadStyles(payload.data);
 
-                            }
+                    } else {
 
-                            break;
-
-                        case 401:
-
-                            error = 'Sassy: 401 Unauthorized Access.';
-                            console.error(error);
-                            this.error([error]);
-                            break;
-
-                        default:
-
-                            error = 'Sassy: An unexpected error occurred.';
-                            console.error(error);
-                            this.error([error]);
+                        console.error('Sassy: Oops, something went wrong.');
+                        console.error(payload.data);
+                        this.error(payload.data);
 
                     }
 
-                }
+                })
+                .catch(err => {
 
-            }.bind(this);
-        
-            http.open('GET', this.params.ajax_url + "?action=sassy_compile&nonce=" + this.params.sassy_compile_nonce + "&sassy-recompile=1", true);
-            http.send();
-            this.clear_errors();
+                    const error = 'Sassy: An unexpected error occurred.';
+                    console.error(error, err);
+                    this.error([error]);
+
+                });
 
         },
 
-        reload_styles: function (styles) {
+        reloadStyles (styles) {
 
-            let links = document.getElementsByTagName("link");
+            if (!styles) return;
 
-            for (const cl in links) {
+            const links = document.querySelectorAll('link[rel="stylesheet"]');
 
-                let link = links[cl];
-                if (link.rel === "stylesheet") {
+            for (const link of links) {
 
-                    if (styles) for (const property in styles) {
+                for (const property in styles) {
 
-                        let entry = styles[property];
-                        let href = entry;
-                        let warnings = null;
-                        let meta = null;
+                    if (!Object.prototype.hasOwnProperty.call(styles, property)) continue;
 
-                        if (entry && typeof entry === "object") {
-                            href = entry.href || null;
-                            if (Array.isArray(entry.warnings) && entry.warnings.length > 0) {
-                                warnings = entry.warnings;
-                            }
-                            if (entry.meta) {
-                                meta = entry.meta;
-                            }
+                    const entry = styles[property];
+
+                    let href = entry;
+                    let warnings = null;
+                    let meta = null;
+
+                    if (entry && typeof entry === 'object') {
+                        href = entry.href || null;
+                        if (Array.isArray(entry.warnings) && entry.warnings.length > 0) {
+                            warnings = entry.warnings;
+                        }
+                        if (entry.meta) {
+                            meta = entry.meta;
+                        }
+                    }
+
+                    if (!href) {
+                        continue;
+                    }
+
+                    if (link.href.includes(href)) {
+
+                        const newHref = new URL(link.href);
+                        newHref.searchParams.set('sassy', Math.random().toString());
+                        link.href = newHref.toString();
+
+                        console.log(`Successfully Recompiled: ${href}`);
+
+                        if (meta) {
+                            console.info(`Sassy compile info for ${property}:`, meta);
                         }
 
-                        if (!href) {
-                            continue;
-                        }
-
-                        if (link.href.includes(href)) {
-                            
-                            let newHref = new URL(link.href);
-                            newHref.searchParams.set('sassy', Math.random());
-                            link.href = newHref;
-
-                            console.log("Successfully Recompiled: " + href);
-                            if (meta) {
-                                console.info("Sassy compile info for " + property + ":", meta);
-                            }
-                            if (warnings && warnings.length) {
-                                var block = warnings.join("\n");
-                                console.warn("Sassy warnings for " + property + ":\n" + block);
-                            }
-
+                        if (warnings && warnings.length) {
+                            const block = warnings.join('\n');
+                            console.warn(`Sassy warnings for ${property}:\n${block}`);
                         }
 
                     }
@@ -174,30 +179,32 @@
 
         },
 
-        error: function (errors) {
+        error (errors) {
 
-            if (this.els.admin_menu) {
+            if (this.els.adminMenu) {
 
-                this.els.admin_menu.innerHTML = "❌ SCSS";
+                this.els.adminMenu.innerHTML = '❌ SCSS';
 
             }
 
             if (this.els.errors) {
 
-                this.els.errors.innerHTML = "";
+                this.els.errors.innerHTML = '';
 
                 for (const instance in errors) {
 
-                    let error = errors[instance];
+                    if (!Object.prototype.hasOwnProperty.call(errors, instance)) continue;
 
-                    const error_node = document.createElement("pre");
-                    error_node.classList.add('sassy-error');
-                    error_node.appendChild(document.createTextNode(error));
+                    const error = errors[instance];
 
-                    this.els.errors.appendChild(error_node);
+                    const errorNode = document.createElement('pre');
+                    errorNode.classList.add('sassy-error');
+                    errorNode.appendChild(document.createTextNode(error));
 
-                    let menu_item = document.querySelector('#wp-admin-bar-sassy-' + instance + ' [data-state]');
-                    if (menu_item) menu_item.setAttribute('data-state', 'error');
+                    this.els.errors.appendChild(errorNode);
+
+                    const menuItem = document.querySelector(`#wp-admin-bar-sassy-${instance} [data-state]`);
+                    if (menuItem) menuItem.setAttribute('data-state', 'error');
 
                 }
 
@@ -207,47 +214,52 @@
 
         },
 
-        clear_errors: function () {
+        clearErrors () {
 
-            if (this.els.admin_menu) {
+            if (this.els.adminMenu) {
 
-                this.els.admin_menu.innerHTML = "SCSS";
+                this.els.adminMenu.innerHTML = 'SCSS';
 
             }
 
             if (this.els.errors) {
 
                 this.els.errors.classList.remove('show');
-                this.els.errors.innerHTML = "";
+                this.els.errors.innerHTML = '';
 
             }
 
-            let menu_items = document.querySelectorAll('#wpadminbar .sassy-file [data-state]');
-            if (menu_items.length > 0) for (var i = 0, menu_item; menu_item = menu_items[i]; i++) menu_item.setAttribute('data-state', 'compiled');
+            const menuItems = document.querySelectorAll('#wpadminbar .sassy-file [data-state]');
+
+            menuItems.forEach(menuItem => {
+                menuItem.setAttribute('data-state', 'compiled');
+            });
 
         },
 
-        //
+        debounce (callback, delay) {
 
-        debounce: function (callback, delay) {
+            let timeoutId;
 
-            var timeout;
-            return function () {
-                var context = this;
-                var args = arguments;
-                if (timeout) {
-                    clearTimeout(timeout);
+            return function debounced (...args) {
+
+                const context = this;
+
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
                 }
-                timeout = setTimeout(function () {
-                    timeout = null;
+
+                timeoutId = setTimeout(() => {
+                    timeoutId = null;
                     callback.apply(context, args);
                 }, delay);
-            }
 
-        }
+            };
 
-    }
+        },
 
-    sassy.init(params);
+    };
 
-})(sass_params);
+    sassy.init(window.sass_params || {});
+
+})();
