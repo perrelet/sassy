@@ -136,18 +136,22 @@
 
                     const entry = styles[property];
 
-                    let href = entry;
-                    let warnings = null;
+                    let href = null;
+                    let warnings = [];
                     let meta = null;
 
                     if (entry && typeof entry === 'object') {
-                        href = entry.href || null;
-                        if (Array.isArray(entry.warnings) && entry.warnings.length > 0) {
+                        if (typeof entry.href === 'string' && entry.href.length > 0) {
+                            href = entry.href;
+                        }
+                        if (Array.isArray(entry.warnings)) {
                             warnings = entry.warnings;
                         }
-                        if (entry.meta) {
+                        if (entry.meta && typeof entry.meta === 'object') {
                             meta = entry.meta;
                         }
+                    } else if (typeof entry === 'string' && entry.length > 0) {
+                        href = entry;
                     }
 
                     if (!href) {
@@ -166,7 +170,7 @@
                             console.info(`Sassy compile info for ${property}:`, meta);
                         }
 
-                        if (warnings && warnings.length) {
+                        if (warnings.length) {
                             const block = warnings.join('\n');
                             console.warn(`Sassy warnings for ${property}:\n${block}`);
                         }
