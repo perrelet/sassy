@@ -108,8 +108,6 @@ class Dart_Sass_Engine implements Compiler_Engine {
         exec($full, $output_lines, $exit_code);
         $out = implode("\n", $output_lines);
 
-        error_log('Dart_Sass_Engine -> compile() -> ' . $out);
-
         if ($exit_code !== 0 || !file_exists($tmp_out)) {
             @unlink($tmp_in);
             @unlink($tmp_out);

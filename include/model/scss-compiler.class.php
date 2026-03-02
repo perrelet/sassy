@@ -35,6 +35,7 @@ class SCSS_Compiler {
     protected $error;
     protected $src_map;
     protected $warnings = [];
+    protected $compile_time = null;
 
     public function __construct () {
 
@@ -59,6 +60,7 @@ class SCSS_Compiler {
         $this->error    = false;
         $this->src_map  = false;
         $this->warnings = [];
+        $this->compile_time = null;
 
     }
 
@@ -118,8 +120,12 @@ class SCSS_Compiler {
         }
 
         if ($run) {
-            $args = $this->build_compile_args($src_path, $variables);
+            $start = microtime(true);
+
+            $args   = $this->build_compile_args($src_path, $variables);
             $result = $this->get_engine()->compile($args);
+
+            $this->compile_time = microtime(true) - $start;
 
             if (!$result->ok()) {
                 $this->error('A compiler error occurred: ' . $result->error);
@@ -156,6 +162,8 @@ class SCSS_Compiler {
             $filemtimes[$build_file] = filemtime($build_file);
             set_transient('sassy-filemtimes-' . $this->handle, $filemtimes);
             $this->compiled = true;
+        } else {
+            $this->compile_time = 0.0;
         }
 
         $output = $build_url;
@@ -284,6 +292,12 @@ class SCSS_Compiler {
     public function get_warnings () {
 
         return $this->warnings;
+
+    }
+
+    public function get_compile_time () {
+
+        return $this->compile_time;
 
     }
 

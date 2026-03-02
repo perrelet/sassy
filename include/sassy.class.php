@@ -162,6 +162,7 @@ class Sassy {
                 'style'          => $compiler->get_style(),
                 'variables'      => $compiler->get_variables(),
                 'has_source_map' => $compiler->has_src_map(),
+                'compile_time'   => $compiler->get_compile_time(),
             ];
 
             $response[$style->handle] = [
