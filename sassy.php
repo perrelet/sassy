@@ -33,4 +33,9 @@ function SASSY() {
 
 $Sassy = new Sassy\Sassy();
 
+if (defined('WP_CLI') && WP_CLI) {
+	require_once SASSY_PATH . 'include/cli/sassy-cli-command.class.php';
+	\WP_CLI::add_command('sassy', \Sassy\Sassy_CLI_Command::class);
+}
+
 //

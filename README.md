@@ -20,8 +20,8 @@ Sassy will compile a source file if any of the following are met:
 
 1. The file has changed since it was last checked.
 2. Any sass variables have been added, removed or changed value.
-3. Compilation is forced via the `sassy-run-compiler` filter.
-4. `CTRL + SPACE` is pressed in a relevant browser window (See [Live Compile](#live-compile))
+3. Compilation is forced via the `sassy-force-compile` filter or `wp sassy compile --force` (See [WP-CLI](#wp-cli)).
+4. `CTRL + SPACE` is pressed in a relevant browser window (See [Live Compile](#live-compile)).
 
 ## Hooks
 
@@ -89,6 +89,26 @@ When live compile runs, Sassy also:
 - Reloads any compiled stylesheets in-place (by adding a cache-busting `sassy` query parameter).
 - Logs compile metadata for each stylesheet to the browser console (engine, compiled file, source, handle, variables, source-map status, compile time, etc.).
 - Logs any SCSS compiler warnings for each stylesheet as a single, readable block in the console.
+
+## WP-CLI
+
+When [WP-CLI](https://wp-cli.org/) is available, Sassy registers a `sassy` command so you can compile all registered SCSS styles from the command line.
+
+### Commands
+
+**`wp sassy compile`** — Compile all registered SCSS styles (theme, plugin, and any styles added via `wp_enqueue_style` with a `.scss` source). Uses the same compilation pipeline as the browser (including Lightning CSS post-processing if configured). Outputs each compiled handle and its compile time.
+
+```bash
+wp sassy compile
+```
+
+**`wp sassy compile --force`** — Force a full recompile, ignoring cache and file modification checks (equivalent to enabling the `sassy-force-compile` filter for that run).
+
+```bash
+wp sassy compile --force
+```
+
+Useful for CI/CD, deployment scripts, or when you want to refresh all SCSS without loading the admin or triggering live compile.
 
 ## Lightning CSS post-processing
 
