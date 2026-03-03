@@ -22,10 +22,13 @@ class Lightning_CSS_Postprocessor {
      */
     public static function filter ($css, $src, $handle, $compiler) {
 
-        $bin = self::resolve_bin();
-    
         // Only run when enabled
         if (!apply_filters('sassy-lightning-css', true, $src, $handle, $compiler)) {
+            return $css;
+        }
+
+        $bin = self::resolve_bin();
+        if (!$bin) {
             return $css;
         }
     
@@ -35,31 +38,62 @@ class Lightning_CSS_Postprocessor {
         if (!$in || !$out) return $css;
     
         file_put_contents($in, $css);
-    
+
         $tools_dir = defined('SASSY_TOOLS_DIR') ? rtrim(SASSY_TOOLS_DIR, "\\/") : null;
-    
+
+        $options = [
+            'minify'         => true,
+            'bundle'         => false,
+            'targets'        => null,  // string passed to --targets, e.g. "= 0.25%"
+            'error_recovery' => false,
+        ];
+
+        $options = apply_filters('sassy-lightning-css-options', $options, $src, $handle, $compiler);
+
         // Decide whether $bin is npx or a cli.js
         $cmd = [];
-    
+
         if (preg_match('/npx(\.cmd)?$/i', $bin) || $bin === 'npx') {
-    
+
             // npx lightningcss ...
-            $cmd = [$bin, 'lightningcss', '--minify', $in, '-o', $out];
-    
+            $cmd[] = $bin;
+            $cmd[] = 'lightningcss';
+
         } else if (preg_match('/\.js$/i', $bin)) {
-    
+
             // node cli.js ...
             $node = self::find_node();
-            if (!$node) return $css;
-    
-            $cmd = [$node, $bin, '--minify', $in, '-o', $out];
-    
+            if (!$node) {
+                return $css;
+            }
+
+            $cmd[] = $node;
+            $cmd[] = $bin;
+
         } else {
-    
+
             // direct binary (unlikely), treat as command
-            $cmd = [$bin, '--minify', $in, '-o', $out];
-    
+            $cmd[] = $bin;
+
         }
+
+        if (!empty($options['minify'])) {
+            $cmd[] = '--minify';
+        }
+        if (!empty($options['bundle'])) {
+            $cmd[] = '--bundle';
+        }
+        if (!empty($options['targets']) && is_string($options['targets'])) {
+            $cmd[] = '--targets';
+            $cmd[] = $options['targets'];
+        }
+        if (!empty($options['error_recovery'])) {
+            $cmd[] = '--error-recovery';
+        }
+
+        $cmd[] = $in;
+        $cmd[] = '-o';
+        $cmd[] = $out;
     
         $result = self::run_process($cmd, $tools_dir);
     

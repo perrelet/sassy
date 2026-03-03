@@ -134,6 +134,22 @@ add_filter('sassy-lightning-css', function ($enabled, $src, $handle, $compiler) 
 
 By default, Sassy runs Lightning CSS with `--minify`. If the binary cannot be found, or Lightning CSS fails, the original compiled CSS is returned unchanged and the Lightning CSS error is logged to PHP’s error log.
 
+To customize Lightning CSS options such as `--minify`, `--bundle`, `--targets`, or `--error-recovery`, you can use:
+
+```php
+add_filter('sassy-lightning-css-options', function ($options, $src, $handle, $compiler) {
+    // Disable minification for certain handles:
+    if (in_array($handle, ['editor-style', 'admin-style'], true)) {
+        $options['minify'] = false;
+    }
+
+    // Example: set custom browser targets
+    $options['targets'] = '= 0.25%';
+
+    return $options;
+}, 10, 4);
+```
+
 ## Source Maps
 
 Source maps can be selectively generated via the `sassy-src-map` filter. The source map configuration can be hooked via the `sassy-src-map-data` filter. Refer to (https://scssphp.github.io/scssphp/docs/) for further information on these parameters. 
