@@ -37,7 +37,9 @@ Sassy will compile a source file if any of the following are met:
 | `sassy-variables` | See [Variables](#variables) | Array of variables to be available. |
 | `sassy-src-map` | `true` | Whether to generate the source map. |
 | `sassy-src-map-options` | See [Source Maps](#source-maps) | Source map options array. |
-| `sassy-css` | N/A | The compiled css. |
+| `sassy-css` | N/A | The compiled css (post‑SCSS engine; used by Lightning CSS). |
+| `sassy-lightning-css` | `true` | Whether to run the optional Lightning CSS post‑processor. |
+| `sassy-lightning-css-binary` | `null` | Returns the Lightning CSS CLI binary/command to use. See [Lightning CSS post-processing](#lightning-css-post-processing). |
 
 ## Variables
 
@@ -85,8 +87,52 @@ Fed up of refreshing the page to see your changes? Us too. Simply press `CTRL + 
 When live compile runs, Sassy also:
 
 - Reloads any compiled stylesheets in-place (by adding a cache-busting `sassy` query parameter).
-- Logs compile metadata for each stylesheet to the browser console (engine, compiled file, source, handle, variables, source-map status, etc.).
+- Logs compile metadata for each stylesheet to the browser console (engine, compiled file, source, handle, variables, source-map status, compile time, etc.).
 - Logs any SCSS compiler warnings for each stylesheet as a single, readable block in the console.
+
+## Lightning CSS post-processing
+
+Sassy can optionally run your compiled CSS through [Lightning CSS](https://lightningcss.dev/) for minification and modern CSS transforms. This happens **after** SCSS compilation, via the `sassy-css` filter.
+
+Lightning CSS is **disabled by default** until you point Sassy at a binary.
+
+### Configuration
+
+You can configure the Lightning CSS binary in one of three ways (checked in this order):
+
+- **Constant in `wp-config.php`:**
+
+```php
+define('SASSY_LIGHTNINGCSS_BIN', 'npx'); // or an absolute path to lightningcss / cli.js
+```
+
+- **Tools directory (for Node-based installs):**
+
+```php
+define('SASSY_TOOLS_DIR', WP_CONTENT_DIR . '/tools'); // e.g. contains node_modules/lightningcss-cli
+```
+
+- **Filter override:**
+
+```php
+add_filter('sassy-lightning-css-binary', function ($bin) {
+    return '/usr/local/bin/lightningcss'; // or 'npx', or 'node /path/to/cli.js'
+});
+```
+
+To toggle Lightning CSS on/off without changing code, use:
+
+```php
+add_filter('sassy-lightning-css', function ($enabled, $src, $handle, $compiler) {
+    // Example: only run in production, or skip for certain handles.
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        return false; // disable in debug/dev
+    }
+    return $enabled;
+}, 10, 4);
+```
+
+By default, Sassy runs Lightning CSS with `--minify`. If the binary cannot be found, or Lightning CSS fails, the original compiled CSS is returned unchanged and the Lightning CSS error is logged to PHP’s error log.
 
 ## Source Maps
 
@@ -109,6 +155,6 @@ Sassy also generates a list of breakpoints as a sass map called `$breakpoints`.
 
 Inspired by Juan Echeverry's [SCSS-Library](https://wordpress.org/plugins/scss-library/?ref=commonninja).
 
-© Jamie Perrelet 2021 - 2022
+© Jamie Perrelet 2021 - 2026
 <br><br>
 ![Digitalis](https://digitalisweb.ca/wp-content/plugins/digitalisweb/assets/png/logo/digitalis.222.250.png)
