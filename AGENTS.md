@@ -216,8 +216,6 @@ Admin bar structure:
     - Compiled CSS link
     - Source map link
     - Imported partials (from source map sources)
-  - _(separator)_
-  - ⭐ **Variables** — lists all SCSS variables with clipboard copy (ClipboardJS)
 
 **Force recompile** via `?sassy-recompile=1`: `UI::run_compiler()` hooks `sassy-force-compile` and returns true.
 

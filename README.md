@@ -57,10 +57,6 @@ By default only the following variables are defined, however others may be added
 ]
 ```
 
-Variable keys and values can be accessed via the SCSS admin bar menu:
-
-![screenshot](https://digitalis.ca/static/screenshots/sassy-menu.jpg)
-
 ### Array variables and Sass maps
 
 The `sassy-variables` filter may also return nested PHP arrays. Sassy will automatically convert any array values into Sass maps before passing them to the compiler. For example:
