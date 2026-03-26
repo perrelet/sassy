@@ -5,12 +5,14 @@ namespace Sassy;
 class UI {
 
 	public function __construct () {
-		
+
 		add_action('admin_bar_menu', [$this, 'admin_bar_menu'], 100);
 		add_filter('sassy-force-compile', [$this, 'run_compiler']);
 
 		if (isset($_GET['sassy-vars'])) add_action('wp_footer', [$this, 'print_variables']);
-		
+
+		if (isset($_GET['sassy-clear-cache'])) add_action('init', [$this, 'clear_cache']);
+
 	}
 
 	public function print_variables () {
@@ -61,6 +63,13 @@ class UI {
             'title'  => !isset($_GET['sassy-vars']) ? __('📝 Log Variables', 'sassy') : __('📝 Don\'t Log Variables', 'sassy'),
             'href'   => add_query_arg('sassy-vars', !isset($_GET['sassy-vars'])),
         ]);
+
+		$admin_bar->add_menu([
+			'id'     => 'sassy-clear-cache',
+			'parent' => 'sassy',
+			'title'  => __('🗑 Clear Cache', 'sassy'),
+			'href'   => add_query_arg('sassy-clear-cache', 1),
+		]);
 
 		do_action('sassy-admin-bar', $admin_bar);
 
@@ -180,6 +189,19 @@ class UI {
 		
 	}
 	
+	public function clear_cache () {
+
+		if (!current_user_can('edit_theme_options')) return;
+
+		global $wpdb;
+
+		$wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_sassy-filemtimes-%' OR option_name LIKE '_transient_sassy-vars-sig-%'");
+
+		wp_safe_redirect(remove_query_arg('sassy-clear-cache'));
+		exit;
+
+	}
+
 	public function run_compiler ($run) {
 
 		if (isset($_GET['sassy-recompile']) && $_GET['sassy-recompile']) return true;
