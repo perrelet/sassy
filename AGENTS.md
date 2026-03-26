@@ -132,9 +132,8 @@ Shells out to Dart Sass CLI via `exec()`. Not used by default — must be return
 
 Binary resolution order:
 1. Constructor argument
-2. `sassy-dart-sass-binary` filter
-3. `SASSY_DART_SASS_BIN` constant (set in `wp-config.php`)
-4. `"sass"` on PATH
+2. `sassy-dart-sass-binary` filter (with `SASSY_DART_SASS_BIN` constant as its default value)
+3. If nothing is configured, `get_sass_bin()` returns `null` and compilation fails with an error message.
 
 Variables are injected by **prepending** `$var: value;` declarations to the SCSS source (via `SCSS_Compiler::prepend_variables()`), not via the library API.
 
@@ -276,8 +275,8 @@ All per-compile filters receive `($value, $src, $handle, $compiler)` as argument
 | `after_setup_theme` | `Sassy::load_integrations()` |
 | `wp_ajax_sassy_compile` | `Sassy::compile_all()` (authenticated) |
 | `wp_ajax_nopriv_sassy_compile` | `Sassy::compile_all()` (unauthenticated — nonce verified inside) |
-| `wp_enqueue_scripts` | `Sassy::enqueue_scripts()` + `UI::scripts()` |
-| `admin_enqueue_scripts` | `Sassy::enqueue_scripts()` + `UI::scripts()` |
+| `wp_enqueue_scripts` | `Sassy::enqueue_scripts()` |
+| `admin_enqueue_scripts` | `Sassy::enqueue_scripts()` |
 | `wp_footer` / `admin_footer` | `Sassy::print_errors()` |
 | `admin_bar_menu` (priority 100) | `UI::admin_bar_menu()` |
 

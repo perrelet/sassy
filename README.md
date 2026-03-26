@@ -41,7 +41,7 @@ Sassy will compile a source file if any of the following are met:
 | `sassy-lightning-css` | `true` | Whether to run the optional Lightning CSS post‑processor. |
 | `sassy-lightning-css-binary` | `null` | Returns the Lightning CSS CLI binary/command to use. See [Lightning CSS post-processing](#lightning-css-post-processing). |
 | `sassy-engine` | `null` | Return a `Compiler_Engine` instance to override the default scssphp engine (e.g. to use Dart Sass). |
-| `sassy-dart-sass-binary` | `null` | Path to the Dart Sass binary. Falls back to `SASSY_DART_SASS_BIN` constant, then `"sass"` on PATH. |
+| `sassy-dart-sass-binary` | `SASSY_DART_SASS_BIN` constant (or `null`) | Path to the Dart Sass binary. If unset, compilation fails — there is no implicit fallback. |
 | `sassy-src-path` | (resolved from URL) | Override the resolved filesystem path of the source SCSS file. |
 | `sassy-print-errors` | `true` | Whether to render compile errors to the page footer. |
 
