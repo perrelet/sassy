@@ -107,6 +107,18 @@ class UI {
 
 			}
 
+			$engine_label = str_replace(['Sassy\\', '_Engine', '_'], ['', '', ' '], $compiler->get_engine_class());
+
+			$compile_time = $compiler->get_compile_time();
+			$compile_label = $compile_time ? round($compile_time * 1000) . 'ms' : 'Cached';
+
+			$admin_bar->add_menu([
+				'id'     => "sassy-{$index}-engine",
+				'parent' => "sassy-{$index}",
+				'title'  => $engine_label . ' &mdash; ' . $compile_label,
+				'href'   => false,
+			]);
+
 			if ($compiler->has_src_map()) {
 
 				$src_map_options = $compiler->get_src_map_options();
