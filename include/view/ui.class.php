@@ -80,7 +80,8 @@ class UI {
 			$index = $compiler->get_index();
 
 			//$icon = $compiler->has_error() ? '❌' : ($compiler->has_compiled() ? '✔️' : '💾');
-			$state = $compiler->has_error() ? 'error' : ($compiler->has_compiled() ? 'compiled' : 'cache');
+			$has_warnings = !empty($compiler->get_warnings());
+		$state = $compiler->has_error() ? 'error' : ($compiler->has_compiled() ? ($has_warnings ? 'warning' : 'compiled') : 'cache');
 			$title = "<span data-state='{$state}'>" . basename(explode('?', $compiler->get_src())[0]). "</span>";
 
 			$admin_bar->add_menu([

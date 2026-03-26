@@ -105,8 +105,12 @@
 
                     if (payload.success) {
 
-                        const hadErrors = this.reloadStyles(payload.data);
-                        if (!hadErrors) this.showNotice('✔ Compiled', 'success');
+                        const result = this.reloadStyles(payload.data);
+                        if (result === 'warning') {
+                            this.showNotice('⚠ Compiled with warnings', 'warning');
+                        } else if (!result) {
+                            this.showNotice('✔ Compiled', 'success');
+                        }
 
                     } else {
 
@@ -132,6 +136,7 @@
             if (!styles) return false;
 
             let hadErrors = false;
+            let hadWarnings = false;
 
             const links = document.querySelectorAll('link[rel="stylesheet"]');
 
@@ -185,8 +190,11 @@
                                 console.error(`Sassy compile error for ${property}:\n${block}`);
                                 this.error([block]);
                             } else {
+                                hadWarnings = true;
                                 console.log(`Successfully Recompiled: ${href}`);
                                 console.warn(`Sassy warnings for ${property}:\n${block}`);
+                                const menuItem = document.querySelector(`#wp-admin-bar-sassy-${meta && meta.index ? meta.index : ''} [data-state]`);
+                                if (menuItem) menuItem.setAttribute('data-state', 'warning');
                             }
                         } else {
                             console.log(`Successfully Recompiled: ${href}`);
@@ -198,7 +206,7 @@
 
             }
 
-            return hadErrors;
+            return hadErrors ? true : (hadWarnings ? 'warning' : false);
 
         },
 

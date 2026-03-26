@@ -21,6 +21,7 @@
   transform: translateY(0);
 }
 #sassy-notice[data-state=success] { background: #1a7f37; }
+#sassy-notice[data-state=warning] { background: #9a6700; }
 #sassy-notice[data-state=error]   { background: #cf222e; }
 
 #sassy-errors {
@@ -52,6 +53,9 @@
 }
 #wpadminbar [data-state][data-state=cache]:before {
   content: "💾 ";
+}
+#wpadminbar [data-state][data-state=warning]:before {
+  content: "⚠️ ";
 }
 
 .sassy-clipboard {
