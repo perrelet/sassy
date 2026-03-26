@@ -8,10 +8,17 @@
 
             this.params = params;
 
+            const notice = document.createElement('div');
+            notice.id = 'sassy-notice';
+            document.body.appendChild(notice);
+
             this.els = {
                 errors: document.getElementById('sassy-errors'),
                 adminMenu: document.querySelector('#wp-admin-bar-sassy > a'),
+                notice,
             };
+
+            this.noticeTimeout = null;
 
             this.addEventListeners();
 
@@ -70,6 +77,7 @@
             const url = `${this.params.ajax_url}?action=sassy_compile&nonce=${this.params.sassy_compile_nonce}&sassy-recompile=1`;
 
             this.clearErrors();
+            this.showNotice('⚡ Compiling\u2026', 'pending');
 
             fetch(url, { credentials: 'same-origin' })
                 .then(response => {
@@ -97,7 +105,8 @@
 
                     if (payload.success) {
 
-                        this.reloadStyles(payload.data);
+                        const hadErrors = this.reloadStyles(payload.data);
+                        if (!hadErrors) this.showNotice('✔ Compiled', 'success');
 
                     } else {
 
@@ -120,7 +129,9 @@
 
         reloadStyles (styles) {
 
-            if (!styles) return;
+            if (!styles) return false;
+
+            let hadErrors = false;
 
             const links = document.querySelectorAll('link[rel="stylesheet"]');
 
@@ -170,6 +181,7 @@
                             const hasError = lines.some(line => /^error:/i.test(line.trim()));
 
                             if (hasError) {
+                                hadErrors = true;
                                 console.error(`Sassy compile error for ${property}:\n${block}`);
                                 this.error([block]);
                             } else {
@@ -186,9 +198,13 @@
 
             }
 
+            return hadErrors;
+
         },
 
         error (errors) {
+
+            this.showNotice('\u2717 Error', 'error');
 
             if (this.els.adminMenu) {
 
@@ -243,6 +259,33 @@
             menuItems.forEach(menuItem => {
                 menuItem.setAttribute('data-state', 'compiled');
             });
+
+        },
+
+        showNotice (message, state) {
+
+            if (!this.els.notice) return;
+
+            if (this.noticeTimeout) {
+                clearTimeout(this.noticeTimeout);
+                this.noticeTimeout = null;
+            }
+
+            this.els.notice.textContent = message;
+            this.els.notice.dataset.state = state || 'pending';
+            this.els.notice.classList.add('show');
+
+            if (state !== 'pending') {
+                const delay = state === 'error' ? 4000 : 2000;
+                this.noticeTimeout = setTimeout(() => this.hideNotice(), delay);
+            }
+
+        },
+
+        hideNotice () {
+
+            if (!this.els.notice) return;
+            this.els.notice.classList.remove('show');
 
         },
 

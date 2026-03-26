@@ -1,4 +1,28 @@
 @charset "UTF-8";
+#sassy-notice {
+  position: fixed;
+  bottom: 2rem;
+  right: 1.5rem;
+  z-index: 100000;
+  background: #1e1e1e;
+  color: #fff;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.4;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(0.5rem);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+#sassy-notice.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+#sassy-notice[data-state=success] { background: #1a7f37; }
+#sassy-notice[data-state=error]   { background: #cf222e; }
+
 #sassy-errors {
   background: #ffc82e;
   border: 10px solid #ff8400;
@@ -68,4 +92,3 @@
   color: white;
 }
 
-/*# sourceMappingURL=sassy.css.map */
