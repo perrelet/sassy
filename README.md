@@ -32,7 +32,7 @@ Sassy will compile a source file if any of the following are met:
 | `sassy-build-path` | `WP_CONTENT_DIR` | The directory to compile to. |
 | `sassy-build-url` | `WP_CONTENT_URL` | URL to the compile directory. |
 | `sassy-build-directory` | `'/scss/'` or `'/scss/' . get_current_blog_id()` on multi_site. | The subdirectory to compile to.  |
-| `sassy-build-name` | Same as source, appended with compiler index. | The name of the compiled files. |
+| `sassy-build-name` | Same as source (e.g. `style.css`). | The name of the compiled files. |
 | `sassy-style` | `'ScssPhp\ScssPhp\OutputStyle::EXPANDED'` | Class of the scss formatter. |
 | `sassy-variables` | See [Variables](#variables) | Array of variables to be available. |
 | `sassy-src-map` | `true` | Whether to generate the source map. |
@@ -40,6 +40,10 @@ Sassy will compile a source file if any of the following are met:
 | `sassy-css` | N/A | The compiled css (post‑SCSS engine; used by Lightning CSS). |
 | `sassy-lightning-css` | `true` | Whether to run the optional Lightning CSS post‑processor. |
 | `sassy-lightning-css-binary` | `null` | Returns the Lightning CSS CLI binary/command to use. See [Lightning CSS post-processing](#lightning-css-post-processing). |
+| `sassy-engine` | `null` | Return a `Compiler_Engine` instance to override the default scssphp engine (e.g. to use Dart Sass). |
+| `sassy-dart-sass-binary` | `null` | Path to the Dart Sass binary. Falls back to `SASSY_DART_SASS_BIN` constant, then `"sass"` on PATH. |
+| `sassy-src-path` | (resolved from URL) | Override the resolved filesystem path of the source SCSS file. |
+| `sassy-print-errors` | `true` | Whether to render compile errors to the page footer. |
 
 ## Variables
 
@@ -47,9 +51,9 @@ By default only the following variables are defined, however others may be added
 
 ```php
 [
-    'wp-content-url' => WP_CONTENT_URL,
-    'template_directory_url'   => get_template_directory_uri(),
-    'stylesheet_directory_url' => get_stylesheet_directory_uri(),
+    'wp-content-url'           => WP_CONTENT_URL,
+    'template-directory-url'   => get_template_directory_uri(),
+    'stylesheet-directory-url' => get_stylesheet_directory_uri(),
 ]
 ```
 
@@ -172,9 +176,18 @@ add_filter('sassy-lightning-css-options', function ($options, $src, $handle, $co
 
 ## Source Maps
 
-Source maps can be selectively generated via the `sassy-src-map` filter. The source map configuration can be hooked via the `sassy-src-map-data` filter. Refer to (https://scssphp.github.io/scssphp/docs/) for further information on these parameters. 
+Source maps can be selectively generated via the `sassy-src-map` filter. The source map configuration can be hooked via the `sassy-src-map-options` filter. Refer to (https://scssphp.github.io/scssphp/docs/) for further information on these parameters.
 
 ## Integrations
+
+### Bricks Builder
+
+Sassy automatically converts the following from Bricks Builder's configuration into SCSS variables:
+
+ - 📱 Break Points (`$b-desktop`, `$b-tablet`, `$b-page`, `$b-phone-landscape`, `$b-phone-portrait`, etc.)
+ - 📐 Section & Column Spacing (`$sec-px`, `$sec-py`, `$col-px`)
+
+Sassy also generates a list of breakpoints as a sass map called `$breakpoints`.
 
 ### Oxygen Builder
 
@@ -186,6 +199,15 @@ Sassy automatically converts the following global styles from Oxygen Builder's c
  - 📐 Section & Column Spacing (`$sec-px`, `$sec-py`, `$col-px`)
 
 Sassy also generates a list of breakpoints as a sass map called `$breakpoints`.
+
+### Digitalis Framework
+
+When the [Digitalis Framework](https://digitalis.ca/) is active (`DIGITALIS_FRAMEWORK_VERSION` defined), Sassy automatically exposes the following SCSS variables:
+
+- `$digitalis_path` — absolute filesystem path to the Digitalis framework directory
+- `$digitalis_uri` — web URL to the Digitalis framework directory
+
+These are useful for referencing framework assets (fonts, images, partials) from within any SCSS file without hardcoding paths.
 
 ## Credits
 

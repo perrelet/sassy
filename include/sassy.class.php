@@ -67,6 +67,7 @@ class Sassy {
 
 		new Bricks();
 		new Oxygen();
+		new Digitalis();
 
 	}
 	
