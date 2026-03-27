@@ -313,7 +313,11 @@ class SCSS_Compiler {
 
     public function has_src_map () {
 
-        return $this->src_map;
+        if ($this->src_map) return true;
+
+        // On cache hits src_map is never set; check whether the map file exists.
+        $options = $this->get_src_map_options();
+        return isset($options['sourceMapWriteTo']) && file_exists($options['sourceMapWriteTo']);
 
     }
 

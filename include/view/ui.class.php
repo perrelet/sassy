@@ -165,12 +165,23 @@ class UI {
 
 								if (strpos($compiler->get_src(), $source) !== false) continue;
 
+								// Convert filesystem path to browser URL.
+								$source_url = false;
+								$abs        = str_replace('\\', '/', $source);
+								$content    = str_replace('\\', '/', WP_CONTENT_DIR);
+								$abspath    = str_replace('\\', '/', rtrim(ABSPATH, '/'));
+								if (strpos($abs, $content) === 0) {
+									$source_url = WP_CONTENT_URL . substr($abs, strlen($content));
+								} elseif (strpos($abs, $abspath) === 0) {
+									$source_url = site_url(substr($abs, strlen($abspath)));
+								}
+
 								$admin_bar->add_menu([
 									'id'		=> "sassy-{$index}-map-source-{$j}",
 									'parent'	=> "sassy-{$index}",
 									'title'		=> basename($source),
-									'href'		=> $source,
-									'meta'		=> ['target' => '_blank'],
+									'href'		=> $source_url ?: false,
+									'meta'		=> $source_url ? ['target' => '_blank'] : [],
 								]);
 
 							}
