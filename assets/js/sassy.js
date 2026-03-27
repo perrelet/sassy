@@ -18,6 +18,14 @@
                 notice,
             };
 
+            if (this.els.errors) {
+                const header = document.createElement('div');
+                header.id = 'sassy-errors-header';
+                header.innerHTML = '<span>SCSS Error</span><button id="sassy-errors-close" type="button">Dismiss</button>';
+                this.els.errors.prepend(header);
+                header.querySelector('#sassy-errors-close').addEventListener('click', () => this.clearErrors());
+            }
+
             this.noticeTimeout = null;
 
             this.addEventListeners();
@@ -105,12 +113,8 @@
 
                     if (payload.success) {
 
-                        const result = this.reloadStyles(payload.data);
-                        if (result === 'warning') {
-                            this.showNotice('⚠ Compiled with warnings', 'warning');
-                        } else if (!result) {
-                            this.showNotice('✔ Compiled', 'success');
-                        }
+                        const hadWarnings = this.reloadStyles(payload.data);
+                        this.showNotice(hadWarnings ? '⚠ Compiled with warnings' : '✔ Compiled', hadWarnings ? 'warning' : 'success');
 
                     } else {
 
@@ -135,7 +139,6 @@
 
             if (!styles) return false;
 
-            let hadErrors = false;
             let hadWarnings = false;
 
             const links = document.querySelectorAll('link[rel="stylesheet"]');
@@ -178,24 +181,22 @@
 
                         if (meta) {
                             console.info(`Sassy compile info for ${property}:`, meta);
+
+                            const engineItem = document.querySelector(`#wp-admin-bar-sassy-${meta.index}-engine .ab-item`);
+                            if (engineItem) {
+                                const engineLabel = (meta.engine || '').replace(/^Sassy\\/, '').replace(/_Engine$/, '').replace(/_/g, ' ');
+                                const compileMs   = meta.compile_time ? Math.round(meta.compile_time * 1000) + 'ms' : '\u2014';
+                                engineItem.textContent = `${engineLabel} \u2014 ${compileMs}`;
+                            }
                         }
 
                         if (warnings.length) {
-                            const lines = warnings.map(w => String(w));
-                            const block = lines.join('\n');
-                            const hasError = lines.some(line => /^error:/i.test(line.trim()));
-
-                            if (hasError) {
-                                hadErrors = true;
-                                console.error(`Sassy compile error for ${property}:\n${block}`);
-                                this.error([block]);
-                            } else {
-                                hadWarnings = true;
-                                console.log(`Successfully Recompiled: ${href}`);
-                                console.warn(`Sassy warnings for ${property}:\n${block}`);
-                                const menuItem = document.querySelector(`#wp-admin-bar-sassy-${meta && meta.index ? meta.index : ''} [data-state]`);
-                                if (menuItem) menuItem.setAttribute('data-state', 'warning');
-                            }
+                            hadWarnings = true;
+                            const block = warnings.map(w => String(w)).join('\n');
+                            console.log(`Successfully Recompiled: ${href}`);
+                            console.warn(`Sassy warnings for ${property}:\n${block}`);
+                            const menuItem = document.querySelector(`#wp-admin-bar-sassy-${meta && meta.index ? meta.index : ''} [data-state]`);
+                            if (menuItem) menuItem.setAttribute('data-state', 'warning');
                         } else {
                             console.log(`Successfully Recompiled: ${href}`);
                         }
@@ -206,7 +207,7 @@
 
             }
 
-            return hadErrors ? true : (hadWarnings ? 'warning' : false);
+            return hadWarnings ? 'warning' : false;
 
         },
 
@@ -222,7 +223,7 @@
 
             if (this.els.errors) {
 
-                this.els.errors.innerHTML = '';
+                this.els.errors.querySelectorAll('.sassy-error').forEach(el => el.remove());
 
                 for (const instance in errors) {
 
@@ -258,7 +259,7 @@
             if (this.els.errors) {
 
                 this.els.errors.classList.remove('show');
-                this.els.errors.innerHTML = '';
+                this.els.errors.querySelectorAll('.sassy-error').forEach(el => el.remove());
 
             }
 

@@ -159,7 +159,8 @@ class SCSS_Compiler {
             if ($filemtimes === false) {
                 $filemtimes = [];
             }
-            $filemtimes[$build_file] = filemtime($build_file);
+            $filemtimes[$build_file]      = filemtime($build_file);
+            $filemtimes['__compile_time__'] = $this->compile_time;
             set_transient('sassy-filemtimes-' . $this->handle, $filemtimes);
             $this->compiled = true;
         } else {
@@ -298,6 +299,15 @@ class SCSS_Compiler {
     public function get_compile_time () {
 
         return $this->compile_time;
+
+    }
+
+    public function get_last_compile_time () {
+
+        if ($this->compile_time > 0) return $this->compile_time;
+
+        $filemtimes = get_transient('sassy-filemtimes-' . $this->handle);
+        return $filemtimes['__compile_time__'] ?? null;
 
     }
 

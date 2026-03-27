@@ -67,7 +67,7 @@ class UI {
 		$admin_bar->add_menu([
 			'id'     => 'sassy-clear-cache',
 			'parent' => 'sassy',
-			'title'  => __('🗑 Clear Cache', 'sassy'),
+			'title'  => __('🗑️ Clear Cache', 'sassy'),
 			'href'   => add_query_arg('sassy-clear-cache', 1),
 		]);
 
@@ -118,8 +118,8 @@ class UI {
 
 			$engine_label = str_replace(['Sassy\\', '_Engine', '_'], ['', '', ' '], $compiler->get_engine_class());
 
-			$compile_time = $compiler->get_compile_time();
-			$compile_label = $compile_time ? round($compile_time * 1000) . 'ms' : 'Cached';
+			$last_compile_time = $compiler->get_last_compile_time();
+			$compile_label = $last_compile_time ? round($last_compile_time * 1000) . 'ms' : '—';
 
 			$admin_bar->add_menu([
 				'id'     => "sassy-{$index}-engine",
