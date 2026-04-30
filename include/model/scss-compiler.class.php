@@ -249,6 +249,7 @@ class SCSS_Compiler {
         if (defined('DIGITALIS_FRAMEWORK_PATH')) {
             $import_paths[] = DIGITALIS_FRAMEWORK_PATH;
         }
+        $import_paths = apply_filters('sassy-import-paths', $import_paths, $src_path, $this->handle, $this);
 
         return [
             'scss'               => file_get_contents($src_path),

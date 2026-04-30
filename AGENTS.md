@@ -247,6 +247,7 @@ The CLI mirrors the AJAX compile endpoint: fires `wp_enqueue_scripts`, iterates 
 | `sassy-build-name` | `{source-name}.css` | Compiled CSS filename |
 | `sassy-style` | `OutputStyle::EXPANDED` | ScssPhp output style |
 | `sassy-variables` | (see defaults above) | SCSS variables array |
+| `sassy-import-paths` | `[dirname($src_path), SASSY_PATH]` (+ `DIGITALIS_FRAMEWORK_PATH` if defined) | Filesystem paths searched by `@import`/`@use` |
 | `sassy-src-map` | `true` | Whether to generate source maps |
 | `sassy-src-map-options` | (sourceMapWriteTo, sourceMapURL, etc.) | Source map config array |
 | `sassy-src-path` | (resolved from URL) | Override source SCSS filesystem path |

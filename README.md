@@ -35,6 +35,7 @@ Sassy will compile a source file if any of the following are met:
 | `sassy-build-name` | Same as source (e.g. `style.css`). | The name of the compiled files. |
 | `sassy-style` | `'ScssPhp\ScssPhp\OutputStyle::EXPANDED'` | Class of the scss formatter. |
 | `sassy-variables` | See [Variables](#variables) | Array of variables to be available. |
+| `sassy-import-paths` | `[dirname($src_path), SASSY_PATH]` (plus `DIGITALIS_FRAMEWORK_PATH` if defined) | Filesystem paths searched by `@import`/`@use`. |
 | `sassy-src-map` | `true` | Whether to generate the source map. |
 | `sassy-src-map-options` | See [Source Maps](#source-maps) | Source map options array. |
 | `sassy-css` | N/A | The compiled css (post‑SCSS engine; used by Lightning CSS). |
