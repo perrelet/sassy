@@ -344,14 +344,19 @@ class SCSS_Compiler {
 
         if (is_null($this->src_path)) {
 
-            $abs = preg_replace('/^' . preg_quote(site_url(), '/') . '/i', '', $this->src);     // Convert the URL to absolute paths.
-            if (preg_match('#^//#', $abs) || strpos($abs, '/') !== 0) return $this->src;        // Ignore SCSS from CDNs, other domains, and relative paths
-            
-            $path = ABSPATH . parse_url($this->src)['path'];
+            // Compare host + path of the source URL against site_url(), scheme-agnostically. WP-CLI runs without HTTPS request context can yield plugin_dir_url()-derived URLs starting `http://` while the option-stored siteurl is `https://`; a strict prefix-strip of site_url() would fail and we'd treat our own SCSS as remote.
+            $url_parts  = parse_url($this->src);
+            $site_host  = parse_url(site_url(), PHP_URL_HOST);
+
+            // Reject CDNs / other domains / relative-or-malformed URLs.
+            if (empty($url_parts['host']) || empty($url_parts['path'])) return $this->src;
+            if (strcasecmp($url_parts['host'], $site_host) !== 0)       return $this->src;
+
+            $path = ABSPATH . ltrim($url_parts['path'], '/');
             if (!file_exists($path)) {
-                $path = rtrim($_SERVER['DOCUMENT_ROOT'], '/') . parse_url($this->src)['path'];
+                $path = rtrim($_SERVER['DOCUMENT_ROOT'], '/') . $url_parts['path'];
             }
-            
+
             // If it is part of a multi-site then the 'domain' must be removed
             if (is_multisite()) {
                 $blog_details_path = get_blog_details()->path;
@@ -363,7 +368,7 @@ class SCSS_Compiler {
         }
 
         return $this->src_path;
-        
+
     }
 
     public function get_src_map_options () {
