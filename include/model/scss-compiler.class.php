@@ -144,7 +144,7 @@ class SCSS_Compiler {
             $this->src_map = !empty($args['source_map']);
             $css = $result->css;
 
-            $css = preg_replace('#(url\((?![\'"]?(?:https?:|/))[\'"]?)#miu', '$1' . dirname($parse_src['path']) . '/', $css);
+            $css = preg_replace('#(url\((?![\'"]?(?:[a-z][a-z0-9+.\-]*:|/|\#))[\'"]?)#miu', '$1' . dirname($parse_src['path']) . '/', $css);
             $css = apply_filters('sassy-css', $css, $this->src, $this->handle, $this);
 
             file_put_contents($build_file, $css);
