@@ -24,7 +24,9 @@ sassy/
 │   │   ├── scss-compiler.class.php    # Per-file compilation orchestrator
 │   │   ├── compile-result.class.php   # DTO returned by compiler engines
 │   │   ├── scss-map.class.php         # PHP array → SCSS map syntax converter
-│   │   ├── import-scanner.class.php   # Walks the @use/@forward/@import graph for cache invalidation
+│   │   ├── import-graph.class.php     # Recorded dependency set; answers "has anything changed?"
+│   │   ├── import-resolver.class.php  # Sass file-resolution rules (partials, _index, load paths)
+│   │   ├── import-scanner.class.php   # Walks the @use/@forward/@import graph into an Import_Graph
 │   │   └── lightning-css-postprocessor.class.php  # Optional Lightning CSS post-processing
 │   ├── engines/
 │   │   ├── compiler-engine.interface.php            # Contract for engine implementations
@@ -56,7 +58,7 @@ sassy/
 1. **`sassy.php`** — Defines constants, creates `new Sassy\Sassy()` stored in `$Sassy` global, registers `SASSY()` helper. Registers WP-CLI command if `WP_CLI` is defined.
 2. **`plugins_loaded`** → `Sassy::boot()`:
    - Loads vendors (Composer autoload)
-   - Loads model classes (require_once in order: `Compile_Result`, `Lightning_CSS_Postprocessor`, `Scss_Map`, `Import_Scanner`, `Compiler_Engine` interface, engine implementations, `SCSS_Compiler`)
+   - Loads model classes (require_once in order: `Compile_Result`, `Lightning_CSS_Postprocessor`, `Scss_Map`, `Import_Graph`, `Import_Resolver`, `Import_Scanner`, `Compiler_Engine` interface, engine implementations, `SCSS_Compiler`)
    - Loads view (`UI` class, instantiated immediately)
    - Registers `Lightning_CSS_Postprocessor::filter` on `sassy-css` at priority 20
    - If `is_admin()`: loads and boots `Admin` → `Updater`
@@ -117,7 +119,8 @@ After filtering, any array values are automatically converted to SCSS map syntax
 ### Dependency tracking
 
 `Import_Scanner::scan()` walks the `@use` / `@forward` / `@import` graph from the entry file and
-records two sets in the `sassy-filemtimes-{handle}` transient:
+returns an `Import_Graph`, which is stored in the `sassy-filemtimes-{handle}` transient and owns
+the "has anything changed?" question. It holds two sets:
 
 - **`deps`** — `path => mtime` for every file the build was compiled from. A change to any of them
   (including a partial) triggers a recompile. This is what makes editing a partial work without

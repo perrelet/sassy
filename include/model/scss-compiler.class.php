@@ -157,14 +157,12 @@ class SCSS_Compiler {
                 }
             }
 
-            $scan = Import_Scanner::scan($src_path, $this->get_import_paths($src_path));
+            $graph = Import_Scanner::scan($src_path, $this->get_import_paths($src_path));
 
-            set_transient('sassy-filemtimes-' . $this->handle, [
+            set_transient('sassy-filemtimes-' . $this->handle, array_merge([
                 $build_file        => filemtime($build_file),
                 '__compile_time__' => $this->compile_time,
-                'deps'             => $scan['deps'],
-                'misses'           => $scan['misses'],
-            ]);
+            ], $graph->to_array()));
 
             set_transient('sassy-vars-sig-' . $this->handle, sha1(serialize($variables)));
 
@@ -197,15 +195,15 @@ class SCSS_Compiler {
             if ($filemtimes === false) {
                 $filemtimes = [];
             }
-            if (!isset($filemtimes[$build_file]) || $this->dependencies_changed($filemtimes, $src_path)) {
+            $graph = Import_Graph::from_array($filemtimes);
+            if (!isset($filemtimes[$build_file]) || !$graph || $graph->has_changed($src_path)) {
                 $run = true;
             }
         }
 
         if (!$run) {
-            // Deliberately not written here. Recording the signature before compiling meant a
-            // failed compile was remembered as current: the error vanished on the next request
-            // and the stale build file was served on. It is written once the compile succeeds.
+            // Written on success, not here: recording it up front meant a failed compile was
+            // remembered as current, so the error vanished on the next request.
             if (sha1(serialize($variables)) !== get_transient('sassy-vars-sig-' . $this->handle)) {
                 $run = true;
             }
@@ -216,38 +214,6 @@ class SCSS_Compiler {
         }
 
         return $run;
-    }
-
-    /**
-     * Whether any file the last build was compiled from has changed.
-     *
-     * Covers the whole @use / @forward / @import graph, so editing a partial invalidates
-     * the cache without having to touch the entry file. The graph itself only needs
-     * rebuilding when a compile happens: adding an import necessarily changes the mtime of
-     * the file that declares it, so a plain stat of the known set is enough in between.
-     *
-     * @param array  $cache    Stored filemtimes transient.
-     * @param string $src_path Current entry file.
-     * @return bool
-     */
-    protected function dependencies_changed (array $cache, $src_path) {
-
-        // No graph recorded yet, or the entry file itself has moved.
-        if (empty($cache['deps']))                 return true;
-        if (!isset($cache['deps'][$src_path]))     return true;
-
-        foreach ($cache['deps'] as $path => $mtime) {
-            if (!is_file($path) || filemtime($path) != $mtime) return true;
-        }
-
-        // A file appearing at a path we searched and did not find would shadow whichever
-        // candidate won, changing what the next compile resolves to.
-        foreach (($cache['misses'] ?? []) as $path) {
-            if (file_exists($path)) return true;
-        }
-
-        return false;
-
     }
 
     /**
@@ -406,12 +372,6 @@ class SCSS_Compiler {
 
     /**
      * Filesystem paths searched by @use / @forward / @import.
-     *
-     * Resolved separately from build_compile_args() because the cache check needs them
-     * too — the import graph has to be walked before we know whether to compile at all.
-     *
-     * @param string|null $src_path Entry file, defaulting to the resolved source path.
-     * @return array
      */
     public function get_import_paths ($src_path = null) {
 
@@ -568,14 +528,7 @@ class SCSS_Compiler {
     }
 
     /**
-     * Create a unique temporary file.
-     *
-     * Deliberately avoids wp_tempnam(), which lives in wp-admin/includes/file.php and is
-     * not loaded on frontend requests — calling it there is a fatal error. get_temp_dir()
-     * is in wp-includes/functions.php and is always available.
-     *
-     * @param string $prefix Filename prefix.
-     * @return string|false Absolute path to the created file, or false on failure.
+     * Not wp_tempnam(): that lives in wp-admin/includes/file.php and is fatal on the frontend.
      */
     public static function temp_file ($prefix = 'sassy-') {
 

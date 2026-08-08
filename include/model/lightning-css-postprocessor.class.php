@@ -139,9 +139,7 @@ class Lightning_CSS_Postprocessor {
             if (file_exists($cli)) return $cli;
         }
 
-        // Nothing configured: Lightning CSS is opt-in, so stay off rather than guessing at
-        // an npx on PATH. Guessing made the post-processor appear enabled on every install,
-        // shelling out and failing on each compile instead of cleanly doing nothing.
+        // Opt-in: guessing at an npx on PATH made this appear enabled on every install.
         return null;
     }
     
