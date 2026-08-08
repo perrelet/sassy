@@ -477,9 +477,13 @@ class SCSS_Compiler {
     }
     
     public function get_style () {
-        
-        return apply_filters('sassy-style', $this->style, $this->src, $this->handle, $this);
-        
+
+        $style = apply_filters('sassy-style', $this->style, $this->src, $this->handle, $this);
+
+        // Engines are handed a string. The filter's default is an OutputStyle case, and an enum
+        // never equals a string, so returning OutputStyle::COMPRESSED used to silently expand.
+        return $style instanceof OutputStyle ? $style->value : (string) $style;
+
     }
     
     public function get_variables () {

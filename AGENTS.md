@@ -285,7 +285,7 @@ The CLI mirrors the AJAX compile endpoint: fires `wp_enqueue_scripts`, iterates 
 | `sassy-build-url` | `WP_CONTENT_URL` | Base URL for compiled output |
 | `sassy-build-directory` | `'/scss/'` (or `'/scss/{blog_id}/'` on multisite) | Subdirectory under build path/url |
 | `sassy-build-name` | `{source-name}.css` | Compiled CSS filename |
-| `sassy-style` | `OutputStyle::EXPANDED` | ScssPhp output style |
+| `sassy-style` | `OutputStyle::EXPANDED` | Output style. May return the enum case or `'expanded'` / `'compressed'`; `get_style()` normalizes to a string before engines see it |
 | `sassy-variables` | (see defaults above) | SCSS variables array |
 | `sassy-import-paths` | `[dirname($src_path), SASSY_PATH]` (+ `DIGITALIS_FRAMEWORK_PATH` if defined) | Filesystem paths searched by `@import`/`@use` |
 | `sassy-src-map` | `true` | Whether to generate source maps |
