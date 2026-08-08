@@ -19,7 +19,7 @@ class Dart_Sass_Engine implements Compiler_Engine {
 
     }
 
-    protected function get_sass_bin () {
+    public function get_sass_bin () {
 
         if ($this->sass_bin !== null && $this->sass_bin !== '') {
             return $this->sass_bin;
@@ -85,6 +85,9 @@ class Dart_Sass_Engine implements Compiler_Engine {
         $exit_code    = 0;
         exec(implode(' ', $cmd) . ' 2>&1', $output_lines, $exit_code);
         $out = trim(implode("\n", $output_lines));
+
+        // Dart Sass cites the temp copy by name; the reader needs the file they wrote.
+        if ($out !== '' && $src_path) $out = str_replace(basename($tmp_in), basename($src_path), $out);
 
         if ($exit_code !== 0 || !file_exists($tmp_out)) {
             static::cleanup($tmp_in, $tmp_out, $tmp_map);

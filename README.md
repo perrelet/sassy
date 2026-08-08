@@ -97,19 +97,34 @@ When [WP-CLI](https://wp-cli.org/) is available, Sassy registers a `sassy` comma
 
 ### Commands
 
-**`wp sassy compile`** — Compile all registered SCSS styles (theme, plugin, and any styles added via `wp_enqueue_style` with a `.scss` source). Uses the same compilation pipeline as the browser (including Lightning CSS post-processing if configured). Outputs each compiled handle and its compile time.
-
 ```bash
-wp sassy compile
+wp sassy status                  # engine, binaries, build path, Lightning CSS state
+wp sassy list                    # discovered styles, cache state, dependency counts
+wp sassy compile                 # compile everything that is stale
+wp sassy compile --force         # ignore the cache
+wp sassy compile my-theme        # just one handle
+wp sassy vars                    # resolved SCSS variables
+wp sassy vars --format=scss      # ...as $name: value; declarations
+wp sassy deps my-theme           # the recorded import graph
+wp sassy clear                   # drop compile caches
 ```
 
-**`wp sassy compile --force`** — Force a full recompile, ignoring cache and file modification checks (equivalent to enabling the `sassy-force-compile` filter for that run).
+Data commands accept `--format=table|csv|json|yaml`, so they can be read by tooling as well as people.
+
+### Finding admin and editor styles
+
+Sassy discovers styles by firing enqueue hooks. By default only `wp_enqueue_scripts` runs, so
+stylesheets registered on `admin_enqueue_scripts` or `enqueue_block_editor_assets` are not found —
+they would stay stale until someone first loaded the admin or the editor.
+
+Use `--hooks` to widen the search:
 
 ```bash
-wp sassy compile --force
+wp sassy compile --hooks=all             # frontend, admin and editor
+wp sassy compile --hooks=admin,editor    # or pick them
 ```
 
-Useful for CI/CD, deployment scripts, or when you want to refresh all SCSS without loading the admin or triggering live compile.
+`--hooks=all` is what you want in a deploy hook, so no visitor pays for a cold compile.
 
 ## Lightning CSS post-processing
 

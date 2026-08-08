@@ -129,6 +129,31 @@ class Sassy {
 		
 	}
 
+	/**
+	 * Registered styles whose source is a .scss file, from both queues.
+	 *
+	 * @return array<string, object>
+	 */
+	public static function get_scss_styles () {
+
+		global $digitalis_styles;
+
+		$styles = wp_styles()->registered;
+		if ($digitalis_styles) $styles = array_merge($styles, $digitalis_styles->registered);
+
+		return array_filter($styles, function ($style) {
+
+			// Dependency-only handles register with src === false.
+			if (empty($style->src) || !is_string($style->src)) return false;
+
+			$path = parse_url($style->src, PHP_URL_PATH);
+
+			return $path && strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'scss';
+
+		});
+
+	}
+
 	public function compile_all () {
 
 		if (!wp_verify_nonce($_REQUEST['nonce'], 'sassy_compile')) {
@@ -140,17 +165,9 @@ class Sassy {
 		do_action('wp_enqueue_scripts');
 		ob_end_clean();
 
-		global $digitalis_styles;
-
 		$response = [];
 
-		$styles = wp_styles()->registered;
-		if ($digitalis_styles) $styles = array_merge($styles, $digitalis_styles->registered);
-		
-		if ($styles) foreach ($styles as $style) {
-
-			$path_parts = pathinfo(parse_url($style->src)['path']);
-			if (!isset($path_parts['extension']) || ($path_parts['extension'] != 'scss')) continue;
+		foreach ($this->get_scss_styles() as $style) {
 
             $compiler = new SCSS_Compiler();
             $this->compilers[] = $compiler;

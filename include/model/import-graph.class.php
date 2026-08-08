@@ -10,13 +10,13 @@ class Import_Graph {
     /** @var array<string, int> path => mtime */
     public $deps;
 
-    /** @var array<int, string> Paths searched and not found, ahead of the winning candidate. */
-    public $misses;
+    /** @var array<string, int> dir => mtime (0 when absent) for directories searched during resolution */
+    public $dirs;
 
-    public function __construct (array $deps = [], array $misses = []) {
+    public function __construct (array $deps = [], array $dirs = []) {
 
-        $this->deps   = $deps;
-        $this->misses = $misses;
+        $this->deps = $deps;
+        $this->dirs = $dirs;
 
     }
 
@@ -27,15 +27,15 @@ class Import_Graph {
 
         if (!is_array($data) || empty($data['deps'])) return null;
 
-        return new static($data['deps'], $data['misses'] ?? []);
+        return new static($data['deps'], $data['dirs'] ?? []);
 
     }
 
     public function to_array () {
 
         return [
-            'deps'   => $this->deps,
-            'misses' => $this->misses,
+            'deps' => $this->deps,
+            'dirs' => $this->dirs,
         ];
 
     }
@@ -48,9 +48,10 @@ class Import_Graph {
             if (!is_file($path) || filemtime($path) != $mtime) return true;
         }
 
-        // A file appearing at a path we searched and missed would shadow the candidate that won.
-        foreach ($this->misses as $path) {
-            if (file_exists($path)) return true;
+        // A directory's mtime moves when an entry is added or removed, which is exactly when
+        // a new file could shadow whichever candidate currently wins.
+        foreach ($this->dirs as $path => $mtime) {
+            if ((is_dir($path) ? filemtime($path) : 0) != $mtime) return true;
         }
 
         return false;

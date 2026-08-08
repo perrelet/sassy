@@ -31,6 +31,9 @@ function SASSY() {
 	return $Sassy;
 }
 
+// WP-CLI includes wp-settings.php from inside a method, so file scope here is not global scope.
+global $Sassy;
+
 $Sassy = new Sassy\Sassy();
 
 if (defined('WP_CLI') && WP_CLI) {

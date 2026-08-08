@@ -113,7 +113,7 @@ After filtering, any array values are automatically converted to SCSS map syntax
 
 | Transient key | Content | Invalidated when |
 |---|---|---|
-| `sassy-filemtimes-{handle}` | `build_file => filemtime`, `__compile_time__`, `deps`, `misses` | Directory creation error; rewritten after each successful compile |
+| `sassy-filemtimes-{handle}` | `build_file => filemtime`, `__compile_time__`, `deps`, `dirs` | Directory creation error; rewritten after each successful compile |
 | `sassy-vars-sig-{handle}` | sha1 of serialized variables | Written only after a **successful** compile, so a failed one is never remembered as current |
 
 ### Dependency tracking
@@ -125,9 +125,9 @@ the "has anything changed?" question. It holds two sets:
 - **`deps`** — `path => mtime` for every file the build was compiled from. A change to any of them
   (including a partial) triggers a recompile. This is what makes editing a partial work without
   touching the entry file.
-- **`misses`** — paths that were searched and *not* found, ahead of the candidate that won. If one
-  of them appears it would shadow the file currently in use, so its existence also invalidates.
-  Only candidates ahead of the winner can shadow it, so in the common case this set is empty.
+- **`dirs`** — `dir => mtime` for every directory searched during resolution, up to and including
+  the one that won. A directory's mtime moves when an entry is added or removed, which is exactly
+  when a new file could shadow the candidate currently in use, or create an ambiguous pair.
 
 The graph itself is only rebuilt when a compile happens. Adding an import necessarily changes the
 mtime of the file declaring it, so between compiles a plain stat of the known set is sufficient.
@@ -135,6 +135,16 @@ mtime of the file declaring it, so between compiles a plain stat of the known se
 Built-in modules (`sass:*`), remote URLs and plain-CSS imports are skipped. Over-inclusion is
 deliberately preferred to under-inclusion: a spurious entry costs one unnecessary recompile,
 a missing one serves stale CSS.
+
+> **Why directories rather than paths.** Recording each individual path that was tried and missed
+> is exact but does not scale: an import that resolves from the last load path tries every earlier
+> candidate first. A real project measured 125 dependencies against **12,588** miss paths, roughly
+> 15–25 ms of `file_exists()` per request. Watching directories brought the same project to 125
+> deps + 145 dirs, about 0.85 ms.
+>
+> The trade is granularity: `filemtime()` is second-resolution, so a file created in the same
+> second as the scan is not seen. Any later change to any tracked file resolves it. This is the
+> same window the entry-file mtime check has always had.
 
 ---
 
@@ -264,12 +274,42 @@ Admin bar structure:
 
 Registered only when `WP_CLI` is defined. Command group: `sassy`.
 
-```bash
-wp sassy compile           # Compile all registered .scss styles
-wp sassy compile --force   # Force full recompile (ignores cache)
-```
+| Command | Purpose |
+|---|---|
+| `wp sassy status` | Engine, binaries and versions, build path, Lightning CSS state, constants |
+| `wp sassy list` | Discovered SCSS styles with cache state, dependency count and last compile time |
+| `wp sassy compile [<handle>...]` | Compile; `--force` ignores the cache |
+| `wp sassy vars [<handle>]` | Resolved SCSS variables, after integrations and filters |
+| `wp sassy deps <handle>` | The recorded import graph, with each file's state |
+| `wp sassy clear [<handle>...]` | Drop compile caches |
 
-The CLI mirrors the AJAX compile endpoint: fires `wp_enqueue_scripts`, iterates all registered styles (including `$digitalis_styles` global), filters for `.scss` extensions, and compiles each. Outputs handle → URL → compile time per file.
+All data commands take `--format=table|csv|json|yaml`; `vars` also accepts `--format=scss`.
+
+### Style discovery and `--hooks`
+
+Styles are found by firing enqueue hooks and then reading both queues via
+`Sassy::get_scss_styles()`. `--hooks` selects which:
+
+| Value | Fires |
+|---|---|
+| `frontend` (default) | `wp_enqueue_scripts` |
+| `admin` | `admin_enqueue_scripts` |
+| `editor` | `enqueue_block_editor_assets` |
+| `all` | all three |
+
+Comma-separated combinations work. Anything registered on an admin or editor hook is invisible to
+the default, which is why deploy-time priming needs `--hooks=all`.
+
+> The flag is `--hooks`, not `--context`: WP-CLI reserves `--context` as a global parameter and
+> rejects the value before the command is reached.
+
+Firing admin and editor hooks outside a real request runs third-party callbacks that assume a
+screen exists, so `set_current_screen()` is called first and each hook set is wrapped in a
+`Throwable` guard that warns and skips rather than losing the run.
+
+> `wp sassy clear` with no handles deletes by pattern from the options table. Under an external
+> object cache transients are not there, so it falls back to clearing discovered handles and says
+> so — widen it with `--hooks=all`.
 
 ---
 

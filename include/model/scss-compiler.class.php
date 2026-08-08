@@ -90,6 +90,22 @@ class SCSS_Compiler {
     }
 
     /**
+     * Point this compiler at a source without compiling, so paths, variables and the
+     * recorded import graph can be inspected.
+     *
+     * @return $this
+     */
+    public function prepare ($src, $handle) {
+
+        $this->init();
+        $this->src    = $src;
+        $this->handle = $handle;
+
+        return $this;
+
+    }
+
+    /**
      * Compile the given SCSS source and return the URL to the built CSS.
      *
      * @param string $src   URL of the SCSS file.
@@ -98,9 +114,7 @@ class SCSS_Compiler {
      */
     public function compile ($src, $handle) {
 
-        $this->init();
-        $this->src    = $src;
-        $this->handle = $handle;
+        $this->prepare($src, $handle);
 
         $src_path  = $this->get_src_path();
         $parse_src = parse_url($this->src);

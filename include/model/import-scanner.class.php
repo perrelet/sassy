@@ -14,10 +14,10 @@ class Import_Scanner {
 
     public static function scan ($entry_path, array $import_paths = []) {
 
-        $deps   = [];
-        $misses = [];
-        $queue  = [$entry_path];
-        $seen   = [];
+        $deps  = [];
+        $dirs  = [];
+        $queue = [$entry_path];
+        $seen  = [];
 
         while ($queue) {
 
@@ -36,7 +36,8 @@ class Import_Scanner {
             foreach (static::parse_rules(file_get_contents($file)) as $rule) {
 
                 $result = Import_Resolver::resolve($rule, $search_dirs);
-                $misses = array_merge($misses, $result['misses']);
+
+                foreach ($result['dirs'] as $dir) $dirs[$dir] = true;
 
                 foreach ($result['found'] as $path) {
                     if (!isset($seen[$path])) $queue[] = $path;
@@ -46,7 +47,11 @@ class Import_Scanner {
 
         }
 
-        return new Import_Graph($deps, array_values(array_unique($misses)));
+        foreach ($dirs as $dir => $_) {
+            $dirs[$dir] = is_dir($dir) ? filemtime($dir) : 0;
+        }
+
+        return new Import_Graph($deps, $dirs);
 
     }
 

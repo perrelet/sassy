@@ -113,7 +113,7 @@ class Lightning_CSS_Postprocessor {
 
     }
 
-    protected static function resolve_bin () {
+    public static function resolve_bin () {
 
         // 1) Constant override
         if (defined('SASSY_LIGHTNINGCSS_BIN') && SASSY_LIGHTNINGCSS_BIN) {

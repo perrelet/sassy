@@ -8,39 +8,36 @@ namespace Sassy;
 class Import_Resolver {
 
     /**
-     * @return array{found: array<int, string>, misses: array<int, string>}
+     * @return array{found: array<int, string>, dirs: array<int, string>} dirs are the
+     *         directories searched, whose mtimes reveal a file appearing that would shadow
+     *         the winner. Watching directories rather than every candidate path matters:
+     *         an import resolving from the last load path tries dozens of paths first.
      */
     public static function resolve ($rule, array $search_dirs) {
 
-        $misses = [];
+        $dirs = [];
 
         foreach ($search_dirs as $dir) {
 
             $found = [];
-            $tried = [];
 
             foreach (static::candidates($rule, $dir) as $candidate) {
+
+                $dirs[] = dirname($candidate);
 
                 // Every match is returned, not just the first: Sass treats an ambiguous pair
                 // (foo.scss beside _foo.scss) as an error, so tracking both keeps us correct
                 // without replicating its precedence rules.
-                if (is_file($candidate)) {
-                    $found[] = $candidate;
-                } else if (!$found) {
-                    $tried[] = $candidate;
-                }
+                if (is_file($candidate)) $found[] = $candidate;
 
             }
 
-            $misses = array_merge($misses, $tried);
-
-            // Only candidates ahead of the winner can shadow it, so later directories are
-            // not recorded as misses.
-            if ($found) return ['found' => $found, 'misses' => $misses];
+            // Later directories cannot shadow the winner, so stop searching.
+            if ($found) return ['found' => $found, 'dirs' => $dirs];
 
         }
 
-        return ['found' => [], 'misses' => $misses];
+        return ['found' => [], 'dirs' => $dirs];
 
     }
 
