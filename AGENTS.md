@@ -113,6 +113,11 @@ After filtering, any array values are automatically converted to SCSS map syntax
 
 Variable values containing the site host are forced onto the scheme of the `home` option.
 
+> Deliberately blunt: it is a string replace across every string-valued variable, so an
+> intentionally `http` URL to your own host is rewritten too. It does not touch
+> protocol-relative `//host` URLs, and it keys on `home` while content URLs derive from
+> `siteurl` — the same host in practice, but the two options can legitimately differ.
+
 Anything WordPress derives from `is_ssl()` — `get_template_directory_uri()` and friends — returns
 `http` under WP-CLI, which makes no HTTPS request, while constants set in `wp-config.php` keep
 their literal scheme. Left alone that mixes schemes inside one stylesheet, and gives a CLI compile
@@ -197,6 +202,10 @@ The CLI can only compile a file, so variable injection means compiling a temp co
 Because the temp input is not co-located with the real source, explicitly relative imports (`@use "./x"`, `@use "../x"`) resolve against `.sassy-tmp/`. Bare and subdirectory forms are unaffected — `dirname($src_path)` is always a load path.
 
 > Post-compile CSS mutation invalidates the map: both the `url()` rewriting in `SCSS_Compiler::compile()` and any `sassy-css` filter (Lightning CSS included) run *after* the engine has produced it.
+>
+> With Lightning CSS enabled the map is not merely stale, it is **unreachable** — Lightning
+> strips the `sourceMappingURL` comment from the CSS it emits, so nothing links to the `.map`
+> file even though it is still written to disk.
 
 ---
 
@@ -322,6 +331,31 @@ screen exists, so `set_current_screen()` is called first and each hook set is wr
 > `wp sassy clear` with no handles deletes by pattern from the options table. Under an external
 > object cache transients are not there, so it falls back to clearing discovered handles and says
 > so — widen it with `--hooks=all`.
+
+---
+
+## Tests
+
+```bash
+php tests/run.php                    # this checkout
+php tests/run.php /path/to/checkout  # another one
+```
+
+No PHPUnit and no WordPress: `tests/bootstrap.php` stubs the handful of functions the compile
+path touches and builds a fixture docroot under `tests/.tmp/`. Each file runs in its own process
+because the fixture root is bound to constants. Tests needing Dart Sass skip themselves when the
+binary is absent.
+
+| File | Covers |
+|---|---|
+| `test-frontend-safety.php` | Nothing in the compile path calls an admin-only function; Lightning CSS stays off unless configured |
+| `test-import-graph.php` | Import parsing and resolution; editing a partial invalidates; shadowing; a failed compile is not remembered as current |
+| `test-multiple-handles.php` | Handles sharing a source directory do not invalidate each other |
+| `test-source-maps.php` | Every map source resolves from where the map is served, and line numbers are unshifted |
+| `test-output-style.php` | `sassy-style` accepts the enum and the string, on both engines |
+
+The second argument is what makes these worth having: point the runner at a checkout from before
+a fix and the relevant tests should fail. A test that passes against both is not testing the fix.
 
 ---
 

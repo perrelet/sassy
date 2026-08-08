@@ -236,7 +236,7 @@ class Sassy_CLI_Command extends WP_CLI_Command {
         foreach ($graph->deps as $path => $mtime) {
             $items[] = [
                 'file'     => $path,
-                'modified' => date('Y-m-d H:i:s', $mtime),
+                'modified' => wp_date('Y-m-d H:i:s', $mtime),
                 'state'    => !is_file($path) ? 'MISSING' : (filemtime($path) != $mtime ? 'changed' : 'current'),
             ];
         }
@@ -244,6 +244,10 @@ class Sassy_CLI_Command extends WP_CLI_Command {
         Utils\format_items($assoc_args['format'] ?? 'table', $items, ['file', 'modified', 'state']);
 
         if ($graph->dirs) WP_CLI::log(sprintf('%d directory(s) watched for shadowing.', count($graph->dirs)));
+
+        if ($graph->truncated) {
+            WP_CLI::warning(sprintf('Graph truncated at %d files; changes beyond that will not invalidate the cache.', Import_Scanner::MAX_FILES));
+        }
 
     }
 

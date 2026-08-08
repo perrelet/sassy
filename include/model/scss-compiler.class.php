@@ -173,6 +173,13 @@ class SCSS_Compiler {
 
             $graph = Import_Scanner::scan($src_path, $this->get_import_paths($src_path));
 
+            if ($graph->truncated) {
+                $this->warnings[] = sprintf(
+                    'Import graph truncated at %d files. Changes beyond that will not invalidate the cache.',
+                    Import_Scanner::MAX_FILES
+                );
+            }
+
             set_transient('sassy-filemtimes-' . $this->handle, array_merge([
                 $build_file        => filemtime($build_file),
                 '__compile_time__' => $this->compile_time,

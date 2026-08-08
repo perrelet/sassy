@@ -167,7 +167,7 @@ class Sassy {
 
 		$response = [];
 
-		foreach ($this->get_scss_styles() as $style) {
+		foreach (static::get_scss_styles() as $style) {
 
             $compiler = new SCSS_Compiler();
             $this->compilers[] = $compiler;

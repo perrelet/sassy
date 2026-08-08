@@ -13,10 +13,14 @@ class Import_Graph {
     /** @var array<string, int> dir => mtime (0 when absent) for directories searched during resolution */
     public $dirs;
 
-    public function __construct (array $deps = [], array $dirs = []) {
+    /** @var bool The walk hit Import_Scanner::MAX_FILES, so the graph is incomplete. */
+    public $truncated;
 
-        $this->deps = $deps;
-        $this->dirs = $dirs;
+    public function __construct (array $deps = [], array $dirs = [], $truncated = false) {
+
+        $this->deps      = $deps;
+        $this->dirs      = $dirs;
+        $this->truncated = (bool) $truncated;
 
     }
 
@@ -27,15 +31,16 @@ class Import_Graph {
 
         if (!is_array($data) || empty($data['deps'])) return null;
 
-        return new static($data['deps'], $data['dirs'] ?? []);
+        return new static($data['deps'], $data['dirs'] ?? [], $data['truncated'] ?? false);
 
     }
 
     public function to_array () {
 
         return [
-            'deps' => $this->deps,
-            'dirs' => $this->dirs,
+            'deps'      => $this->deps,
+            'dirs'      => $this->dirs,
+            'truncated' => $this->truncated,
         ];
 
     }

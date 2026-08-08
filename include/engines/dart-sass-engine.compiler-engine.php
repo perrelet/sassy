@@ -52,6 +52,9 @@ class Dart_Sass_Engine implements Compiler_Engine {
         $tmp_dir = $build_dir . '/.sassy-tmp';
         if (!is_dir($tmp_dir)) wp_mkdir_p($tmp_dir);
 
+        static::sweep($tmp_dir . '/_sassy-*.tmp.scss');
+        static::sweep($build_dir . '/.sassy-*.tmp.css*');
+
         $uniq    = uniqid();
         $tmp_in  = $tmp_dir . '/_sassy-' . $uniq . '.tmp.scss';
         $tmp_out = $build_dir . '/.sassy-' . $uniq . '.tmp.css';
@@ -168,6 +171,19 @@ class Dart_Sass_Engine implements Compiler_Engine {
 
         foreach ($paths as $path) {
             if ($path) @unlink($path);
+        }
+
+    }
+
+    /**
+     * Drop temp files a killed compile never got to clean up.
+     */
+    protected static function sweep ($pattern, $max_age = 3600) {
+
+        $cutoff = time() - $max_age;
+
+        foreach ((glob($pattern) ?: []) as $path) {
+            if (is_file($path) && filemtime($path) < $cutoff) @unlink($path);
         }
 
     }

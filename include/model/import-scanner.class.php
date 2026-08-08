@@ -14,10 +14,11 @@ class Import_Scanner {
 
     public static function scan ($entry_path, array $import_paths = []) {
 
-        $deps  = [];
-        $dirs  = [];
-        $queue = [$entry_path];
-        $seen  = [];
+        $deps      = [];
+        $dirs      = [];
+        $queue     = [$entry_path];
+        $seen      = [];
+        $truncated = false;
 
         while ($queue) {
 
@@ -26,7 +27,11 @@ class Import_Scanner {
             if (isset($seen[$file])) continue;
             $seen[$file] = true;
 
-            if (count($deps) >= self::MAX_FILES) break;
+            if (count($deps) >= self::MAX_FILES) {
+                $truncated = true;
+                break;
+            }
+
             if (!is_file($file)) continue;
 
             $deps[$file] = filemtime($file);
@@ -51,7 +56,7 @@ class Import_Scanner {
             $dirs[$dir] = is_dir($dir) ? filemtime($dir) : 0;
         }
 
-        return new Import_Graph($deps, $dirs);
+        return new Import_Graph($deps, $dirs, $truncated);
 
     }
 
