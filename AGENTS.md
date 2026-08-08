@@ -24,6 +24,7 @@ sassy/
 │   │   ├── scss-compiler.class.php    # Per-file compilation orchestrator
 │   │   ├── compile-result.class.php   # DTO returned by compiler engines
 │   │   ├── scss-map.class.php         # PHP array → SCSS map syntax converter
+│   │   ├── import-scanner.class.php   # Walks the @use/@forward/@import graph for cache invalidation
 │   │   └── lightning-css-postprocessor.class.php  # Optional Lightning CSS post-processing
 │   ├── engines/
 │   │   ├── compiler-engine.interface.php            # Contract for engine implementations
@@ -55,7 +56,7 @@ sassy/
 1. **`sassy.php`** — Defines constants, creates `new Sassy\Sassy()` stored in `$Sassy` global, registers `SASSY()` helper. Registers WP-CLI command if `WP_CLI` is defined.
 2. **`plugins_loaded`** → `Sassy::boot()`:
    - Loads vendors (Composer autoload)
-   - Loads model classes (require_once in order: `Compile_Result`, `Lightning_CSS_Postprocessor`, `Scss_Map`, `Compiler_Engine` interface, engine implementations, `SCSS_Compiler`)
+   - Loads model classes (require_once in order: `Compile_Result`, `Lightning_CSS_Postprocessor`, `Scss_Map`, `Import_Scanner`, `Compiler_Engine` interface, engine implementations, `SCSS_Compiler`)
    - Loads view (`UI` class, instantiated immediately)
    - Registers `Lightning_CSS_Postprocessor::filter` on `sassy-css` at priority 20
    - If `is_admin()`: loads and boots `Admin` → `Updater`
@@ -75,7 +76,7 @@ sassy/
 1. **Resolve source path** — converts the `.scss` URL to an absolute filesystem path. Handles multisite by normalizing the blog path. Filterable via `sassy-src-path`.
 2. **Cache check** (`should_compile`) — skips actual compilation if:
    - `sassy-force-compile` filter returns false, AND
-   - `sassy-filemtimes-{handle}` transient shows the file hasn't changed, AND
+   - No file in the recorded import graph has changed (see [Dependency tracking](#dependency-tracking)), AND
    - `sassy-vars-sig-{handle}` transient matches sha1 of current serialized variables, AND
    - The compiled build file already exists on disk.
 3. **Build compile args** — assembles `$args`: scss content, src_path, import_paths (source dir + SASSY_PATH + DIGITALIS_FRAMEWORK_PATH if defined), variables (resolved via `get_variables()`), output style, source map settings.
@@ -110,8 +111,27 @@ After filtering, any array values are automatically converted to SCSS map syntax
 
 | Transient key | Content | Invalidated when |
 |---|---|---|
-| `sassy-filemtimes-{handle}` | `build_file => filemtime` | Directory creation error; refreshed on each compile |
-| `sassy-vars-sig-{handle}` | sha1 of serialized variables | Set on signature mismatch (triggers recompile) |
+| `sassy-filemtimes-{handle}` | `build_file => filemtime`, `__compile_time__`, `deps`, `misses` | Directory creation error; rewritten after each successful compile |
+| `sassy-vars-sig-{handle}` | sha1 of serialized variables | Written only after a **successful** compile, so a failed one is never remembered as current |
+
+### Dependency tracking
+
+`Import_Scanner::scan()` walks the `@use` / `@forward` / `@import` graph from the entry file and
+records two sets in the `sassy-filemtimes-{handle}` transient:
+
+- **`deps`** — `path => mtime` for every file the build was compiled from. A change to any of them
+  (including a partial) triggers a recompile. This is what makes editing a partial work without
+  touching the entry file.
+- **`misses`** — paths that were searched and *not* found, ahead of the candidate that won. If one
+  of them appears it would shadow the file currently in use, so its existence also invalidates.
+  Only candidates ahead of the winner can shadow it, so in the common case this set is empty.
+
+The graph itself is only rebuilt when a compile happens. Adding an import necessarily changes the
+mtime of the file declaring it, so between compiles a plain stat of the known set is sufficient.
+
+Built-in modules (`sass:*`), remote URLs and plain-CSS imports are skipped. Over-inclusion is
+deliberately preferred to under-inclusion: a spurious entry costs one unnecessary recompile,
+a missing one serves stale CSS.
 
 ---
 

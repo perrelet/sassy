@@ -30,6 +30,7 @@ class SCSS_Compiler {
     protected $build_file;
     protected $src_path;
     protected $src_map_options;
+    protected $import_paths;
 
     protected $compiled;
     protected $error;
@@ -55,6 +56,7 @@ class SCSS_Compiler {
         $this->build_file       = null;
         $this->src_path         = null;
         $this->src_map_options  = null;
+        $this->import_paths     = null;
 
         $this->compiled = false;
         $this->error    = false;
@@ -155,13 +157,17 @@ class SCSS_Compiler {
                 }
             }
 
-            $filemtimes = get_transient('sassy-filemtimes-' . $this->handle);
-            if ($filemtimes === false) {
-                $filemtimes = [];
-            }
-            $filemtimes[$build_file]      = filemtime($build_file);
-            $filemtimes['__compile_time__'] = $this->compile_time;
-            set_transient('sassy-filemtimes-' . $this->handle, $filemtimes);
+            $scan = Import_Scanner::scan($src_path, $this->get_import_paths($src_path));
+
+            set_transient('sassy-filemtimes-' . $this->handle, [
+                $build_file        => filemtime($build_file),
+                '__compile_time__' => $this->compile_time,
+                'deps'             => $scan['deps'],
+                'misses'           => $scan['misses'],
+            ]);
+
+            set_transient('sassy-vars-sig-' . $this->handle, sha1(serialize($variables)));
+
             $this->compiled = true;
         } else {
             $this->compile_time = 0.0;
@@ -191,16 +197,17 @@ class SCSS_Compiler {
             if ($filemtimes === false) {
                 $filemtimes = [];
             }
-            if (!isset($filemtimes[$build_file]) || $filemtimes[$build_file] < filemtime($src_path)) {
+            if (!isset($filemtimes[$build_file]) || $this->dependencies_changed($filemtimes, $src_path)) {
                 $run = true;
             }
         }
 
         if (!$run) {
-            $signature = sha1(serialize($variables));
-            if ($signature !== get_transient('sassy-vars-sig-' . $this->handle)) {
+            // Deliberately not written here. Recording the signature before compiling meant a
+            // failed compile was remembered as current: the error vanished on the next request
+            // and the stale build file was served on. It is written once the compile succeeds.
+            if (sha1(serialize($variables)) !== get_transient('sassy-vars-sig-' . $this->handle)) {
                 $run = true;
-                set_transient('sassy-vars-sig-' . $this->handle, $signature);
             }
         }
 
@@ -209,6 +216,38 @@ class SCSS_Compiler {
         }
 
         return $run;
+    }
+
+    /**
+     * Whether any file the last build was compiled from has changed.
+     *
+     * Covers the whole @use / @forward / @import graph, so editing a partial invalidates
+     * the cache without having to touch the entry file. The graph itself only needs
+     * rebuilding when a compile happens: adding an import necessarily changes the mtime of
+     * the file that declares it, so a plain stat of the known set is enough in between.
+     *
+     * @param array  $cache    Stored filemtimes transient.
+     * @param string $src_path Current entry file.
+     * @return bool
+     */
+    protected function dependencies_changed (array $cache, $src_path) {
+
+        // No graph recorded yet, or the entry file itself has moved.
+        if (empty($cache['deps']))                 return true;
+        if (!isset($cache['deps'][$src_path]))     return true;
+
+        foreach ($cache['deps'] as $path => $mtime) {
+            if (!is_file($path) || filemtime($path) != $mtime) return true;
+        }
+
+        // A file appearing at a path we searched and did not find would shadow whichever
+        // candidate won, changing what the next compile resolves to.
+        foreach (($cache['misses'] ?? []) as $path) {
+            if (file_exists($path)) return true;
+        }
+
+        return false;
+
     }
 
     /**
@@ -245,16 +284,10 @@ class SCSS_Compiler {
      */
     protected function build_compile_args ($src_path, array $variables) {
 
-        $import_paths = [dirname($src_path), SASSY_PATH];
-        if (defined('DIGITALIS_FRAMEWORK_PATH')) {
-            $import_paths[] = DIGITALIS_FRAMEWORK_PATH;
-        }
-        $import_paths = apply_filters('sassy-import-paths', $import_paths, $src_path, $this->handle, $this);
-
         return [
             'scss'               => file_get_contents($src_path),
             'src_path'           => $src_path,
-            'import_paths'       => $import_paths,
+            'import_paths'       => $this->get_import_paths($src_path),
             'variables'          => $variables,
             'style'              => $this->get_style(),
             'source_map'         => apply_filters('sassy-src-map', true, $this->src, $this->handle, $this),
@@ -368,6 +401,34 @@ class SCSS_Compiler {
         }
 
         return $this->src_path;
+
+    }
+
+    /**
+     * Filesystem paths searched by @use / @forward / @import.
+     *
+     * Resolved separately from build_compile_args() because the cache check needs them
+     * too — the import graph has to be walked before we know whether to compile at all.
+     *
+     * @param string|null $src_path Entry file, defaulting to the resolved source path.
+     * @return array
+     */
+    public function get_import_paths ($src_path = null) {
+
+        if (is_null($this->import_paths)) {
+
+            $src_path = $src_path ?: $this->get_src_path();
+
+            $import_paths = [dirname($src_path), SASSY_PATH];
+            if (defined('DIGITALIS_FRAMEWORK_PATH')) {
+                $import_paths[] = DIGITALIS_FRAMEWORK_PATH;
+            }
+
+            $this->import_paths = apply_filters('sassy-import-paths', $import_paths, $src_path, $this->handle, $this);
+
+        }
+
+        return $this->import_paths;
 
     }
 
