@@ -45,14 +45,15 @@ class Dart_Sass_Engine implements Compiler_Engine {
             ? rtrim(dirname($map_opts['sourceMapWriteTo']), '/\\')
             : rtrim(get_temp_dir(), '/\\');
 
-        // Input goes beside the real source so relative @use resolves the way it would for the
-        // real file; output goes in the build directory so the map's source paths are relative
-        // to where the map is actually served from.
-        $src_dir = $src_path ? dirname($src_path) : $build_dir;
-        $tmp_dir = is_writable($src_dir) ? $src_dir : $build_dir;
+        // The temp input gets its own directory, never a source or load-path one: the import
+        // graph watches directory mtimes for shadowing files, and creating a file in a watched
+        // directory invalidates every handle compiled from it. Output goes in the build
+        // directory so the map's source paths are relative to where the map is served from.
+        $tmp_dir = $build_dir . '/.sassy-tmp';
+        if (!is_dir($tmp_dir)) wp_mkdir_p($tmp_dir);
 
         $uniq    = uniqid();
-        $tmp_in  = rtrim($tmp_dir, '/\\') . '/_sassy-' . $uniq . '.tmp.scss';
+        $tmp_in  = $tmp_dir . '/_sassy-' . $uniq . '.tmp.scss';
         $tmp_out = $build_dir . '/.sassy-' . $uniq . '.tmp.css';
         $tmp_map = $tmp_out . '.map';
 

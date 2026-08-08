@@ -13,6 +13,18 @@ class Sassy_CLI_Command extends WP_CLI_Command {
 
     const CONTEXTS = ['frontend', 'admin', 'editor'];
 
+    public function __construct () {
+
+        // WP-CLI makes no HTTPS request, so is_ssl() is false and everything WordPress derives
+        // from it -- get_template_directory_uri() and friends -- comes back http even on an
+        // https site. That bakes mixed-content URLs into the CSS, and gives the variables a
+        // different signature than a web request, so the first visitor recompiles anyway.
+        if (!is_ssl() && parse_url((string) get_option('home'), PHP_URL_SCHEME) === 'https') {
+            $_SERVER['HTTPS'] = 'on';
+        }
+
+    }
+
     /**
      * Compile registered SCSS styles.
      *

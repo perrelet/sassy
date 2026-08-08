@@ -518,10 +518,42 @@ class SCSS_Compiler {
                 }
             }
 
+            $this->variables = static::normalize_url_schemes($this->variables);
+
         }
 
         return $this->variables;
         
+    }
+
+    /**
+     * Force site URLs in variable values onto the scheme the site is actually served on.
+     *
+     * Anything derived from is_ssl() comes back http under WP-CLI and under a misconfigured
+     * proxy, which both bakes mixed-content URLs into the CSS and gives the variables a
+     * different signature than a web request would — so a CLI-primed cache is discarded by the
+     * first visitor. Values built from constants at plugin-load time cannot be fixed any
+     * earlier than this.
+     */
+    protected static function normalize_url_schemes (array $variables) {
+
+        $home   = (string) get_option('home');
+        $host   = parse_url($home, PHP_URL_HOST);
+        $scheme = parse_url($home, PHP_URL_SCHEME);
+
+        if (!$host || !$scheme) return $variables;
+
+        $wrong = ($scheme === 'https' ? 'http' : 'https') . '://' . $host;
+        $right = $scheme . '://' . $host;
+
+        foreach ($variables as $key => $value) {
+            if (is_string($value) && strpos($value, $wrong) !== false) {
+                $variables[$key] = str_replace($wrong, $right, $value);
+            }
+        }
+
+        return $variables;
+
     }
 
     /**

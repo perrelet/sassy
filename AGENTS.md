@@ -109,6 +109,18 @@ The engine is resolved lazily in `SCSS_Compiler::get_engine()`:
 
 After filtering, any array values are automatically converted to SCSS map syntax via `Scss_Map::from_array()` (supports nesting).
 
+### URL scheme normalization
+
+Variable values containing the site host are forced onto the scheme of the `home` option.
+
+Anything WordPress derives from `is_ssl()` — `get_template_directory_uri()` and friends — returns
+`http` under WP-CLI, which makes no HTTPS request, while constants set in `wp-config.php` keep
+their literal scheme. Left alone that mixes schemes inside one stylesheet, and gives a CLI compile
+a different variable signature than a web request, so `wp sassy compile` would prime a cache the
+first visitor immediately discards. The CLI also sets `$_SERVER['HTTPS']` up front, but that
+cannot help values other plugins baked into constants at load time, which is why the
+normalization runs over the final variable set.
+
 ### Caching Transients
 
 | Transient key | Content | Invalidated when |
@@ -178,11 +190,11 @@ Variables are injected by **prepending** `$var: value;` declarations to the SCSS
 
 The CLI can only compile a file, so variable injection means compiling a temp copy. Three things follow, all handled inside the engine:
 
-- The temp input is written **beside the real source**, so relative `@use` resolves exactly as it would for the real file.
+- The temp input goes in **`{build_dir}/.sassy-tmp/`**, never a source or load-path directory. Dependency tracking watches directory mtimes, so a temp file written into a watched directory invalidates every handle compiled from it — three handles sharing one source directory would recompile each other on every request. Restoring the mtime afterwards is not an option: setting an explicit mtime requires *ownership* of the directory, not merely write access, so it fails silently whenever CLI and web-server users differ.
 - Output and map are written **into the build directory**, so the `sources` paths Dart Sass emits — which are relative to the map — are already correct for where the map is served from.
 - `sources` entry for the temp copy is rewritten to the real file, and the `sourceMappingURL` comment (which Dart Sass names after the temp output) is replaced with `sourceMapURL` from `sassy-src-map-options`.
 
-If the source directory is not writable the temp input falls back to the build directory; relative `@use` then resolves against the build directory rather than the source, so bare imports need to be on a load path.
+Because the temp input is not co-located with the real source, explicitly relative imports (`@use "./x"`, `@use "../x"`) resolve against `.sassy-tmp/`. Bare and subdirectory forms are unaffected — `dirname($src_path)` is always a load path.
 
 > Post-compile CSS mutation invalidates the map: both the `url()` rewriting in `SCSS_Compiler::compile()` and any `sassy-css` filter (Lightning CSS included) run *after* the engine has produced it.
 
