@@ -5,35 +5,20 @@ namespace Sassy;
 /**
  * Compiler engine using the Dart Sass CLI.
  *
- * Expects $args to match the Compiler_Engine contract (scss, src_path, import_paths,
- * variables as key => string, style, source_map). Variables are prepended to the
- * SCSS source for the CLI.
- *
- * Binary path is resolved at compile time for portability across dev/staging/production:
- * 1. Pass a path to the constructor when instantiating via the sassy-engine filter, or
- * 2. Define SASSY_DART_SASS_BIN in wp-config.php (e.g. per environment), or
- * 3. Use the sassy-dart-sass-binary filter to return the path.
- * Default if none set: "sass" (rely on PATH).
+ * Binary path resolves from the constructor argument, then the sassy-dart-sass-binary
+ * filter, then the SASSY_DART_SASS_BIN constant. There is no implicit fallback.
  */
 class Dart_Sass_Engine implements Compiler_Engine {
 
-    /** @var string|null Path to the sass executable, or null to resolve via filter/constant. */
+    /** @var string|null */
     protected $sass_bin;
 
-    /**
-     * @param string|null $sass_bin Path to the Dart Sass binary, or null to use sassy-dart-sass-binary filter / SASSY_DART_SASS_BIN constant (default "sass").
-     */
     public function __construct ($sass_bin = null) {
 
         $this->sass_bin = $sass_bin;
 
     }
 
-    /**
-     * Resolve the Dart Sass binary path (constructor, filter, constant, or "sass").
-     *
-     * @return string
-     */
     protected function get_sass_bin () {
 
         if ($this->sass_bin !== null && $this->sass_bin !== '') {
@@ -45,10 +30,8 @@ class Dart_Sass_Engine implements Compiler_Engine {
     }
 
     /**
-     * Compile SCSS to CSS by shelling out to the Dart Sass binary.
-     *
-     * @param array $args Must include scss; optional variables, import_paths, style, source_map.
-     * @return Compile_Result
+     * @param array $args Must include scss; optional src_path, variables, import_paths, style,
+     *                    source_map, source_map_options.
      */
     public function compile (array $args) : Compile_Result {
 
@@ -56,20 +39,31 @@ class Dart_Sass_Engine implements Compiler_Engine {
             return new Compile_Result(null, null, 'Dart Sass binary path not set. Define SASSY_DART_SASS_BIN or use the sassy-dart-sass-binary filter.', null);
         }
 
-        $tmp_in  = SCSS_Compiler::temp_file('sassy-in-');
-        $tmp_out = SCSS_Compiler::temp_file('sassy-out-');
-        $tmp_map = $tmp_out . '.map';
+        $src_path  = $args['src_path'] ?? null;
+        $map_opts  = $args['source_map_options'] ?? [];
+        $build_dir = isset($map_opts['sourceMapWriteTo'])
+            ? rtrim(dirname($map_opts['sourceMapWriteTo']), '/\\')
+            : rtrim(get_temp_dir(), '/\\');
 
-        if (!$tmp_in || !$tmp_out) {
-            return new Compile_Result(null, null, 'Unable to create temp files.', null);
-        }
+        // Input goes beside the real source so relative @use resolves the way it would for the
+        // real file; output goes in the build directory so the map's source paths are relative
+        // to where the map is actually served from.
+        $src_dir = $src_path ? dirname($src_path) : $build_dir;
+        $tmp_dir = is_writable($src_dir) ? $src_dir : $build_dir;
+
+        $uniq    = uniqid();
+        $tmp_in  = rtrim($tmp_dir, '/\\') . '/_sassy-' . $uniq . '.tmp.scss';
+        $tmp_out = $build_dir . '/.sassy-' . $uniq . '.tmp.css';
+        $tmp_map = $tmp_out . '.map';
 
         $scss = $args['scss'] ?? '';
         if (!empty($args['variables'])) {
             $scss = SCSS_Compiler::prepend_variables($scss, $args['variables']);
         }
 
-        file_put_contents($tmp_in, $scss);
+        if (file_put_contents($tmp_in, $scss) === false) {
+            return new Compile_Result(null, null, 'Unable to write temporary SCSS file: ' . $tmp_in, null);
+        }
 
         $cmd = [];
 
@@ -81,61 +75,96 @@ class Dart_Sass_Engine implements Compiler_Engine {
             $cmd[] = '--load-path=' . escapeshellarg($path);
         }
 
-        // Variables: easiest is to prepend them as SCSS before compilation.
-        // You can also generate a partial and @use it, but prepend works well for simple var injection.
-        // If you want maps and quoted strings reliably, generate SCSS assignments carefully.
+        $cmd[] = !empty($args['source_map']) ? '--source-map' : '--no-source-map';
+        $cmd[] = (($args['style'] ?? '') === 'compressed') ? '--style=compressed' : '--style=expanded';
 
-        if (!empty($args['source_map'])) {
-            $cmd[] = '--source-map';
-        } else {
-            $cmd[] = '--no-source-map';
-        }
-
-        // Choose style: expanded or compressed
-        if (($args['style'] ?? '') === 'compressed') {
-            $cmd[] = '--style=compressed';
-        } else {
-            $cmd[] = '--style=expanded';
-        }
-
-        // Prevent Dart Sass from writing "error CSS" into the output file on failure.
+        // Without this Dart Sass writes the error message into the output file as CSS.
         $cmd[] = '--no-error-css';
-
-        $full = implode(' ', $cmd) . ' 2>&1';
 
         $output_lines = [];
         $exit_code    = 0;
-        exec($full, $output_lines, $exit_code);
-        $out = implode("\n", $output_lines);
+        exec(implode(' ', $cmd) . ' 2>&1', $output_lines, $exit_code);
+        $out = trim(implode("\n", $output_lines));
 
         if ($exit_code !== 0 || !file_exists($tmp_out)) {
-            @unlink($tmp_in);
-            @unlink($tmp_out);
-            @unlink($tmp_map);
-
-            $msg = is_string($out) && $out !== '' ? trim($out) : 'Dart Sass compile failed.';
-            return new Compile_Result(null, null, $msg, null);
+            static::cleanup($tmp_in, $tmp_out, $tmp_map);
+            return new Compile_Result(null, null, $out !== '' ? $out : 'Dart Sass compile failed.', null);
         }
 
         $css = file_get_contents($tmp_out);
         $map = file_exists($tmp_map) ? file_get_contents($tmp_map) : null;
 
+        if ($map !== null) {
+            $map = static::rewrite_map($map, basename($tmp_in), $build_dir, $src_path);
+        }
+
+        $css = static::rewrite_map_url($css, $map_opts['sourceMapURL'] ?? null);
+
         $warnings = null;
-        if (is_string($out)) {
-            $trimmed = trim($out);
-            if ($trimmed !== '') {
-                $lines = preg_split('/\R/', $trimmed);
-                $warnings = array_values(array_filter($lines, static function ($line) {
-                    return trim($line) !== '';
-                }));
+        if ($out !== '') {
+            $warnings = array_values(array_filter(preg_split('/\R/', $out), static function ($line) {
+                return trim($line) !== '';
+            }));
+        }
+
+        static::cleanup($tmp_in, $tmp_out, $tmp_map);
+
+        return new Compile_Result($css, $map, null, $warnings);
+
+    }
+
+    /**
+     * Point the map's entry source at the real file rather than the temp copy compiled from.
+     */
+    protected static function rewrite_map ($map, $tmp_basename, $map_dir, $src_path) {
+
+        if (!$src_path) return $map;
+
+        $data = json_decode($map, true);
+        if (!is_array($data) || empty($data['sources'])) return $map;
+
+        foreach ($data['sources'] as $i => $source) {
+            if (basename($source) === $tmp_basename) {
+                $data['sources'][$i] = static::relative_path($map_dir, $src_path);
             }
         }
 
-        @unlink($tmp_in);
-        @unlink($tmp_out);
-        @unlink($tmp_map);
+        $encoded = json_encode($data, JSON_UNESCAPED_SLASHES);
 
-        return new Compile_Result($css, $map, null, $warnings);
+        return $encoded === false ? $map : $encoded;
+
+    }
+
+    /**
+     * Dart Sass names whatever output file it was handed, which is a temp file.
+     */
+    protected static function rewrite_map_url ($css, $url) {
+
+        $css = preg_replace('~/\*#\s*sourceMappingURL=[^\r\n]*\*/\s*$~', '', $css);
+
+        return $url ? rtrim($css) . "\n\n/*# sourceMappingURL={$url} */\n" : $css;
+
+    }
+
+    protected static function relative_path ($from_dir, $to) {
+
+        $from = explode('/', trim(str_replace('\\', '/', $from_dir), '/'));
+        $to   = explode('/', trim(str_replace('\\', '/', $to), '/'));
+
+        while ($from && $to && $from[0] === $to[0]) {
+            array_shift($from);
+            array_shift($to);
+        }
+
+        return str_repeat('../', count($from)) . implode('/', $to);
+
+    }
+
+    protected static function cleanup (...$paths) {
+
+        foreach ($paths as $path) {
+            if ($path) @unlink($path);
+        }
 
     }
 

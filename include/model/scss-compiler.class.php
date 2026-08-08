@@ -523,7 +523,9 @@ class SCSS_Compiler {
         foreach ($variables as $key => $value) {
             $lines[] = '$' . $key . ': ' . $value . ';';
         }
-        return implode("\n", $lines) . "\n\n" . $scss;
+        // One line, joined to the source's first: anything taller shifts every source map
+        // line number by the number of variables injected.
+        return implode(' ', $lines) . ' ' . $scss;
 
     }
 

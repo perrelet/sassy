@@ -149,6 +149,10 @@ Uses `scssphp/scssphp` v2.x — pure PHP, no external processes.
 - Source maps generated via `Compiler::SOURCE_MAP_FILE`.
 - Warnings returned in `Compile_Result::info`.
 
+> **scssphp v2.1.0 does not implement Sass modules.** `@use` and `@forward` throw
+> `Sass modules are not implemented yet`; only `@import` works. This engine is the zero-dependency
+> option for small projects, but anything written in modern Sass needs `Dart_Sass_Engine`.
+
 ### `Dart_Sass_Engine` (optional)
 
 Shells out to Dart Sass CLI via `exec()`. Not used by default — must be returned from the `sassy-engine` filter.
@@ -158,7 +162,19 @@ Binary resolution order:
 2. `sassy-dart-sass-binary` filter (with `SASSY_DART_SASS_BIN` constant as its default value)
 3. If nothing is configured, `get_sass_bin()` returns `null` and compilation fails with an error message.
 
-Variables are injected by **prepending** `$var: value;` declarations to the SCSS source (via `SCSS_Compiler::prepend_variables()`), not via the library API.
+Variables are injected by **prepending** `$var: value;` declarations to the SCSS source (via `SCSS_Compiler::prepend_variables()`), not via the library API. The prelude is emitted as a *single line joined to the source's first line* — the CLI has no equivalent of scssphp's `addVariables()`, and any taller prelude shifts every source map line number by the number of variables injected.
+
+#### Source maps
+
+The CLI can only compile a file, so variable injection means compiling a temp copy. Three things follow, all handled inside the engine:
+
+- The temp input is written **beside the real source**, so relative `@use` resolves exactly as it would for the real file.
+- Output and map are written **into the build directory**, so the `sources` paths Dart Sass emits — which are relative to the map — are already correct for where the map is served from.
+- `sources` entry for the temp copy is rewritten to the real file, and the `sourceMappingURL` comment (which Dart Sass names after the temp output) is replaced with `sourceMapURL` from `sassy-src-map-options`.
+
+If the source directory is not writable the temp input falls back to the build directory; relative `@use` then resolves against the build directory rather than the source, so bare imports need to be on a load path.
+
+> Post-compile CSS mutation invalidates the map: both the `url()` rewriting in `SCSS_Compiler::compile()` and any `sassy-css` filter (Lightning CSS included) run *after* the engine has produced it.
 
 ---
 
