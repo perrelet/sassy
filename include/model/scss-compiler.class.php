@@ -505,5 +505,21 @@ class SCSS_Compiler {
         return implode("\n", $lines) . "\n\n" . $scss;
 
     }
-    
+
+    /**
+     * Create a unique temporary file.
+     *
+     * Deliberately avoids wp_tempnam(), which lives in wp-admin/includes/file.php and is
+     * not loaded on frontend requests — calling it there is a fatal error. get_temp_dir()
+     * is in wp-includes/functions.php and is always available.
+     *
+     * @param string $prefix Filename prefix.
+     * @return string|false Absolute path to the created file, or false on failure.
+     */
+    public static function temp_file ($prefix = 'sassy-') {
+
+        return tempnam(get_temp_dir(), $prefix);
+
+    }
+
 }

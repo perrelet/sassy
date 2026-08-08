@@ -56,8 +56,8 @@ class Dart_Sass_Engine implements Compiler_Engine {
             return new Compile_Result(null, null, 'Dart Sass binary path not set. Define SASSY_DART_SASS_BIN or use the sassy-dart-sass-binary filter.', null);
         }
 
-        $tmp_in  = wp_tempnam('sassy-in.scss');
-        $tmp_out = wp_tempnam('sassy-out.css');
+        $tmp_in  = SCSS_Compiler::temp_file('sassy-in-');
+        $tmp_out = SCSS_Compiler::temp_file('sassy-out-');
         $tmp_map = $tmp_out . '.map';
 
         if (!$tmp_in || !$tmp_out) {

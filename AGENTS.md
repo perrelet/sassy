@@ -147,7 +147,8 @@ Binary resolution order:
 1. `SASSY_LIGHTNINGCSS_BIN` constant
 2. `sassy-lightning-css-binary` filter
 3. `SASSY_TOOLS_DIR` constant — looks for `npx` on PATH, then falls back to `node_modules/lightningcss-cli/dist/cli.js` inside that directory
-4. Last resort: `npx` on PATH
+
+If none of these are configured, `resolve_bin()` returns `null` and the post-processor returns the CSS untouched. There is deliberately no "try `npx` and hope" fallback — that made the post-processor appear enabled on every install.
 
 Process execution uses `proc_open()` with non-blocking I/O and a 60s timeout. Fails gracefully (returns original CSS) if binary is missing or process fails. stderr is discarded silently (logged to PHP error log on error).
 

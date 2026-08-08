@@ -32,8 +32,8 @@ class Lightning_CSS_Postprocessor {
             return $css;
         }
     
-        $in  = wp_tempnam("sassy-in-{$handle}.css");
-        $out = wp_tempnam("sassy-out-{$handle}.css");
+        $in  = SCSS_Compiler::temp_file('sassy-in-');
+        $out = SCSS_Compiler::temp_file('sassy-out-');
     
         if (!$in || !$out) return $css;
     
@@ -138,9 +138,11 @@ class Lightning_CSS_Postprocessor {
             $cli = $tools_dir . DIRECTORY_SEPARATOR . 'node_modules' . DIRECTORY_SEPARATOR . 'lightningcss-cli' . DIRECTORY_SEPARATOR . 'dist' . DIRECTORY_SEPARATOR . 'cli.js';
             if (file_exists($cli)) return $cli;
         }
-    
-        // 4) Last resort: hope npx is callable
-        return 'npx';
+
+        // Nothing configured: Lightning CSS is opt-in, so stay off rather than guessing at
+        // an npx on PATH. Guessing made the post-processor appear enabled on every install,
+        // shelling out and failing on each compile instead of cleanly doing nothing.
+        return null;
     }
     
     protected static function find_npx () {
