@@ -1,0 +1,24 @@
+# Editors & agents
+.claude
+.vscode
+.idea
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Tooling — Lightning CSS is installed per-environment, never shipped
+node_modules/
+composer.phar
+
+# Test fixtures
+tests/.tmp/
+
+# Merge/patch artifacts
+*.orig
+*.rej
+
+# vendor/ is deliberately committed: the plugin ships without a composer install
