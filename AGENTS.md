@@ -43,7 +43,7 @@ sassy/
 │   ├── view/
 │   │   └── ui.class.php              # Admin bar SCSS menu, clipboard support
 │   └── cli/
-│       └── sassy-cli-command.class.php  # WP-CLI: status, list, compile, vars, deps, clear
+│       └── sassy-cli-command.class.php  # WP-CLI: status, list, compile, watch, vars, deps, clear
 ├── assets/
 │   └── css/sassy.css                 # Plugin's own admin styles (hand-maintained)
 ├── tests/                            # `php tests/run.php` — no PHPUnit, no WordPress
@@ -334,6 +334,7 @@ Registered only when `WP_CLI` is defined. Command group: `sassy`.
 | `wp sassy vars [<handle>]` | Resolved SCSS variables, after integrations and filters |
 | `wp sassy deps <handle>` | The recorded import graph, with each file's state |
 | `wp sassy clear [<handle>...]` | Drop compile caches |
+| `wp sassy watch [<handle>...]` | Recompile on change until interrupted; `--interval` sets the poll |
 
 All data commands take `--format=table|csv|json|yaml`; `vars` also accepts `--format=scss`.
 
@@ -358,6 +359,21 @@ the default, which is why deploy-time priming needs `--hooks=all`.
 Firing admin and editor hooks outside a real request runs third-party callbacks that assume a
 screen exists, so `set_current_screen()` is called first and each hook set is wrapped in a
 `Throwable` guard that warns and skips rather than losing the run.
+
+### `wp sassy watch`
+
+A loop around the same cache check `style_loader_src` runs, so it needed no new change detection.
+Three things it has to get right:
+
+- **`clearstatcache()` every tick.** PHP caches stat results for the life of the process, so
+  without it the watcher reads the mtimes from its first pass forever and never sees anything.
+- **It ignores `sassy-check-dependencies`.** Turning the check off is a production decision;
+  asking to watch is an explicit request for it.
+- **Discovery happens once.** Re-firing enqueue hooks each tick would run third-party callbacks
+  in a loop, so a newly registered handle needs a restart.
+
+Not a deploy mechanism: under an external object cache a long-running process holds a runtime
+cache and will not see a concurrent web request recompiling.
 
 > `wp sassy clear` with no handles deletes by pattern from the options table. Under an external
 > object cache transients are not there, so it falls back to clearing discovered handles and says

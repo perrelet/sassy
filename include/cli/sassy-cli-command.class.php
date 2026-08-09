@@ -99,6 +99,118 @@ class Sassy_CLI_Command extends WP_CLI_Command {
     }
 
     /**
+     * Recompile as files change, until interrupted.
+     *
+     * ## OPTIONS
+     *
+     * [<handle>...]
+     * : Only watch these handles. Defaults to every discovered SCSS style.
+     *
+     * [--hooks=<hooks>]
+     * : Which enqueue hooks to fire before looking for styles. Comma-separated, or "all".
+     * ---
+     * default: frontend
+     * ---
+     *
+     * [--interval=<seconds>]
+     * : Seconds between checks.
+     * ---
+     * default: 1
+     * ---
+     *
+     * ## EXAMPLES
+     *
+     *     wp sassy watch
+     *     wp sassy watch --hooks=all --interval=2
+     *
+     * @when after_wp_load
+     */
+    public function watch ($args, $assoc_args) {
+
+        $styles = $this->discover($assoc_args, $args);
+
+        if (!$styles) WP_CLI::error('No SCSS styles found. Try --hooks=all.');
+
+        // Watching is an explicit request to watch; a production opt-out does not apply.
+        add_filter('sassy-check-dependencies', '__return_true', 99);
+
+        $interval = max(1, (int) ($assoc_args['interval'] ?? 1));
+        $files    = 0;
+
+        foreach ($styles as $style) {
+            $compiler = $this->watch_once($style);
+            $graph    = Import_Graph::from_array(get_transient('sassy-filemtimes-' . $style->handle));
+            $files   += $graph ? count($graph->deps) : 0;
+        }
+
+        WP_CLI::log(sprintf('Watching %d handle(s), %d file(s), every %ds. Ctrl-C to stop.', count($styles), $files, $interval));
+
+        $stop = function () {
+            WP_CLI::log('');
+            WP_CLI::log('Stopped.');
+            exit(0);
+        };
+
+        if (function_exists('pcntl_signal')) {
+            pcntl_signal(SIGINT, $stop);
+            pcntl_signal(SIGTERM, $stop);
+        }
+
+        while (true) {
+
+            sleep($interval);
+
+            if (function_exists('pcntl_signal_dispatch')) pcntl_signal_dispatch();
+
+            // Long-running process: PHP would otherwise keep serving the stat results it cached
+            // on the first pass, and nothing would ever look changed.
+            clearstatcache();
+
+            foreach ($styles as $style) $this->watch_once($style);
+
+        }
+
+    }
+
+    /**
+     * Compile one style if it is stale, reporting only when something actually happened.
+     */
+    protected function watch_once ($style) {
+
+        $compiler = new SCSS_Compiler();
+        $compiler->compile($style->src, $style->handle);
+
+        $stamp = wp_date('H:i:s');
+
+        if ($compiler->has_error()) {
+
+            WP_CLI::log(sprintf('%s  %s  %s', $stamp, $style->handle, \WP_CLI::colorize('%RERROR%n')));
+
+            foreach (preg_split('/\R/', (string) $compiler->get_error()) as $line) {
+                WP_CLI::log('           ' . $line);
+            }
+
+            return $compiler;
+
+        }
+
+        if (!$compiler->has_compiled()) return $compiler;
+
+        $warnings = $compiler->get_warnings();
+
+        WP_CLI::log(sprintf(
+            '%s  %s  %.2fs%s',
+            $stamp,
+            $style->handle,
+            (float) $compiler->get_compile_time(),
+            $warnings ? sprintf('  (%d warning%s)', count($warnings), count($warnings) === 1 ? '' : 's') : ''
+        ));
+
+        return $compiler;
+
+    }
+
+    /**
      * List discovered SCSS styles and their cache state.
      *
      * ## OPTIONS

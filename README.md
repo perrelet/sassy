@@ -108,6 +108,7 @@ wp sassy vars                    # resolved SCSS variables
 wp sassy vars --format=scss      # ...as $name: value; declarations
 wp sassy deps my-theme           # the recorded import graph
 wp sassy clear                   # drop compile caches
+wp sassy watch                   # recompile as you edit, until Ctrl-C
 ```
 
 Data commands accept `--format=table|csv|json|yaml`, so they can be read by tooling as well as people.
@@ -126,6 +127,20 @@ wp sassy compile --hooks=admin,editor    # or pick them
 ```
 
 `--hooks=all` is what you want in a deploy hook, so no visitor pays for a cold compile.
+
+### Watching
+
+`wp sassy watch` recompiles the moment a file changes, so the CSS is built before you switch to
+the browser and Sass errors appear in the terminal you are editing in.
+
+```bash
+wp sassy watch                        # frontend styles, checked every second
+wp sassy watch --hooks=all            # admin and editor styles too
+wp sassy watch my-theme --interval=2  # one handle, less often
+```
+
+A compile error prints and the loop keeps going, so you fix and save rather than restarting.
+Handles are discovered once at startup — registering a new one needs a restart.
 
 ## Lightning CSS post-processing
 
