@@ -52,11 +52,29 @@ class Import_Scanner {
 
         }
 
+        $watch = [];
+
         foreach ($dirs as $dir => $_) {
-            $dirs[$dir] = is_dir($dir) ? filemtime($dir) : 0;
+            if (static::holds_sass($dir)) $watch[$dir] = filemtime($dir);
         }
 
-        return new Import_Graph($deps, $dirs, $truncated);
+        return new Import_Graph($deps, $watch, $truncated);
+
+    }
+
+    /**
+     * Whether a directory is somewhere a shadowing partial could plausibly appear.
+     *
+     * Load-path roots that hold no Sass at all — the plugin directory, a framework root — are
+     * skipped. They churn for unrelated reasons, and every such churn would invalidate every
+     * handle on the site. A directory appearing is still caught: creating it moves its parent's
+     * mtime, and the entry file's own directory is always watched.
+     */
+    protected static function holds_sass ($dir) {
+
+        if (!is_dir($dir)) return false;
+
+        return (bool) (glob($dir . '/*.scss') ?: glob($dir . '/*.sass'));
 
     }
 

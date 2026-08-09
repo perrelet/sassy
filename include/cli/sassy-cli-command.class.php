@@ -340,6 +340,7 @@ class Sassy_CLI_Command extends WP_CLI_Command {
         $row('engine',      $compiler->get_engine_class());
         $row('output style', $compiler->get_style());
         $row('source maps', apply_filters('sassy-src-map', true, null, null, $compiler) ? 'on' : 'off');
+        $row('dependency checking', apply_filters('sassy-check-dependencies', true, null, null, $compiler) ? 'on' : 'off (compile explicitly)');
 
         $sass_bin = (new Dart_Sass_Engine())->get_sass_bin();
         $row('dart sass binary', $sass_bin ?: '(not configured)');

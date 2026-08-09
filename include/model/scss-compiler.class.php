@@ -216,10 +216,17 @@ class SCSS_Compiler {
             if ($filemtimes === false) {
                 $filemtimes = [];
             }
-            $graph = Import_Graph::from_array($filemtimes);
-            if (!isset($filemtimes[$build_file]) || !$graph || $graph->has_changed($src_path)) {
+            if (!isset($filemtimes[$build_file])) {
+
                 $run = true;
+
+            } else if (apply_filters('sassy-check-dependencies', true, $this->src, $this->handle, $this)) {
+
+                $graph = Import_Graph::from_array($filemtimes);
+                if (!$graph || $graph->has_changed($src_path)) $run = true;
+
             }
+
         }
 
         if (!$run) {

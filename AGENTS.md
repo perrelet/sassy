@@ -43,10 +43,10 @@ sassy/
 │   ├── view/
 │   │   └── ui.class.php              # Admin bar SCSS menu, clipboard support
 │   └── cli/
-│       └── sassy-cli-command.class.php  # WP-CLI: `wp sassy compile [--force]`
+│       └── sassy-cli-command.class.php  # WP-CLI: status, list, compile, vars, deps, clear
 ├── assets/
-│   ├── scss/sassy.scss               # Plugin's own admin styles (source)
-│   └── css/sassy.css                 # Compiled output of the above (committed)
+│   └── css/sassy.css                 # Plugin's own admin styles (hand-maintained)
+├── tests/                            # `php tests/run.php` — no PHPUnit, no WordPress
 ├── vendor/                           # Composer dependencies (scssphp/scssphp v2.x)
 └── composer.json                     # Requires scssphp/scssphp ^2.1.0
 ```
@@ -130,7 +130,7 @@ normalization runs over the final variable set.
 
 | Transient key | Content | Invalidated when |
 |---|---|---|
-| `sassy-filemtimes-{handle}` | `build_file => filemtime`, `__compile_time__`, `deps`, `dirs` | Directory creation error; rewritten after each successful compile |
+| `sassy-filemtimes-{handle}` | `build_file => filemtime`, `__compile_time__`, `deps`, `dirs`, `truncated` | Directory creation error; rewritten after each successful compile |
 | `sassy-vars-sig-{handle}` | sha1 of serialized variables | Written only after a **successful** compile, so a failed one is never remembered as current |
 
 ### Dependency tracking
@@ -142,9 +142,16 @@ the "has anything changed?" question. It holds two sets:
 - **`deps`** — `path => mtime` for every file the build was compiled from. A change to any of them
   (including a partial) triggers a recompile. This is what makes editing a partial work without
   touching the entry file.
-- **`dirs`** — `dir => mtime` for every directory searched during resolution, up to and including
-  the one that won. A directory's mtime moves when an entry is added or removed, which is exactly
-  when a new file could shadow the candidate currently in use, or create an ambiguous pair.
+- **`dirs`** — `dir => mtime` for directories searched during resolution, up to and including the
+  one that won, **that currently hold at least one `.scss` or `.sass` file**. A directory's mtime
+  moves when an entry is added or removed, which is exactly when a new file could shadow the
+  candidate currently in use, or create an ambiguous pair.
+
+  Sass-free load-path roots — the plugin directory, a framework root — are skipped. They churn
+  for unrelated reasons and every such churn would invalidate every handle on the site. A
+  directory *appearing* is still caught: creating it moves its parent's mtime, and the entry
+  file's own directory is always watched. On one real project this cut the watch set from 145
+  directories to 6.
 
 The graph itself is only rebuilt when a compile happens. Adding an import necessarily changes the
 mtime of the file declaring it, so between compiles a plain stat of the known set is sufficient.
@@ -162,6 +169,26 @@ a missing one serves stale CSS.
 > The trade is granularity: `filemtime()` is second-resolution, so a file created in the same
 > second as the scan is not seen. Any later change to any tracked file resolves it. This is the
 > same window the entry-file mtime check has always had.
+
+### Cost, and turning it off
+
+The check is one `stat` per dependency plus one per watched directory, on every request, per
+handle. The same project measures ~0.45 ms for 125 dependencies and 6 directories — a fraction of
+a percent of a typical response, and it scales linearly with project size.
+
+That assumes local disk. On NFS, EFS or a container bind mount, stat latency is an order of
+magnitude higher and those calls become tens of milliseconds per request. Return false from
+`sassy-check-dependencies` there and drive compilation explicitly instead:
+
+```php
+add_filter('sassy-check-dependencies', function ($check, $src, $handle, $compiler) {
+    return defined('WP_DEBUG') && WP_DEBUG;   // watch in dev, deploy-compile in production
+}, 10, 4);
+```
+
+With it off, a handle still compiles when it has never been built, when the build file is missing,
+when variables change, and on `sassy-force-compile` — so `wp sassy compile --hooks=all` in a
+deploy hook remains sufficient. What stops happening is noticing edits on disk.
 
 ---
 
@@ -367,6 +394,7 @@ a fix and the relevant tests should fail. A test that passes against both is not
 |---|---|---|
 | `sassy-compile` | `true` | Skip compilation for a handle entirely |
 | `sassy-force-compile` | `false` | Force recompile regardless of cache |
+| `sassy-check-dependencies` | `true` | Whether to stat the import graph on each request. False trades edit detection for the stat cost |
 | `sassy-build-path` | `WP_CONTENT_DIR` | Base filesystem path for compiled output |
 | `sassy-build-url` | `WP_CONTENT_URL` | Base URL for compiled output |
 | `sassy-build-directory` | `'/scss/'` (or `'/scss/{blog_id}/'` on multisite) | Subdirectory under build path/url |
@@ -454,7 +482,7 @@ An alternative `WP_Styles` registry used by the Digitalis framework to register 
 
 ## Development Notes
 
-- The plugin's own admin CSS (`assets/scss/sassy.scss`) is compiled via a VS Code task (`sass assets/scss/sassy.scss assets/css/sassy.css`), not by the plugin itself.
+- The plugin's own admin CSS is `assets/css/sassy.css`, edited directly — the SCSS source was dropped in `398e1c6`, so the VS Code Sass task in `.vscode/tasks.json` no longer has an input.
 - The `Scssphp_Engine` is the only engine that needs no external binaries — safe default for all environments.
 - When adding a new integration: extend `Integration`, implement `condition()` and `get_variables()`, then add `new YourIntegration()` in `Sassy::load_integrations()`.
 - When adding a new filter to `SCSS_Compiler`, keep the signature consistent: `($value, $src, $handle, $compiler)`.

@@ -59,6 +59,21 @@ fixture("$SCSS/_a.scss", "@use 'b';\n");
 fixture("$SCSS/_b.scss", "@use 'a';\n");
 check('a cycle terminates', count(Import_Scanner::scan("$SCSS/_a.scss", [$SCSS])->deps) === 2);
 
+section('The watch set skips directories holding no Sass');
+
+// A load-path root with no SCSS in it churns for unrelated reasons, and watching it would
+// invalidate every handle on the site whenever anything was added to it.
+$BARREN = WP_CONTENT_DIR . '/barren';
+@mkdir($BARREN, 0777, true);
+file_put_contents("$BARREN/readme.txt", "not sass\n");
+
+$graph = Import_Scanner::scan("$SCSS/entry.scss", [$SCSS, $SHARED, $BARREN]);
+
+check('a Sass-free load path is not watched', !isset($graph->dirs[$BARREN]), $BARREN);
+check('the entry file directory is watched',  isset($graph->dirs[$SCSS]));
+check('a load path holding Sass is watched',  isset($graph->dirs[$SHARED]));
+check('no watched directory is missing',      !count(array_filter(array_keys($graph->dirs), fn($d) => !is_dir($d))));
+
 if (!dart_available()) {
     skip('invalidation', 'sass binary not installed');
     finish();
@@ -77,6 +92,27 @@ fixture("$SCSS/_mix.scss", "\$pad: 99px;\n", 500);   // the partial only; entry 
 check('editing a partial recompiles', compile($URL, 'inv')->has_compiled());
 check('output reflects the edit',     str_contains(file_get_contents(WP_CONTENT_DIR . '/scss/entry.css'), '99px'));
 check('then settles back to cached',  !compile($URL, 'inv')->has_compiled());
+
+section('sassy-check-dependencies can switch the stat cost off');
+
+fixture("$SCSS/entry.scss", "@use 'mix';\n.a { padding: mix.\$pad; }\n", 320);
+fixture("$SCSS/_mix.scss", "\$pad: 4px;\n", 330);
+check('baseline compiles', compile($URL, 'nocheck')->has_compiled());
+
+$GLOBALS['filter_overrides']['sassy-check-dependencies'] = false;
+
+fixture("$SCSS/_mix.scss", "\$pad: 7px;\n", 340);
+check('a partial edit is ignored when off', !compile($URL, 'nocheck')->has_compiled());
+
+// Explicit invalidation still works, so a deploy hook can drive compilation.
+$GLOBALS['filter_overrides']['sassy-force-compile'] = true;
+check('force still compiles', compile($URL, 'nocheck')->has_compiled());
+unset($GLOBALS['filter_overrides']['sassy-force-compile']);
+
+$GLOBALS['filter_overrides']['sassy-check-dependencies'] = true;
+fixture("$SCSS/_mix.scss", "\$pad: 8px;\n", 350);
+check('and edits land again once back on', compile($URL, 'nocheck')->has_compiled());
+unset($GLOBALS['filter_overrides']['sassy-check-dependencies']);
 
 section('Shadowing');
 

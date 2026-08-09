@@ -29,6 +29,7 @@ Sassy will compile a source file if any of the following are met:
 | - | - | - |
 | `sassy-compile` | `true` | Whether to compile the current asset. |
 | `sassy-force-compile` | `false` | Force a recompile (skips file checks). |
+| `sassy-check-dependencies` | `true` | Whether to check imported partials for changes on each request. Return `false` on slow/networked filesystems and compile from a deploy hook instead. |
 | `sassy-build-path` | `WP_CONTENT_DIR` | The directory to compile to. |
 | `sassy-build-url` | `WP_CONTENT_URL` | URL to the compile directory. |
 | `sassy-build-directory` | `'/scss/'` or `'/scss/' . get_current_blog_id()` on multi_site. | The subdirectory to compile to.  |
