@@ -93,6 +93,22 @@ check('editing a partial recompiles', compile($URL, 'inv')->has_compiled());
 check('output reflects the edit',     str_contains(file_get_contents(WP_CONTENT_DIR . '/scss/entry.css'), '99px'));
 check('then settles back to cached',  !compile($URL, 'inv')->has_compiled());
 
+section('A same-second edit is still detected');
+
+// mtime is second-resolution, so an edit inside the same second as the scan leaves it
+// unchanged — and would be missed permanently, not just late. Size is compared too.
+fixture("$SCSS/entry.scss", "@use 'mix';\n.a { padding: mix.\$pad; }\n", 200);
+fixture("$SCSS/_mix.scss", "\$pad: 4px;\n", 210);
+check('baseline compiles', compile($URL, 'sub-second')->has_compiled());
+
+$partial = "$SCSS/_mix.scss";
+$mtime   = filemtime($partial);
+file_put_contents($partial, "\$pad: 4px; // edited within the same second\n");
+touch($partial, $mtime);   // exactly what a fast second save looks like
+
+check('mtime really is unchanged', filemtime($partial) === $mtime);
+check('the edit is still caught',  compile($URL, 'sub-second')->has_compiled());
+
 section('sassy-check-dependencies can switch the stat cost off');
 
 fixture("$SCSS/entry.scss", "@use 'mix';\n.a { padding: mix.\$pad; }\n", 320);

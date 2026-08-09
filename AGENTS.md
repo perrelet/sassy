@@ -139,7 +139,7 @@ normalization runs over the final variable set.
 returns an `Import_Graph`, which is stored in the `sassy-filemtimes-{handle}` transient and owns
 the "has anything changed?" question. It holds two sets:
 
-- **`deps`** — `path => mtime` for every file the build was compiled from. A change to any of them
+- **`deps`** — `path => [mtime, size]` for every file the build was compiled from. A change to any of them
   (including a partial) triggers a recompile. This is what makes editing a partial work without
   touching the entry file.
 - **`dirs`** — `dir => mtime` for directories searched during resolution, up to and including the
@@ -167,8 +167,12 @@ a missing one serves stale CSS.
 > deps + 145 dirs, about 0.85 ms.
 >
 > The trade is granularity: `filemtime()` is second-resolution, so a file created in the same
-> second as the scan is not seen. Any later change to any tracked file resolves it. This is the
-> same window the entry-file mtime check has always had.
+> second as the scan leaves the directory's mtime unchanged and is not seen. Any later change to
+> any tracked file resolves it.
+>
+> Tracked *files* do not have this window — `deps` stores `[mtime, size]` from a single `stat`,
+> so a second save inside the same second is still caught unless it happens to preserve the byte
+> count exactly.
 
 ### Cost, and turning it off
 

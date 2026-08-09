@@ -233,11 +233,11 @@ class Sassy_CLI_Command extends WP_CLI_Command {
 
         $items = [];
 
-        foreach ($graph->deps as $path => $mtime) {
+        foreach ($graph->deps as $path => $stamp) {
             $items[] = [
                 'file'     => $path,
-                'modified' => wp_date('Y-m-d H:i:s', $mtime),
-                'state'    => !is_file($path) ? 'MISSING' : (filemtime($path) != $mtime ? 'changed' : 'current'),
+                'modified' => wp_date('Y-m-d H:i:s', is_array($stamp) ? $stamp[0] : $stamp),
+                'state'    => !is_file($path) ? 'MISSING' : (Import_Graph::stamp_matches($path, $stamp) ? 'current' : 'changed'),
             ];
         }
 

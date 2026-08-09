@@ -7,7 +7,7 @@ namespace Sassy;
  */
 class Import_Graph {
 
-    /** @var array<string, int> path => mtime */
+    /** @var array<string, array{0: int, 1: int}> path => [mtime, size] */
     public $deps;
 
     /** @var array<string, int> dir => mtime (0 when absent) for directories searched during resolution */
@@ -45,12 +45,37 @@ class Import_Graph {
 
     }
 
+    /**
+     * @return array{0: int, 1: int}|null [mtime, size], from one stat call.
+     */
+    public static function stamp ($path) {
+
+        $stat = @stat($path);
+
+        return $stat ? [$stat['mtime'], $stat['size']] : null;
+
+    }
+
+    /**
+     * Size is compared alongside mtime because mtime is only second-resolution: a file saved
+     * twice inside the same second would otherwise never be seen as changed again.
+     */
+    public static function stamp_matches ($path, $stamp) {
+
+        if (!is_array($stamp)) return false;   // pre-2.1 shape, stored as a bare mtime
+
+        $now = static::stamp($path);
+
+        return $now && $now[0] == $stamp[0] && $now[1] == $stamp[1];
+
+    }
+
     public function has_changed ($entry) {
 
         if (!isset($this->deps[$entry])) return true;
 
-        foreach ($this->deps as $path => $mtime) {
-            if (!is_file($path) || filemtime($path) != $mtime) return true;
+        foreach ($this->deps as $path => $stamp) {
+            if (!static::stamp_matches($path, $stamp)) return true;
         }
 
         // A directory's mtime moves when an entry is added or removed, which is exactly when

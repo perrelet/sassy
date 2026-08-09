@@ -34,7 +34,7 @@ class Import_Scanner {
 
             if (!is_file($file)) continue;
 
-            $deps[$file] = filemtime($file);
+            $deps[$file] = Import_Graph::stamp($file);
 
             $search_dirs = array_merge([dirname($file)], $import_paths);
 
