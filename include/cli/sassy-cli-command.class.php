@@ -246,11 +246,15 @@ class Sassy_CLI_Command extends WP_CLI_Command {
             $graph    = Import_Graph::from_array(get_transient('sassy-filemtimes-' . $style->handle));
             $built    = $compiler->get_build_file();
 
+            if      (!file_exists($compiler->get_src_path())) $state = 'no source';
+            else if (!file_exists($built))                    $state = 'not built';
+            else                                              $state = $compiler->is_current() ? 'current' : 'stale';
+
             $items[] = [
                 'handle'  => $style->handle,
                 'source'  => $compiler->get_src_path(),
                 'built'   => $built,
-                'state'   => !file_exists($built) ? 'not built' : (($graph && !$graph->has_changed($compiler->get_src_path())) ? 'current' : 'stale'),
+                'state'   => $state,
                 'deps'    => $graph ? count($graph->deps) : 0,
                 'engine'  => $compiler->get_engine_class(),
                 'time'    => ($t = $compiler->get_last_compile_time()) ? sprintf('%.3fs', $t) : '',

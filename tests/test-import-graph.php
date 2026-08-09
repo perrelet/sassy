@@ -109,6 +109,30 @@ touch($partial, $mtime);   // exactly what a fast second save looks like
 check('mtime really is unchanged', filemtime($partial) === $mtime);
 check('the edit is still caught',  compile($URL, 'sub-second')->has_compiled());
 
+section('is_current() agrees with what a compile actually does');
+
+fixture("$SCSS/entry.scss", "@use 'mix';\n.a { padding: mix.\$pad; }\n", 250);
+fixture("$SCSS/_mix.scss", "\$pad: 4px;\n", 260);
+compile($URL, 'current');
+
+$state = fn() => (new Sassy\SCSS_Compiler())->prepare($URL, 'current')->is_current();
+
+check('current right after compiling', $state());
+
+// Reporting used to consult the import graph alone, so a variable change read as current
+// while the very next request rebuilt.
+delete_transient('sassy-vars-sig-current');
+check('a variable-signature change reads as stale', !$state());
+check('and a compile confirms it', compile($URL, 'current')->has_compiled());
+
+fixture("$SCSS/_mix.scss", "\$pad: 5px;\n", 270);
+check('a partial edit reads as stale', !$state());
+compile($URL, 'current');
+
+$GLOBALS['filter_overrides']['sassy-force-compile'] = true;
+check('force reads as stale too', !$state());
+unset($GLOBALS['filter_overrides']['sassy-force-compile']);
+
 section('sassy-check-dependencies can switch the stat cost off');
 
 fixture("$SCSS/entry.scss", "@use 'mix';\n.a { padding: mix.\$pad; }\n", 320);

@@ -200,6 +200,22 @@ class SCSS_Compiler {
     }
 
     /**
+     * Whether the built file is up to date, without compiling.
+     *
+     * Asks should_compile() rather than re-deriving the answer, so a caller reporting state
+     * cannot drift from the caller acting on it.
+     */
+    public function is_current () {
+
+        $src_path = $this->get_src_path();
+
+        if (!file_exists($src_path)) return false;
+
+        return !$this->should_compile($this->get_build_file(), $src_path, $this->get_variables());
+
+    }
+
+    /**
      * Whether we need to run compilation (cache invalid or missing).
      *
      * @param string $build_file Path to built CSS file.

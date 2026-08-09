@@ -90,8 +90,12 @@ class Dart_Sass_Engine implements Compiler_Engine {
         exec(implode(' ', $cmd) . ' 2>&1', $output_lines, $exit_code);
         $out = trim(implode("\n", $output_lines));
 
-        // Dart Sass cites the temp copy by name; the reader needs the file they wrote.
-        if ($out !== '' && $src_path) $out = str_replace(basename($tmp_in), basename($src_path), $out);
+        // Dart Sass cites the temp copy, path and all, relative to the working directory. Match
+        // the whole path token or the reader is left with a .sassy-tmp/ prefix that resolves to
+        // nothing. Bare basenames are what Dart prints for every other frame.
+        if ($out !== '' && $src_path) {
+            $out = preg_replace('~\S*' . preg_quote(basename($tmp_in), '~') . '~', basename($src_path), $out);
+        }
 
         if ($exit_code !== 0 || !file_exists($tmp_out)) {
             static::cleanup($tmp_in, $tmp_out, $tmp_map);

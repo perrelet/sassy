@@ -77,6 +77,25 @@ function vlq_field ($segment, $index) {
 $first = explode(',', explode(';', $map['mappings'])[0])[0];
 check('first mapping points at source line 3', vlq_field($first, 2) === 2, '0-indexed ' . vlq_field($first, 2));
 
+section('Diagnostics name the file the author wrote');
+
+// Dart Sass cites whatever file it was handed, which is the temp copy, path and all.
+fixture("$SCSS/warns.scss", ".a { content: unquote(\"x\"); }\n");
+$warned = compile('http://test.local/wp-content/themes/t/scss/warns.scss', 'warns');
+$text   = implode("\n", $warned->get_warnings());
+
+check('a warning was produced', $text !== '', 'nothing to check against');
+check('no temp basename leaks',  !str_contains($text, '.tmp.scss'), $text);
+check('no temp directory leaks', !str_contains($text, '.sassy-tmp'), $text);
+check('the real filename is cited', str_contains($text, 'warns.scss'), $text);
+
+// Same for hard errors, which take a different path out of the engine.
+fixture("$SCSS/broken.scss", ".a { padding: ; }\n");
+$broken = compile('http://test.local/wp-content/themes/t/scss/broken.scss', 'broken');
+
+check('the compile failed',        $broken->has_error());
+check('no temp path in the error', !str_contains((string) $broken->get_error(), '.sassy-tmp'), (string) $broken->get_error());
+
 section('Cleanup');
 $strays = array_merge(
     glob("$SCSS/_sassy-*") ?: [],
@@ -85,7 +104,10 @@ $strays = array_merge(
 );
 check('no temp files left behind', !$strays, implode(', ', $strays));
 
-$built = array_values(array_diff(scandir($BUILD), ['.', '..', '.sassy-tmp']));
-check('build dir holds only the css and map', count($built) === 2, implode(', ', $built));
+$unexpected = array_filter(
+    array_diff(scandir($BUILD), ['.', '..', '.sassy-tmp']),
+    fn($file) => !preg_match('/\.css(\.map)?$/', $file)
+);
+check('build dir holds nothing but css and maps', !$unexpected, implode(', ', $unexpected));
 
 finish();
