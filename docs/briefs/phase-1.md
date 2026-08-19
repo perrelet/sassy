@@ -31,9 +31,6 @@ handle-dependency graph. Build the spine that models all of them: an `Asset` val
   `Sassy::get_scss_styles()`.
 - `wp sassy list` now lists **every** discovered handle, with a `--compilable` flag to narrow.
   This is a deliberate behavioural change, not a regression. Columns gain `type` and WP `deps`.
-- `is_compilable()` accepts `scss` **and** `sass` (plan §3 phase 1). `Sassy::style_loader_src()`
-  widens its extension check to match — the resolver already resolved both, so this closes an
-  asymmetry rather than adding a feature. It is the one build-path edit phase 1 makes.
 
 ## Path resolution — the one judgement call, pre-made
 
@@ -78,8 +75,7 @@ Every acceptance item in plan §3 phase 1, plus:
 ## Out of bounds
 
 - Anything in phase 2's territory: do not split `SCSS_Compiler`, do not touch `should_compile()`,
-  transients, engines, or the build pipeline beyond the `get_src_path()` delegation and the
-  `.sass` extension widening above.
+  transients, engines, or the build pipeline beyond the `get_src_path()` delegation above.
 - No d-pace edits — phase 1 requires none.
 - No changes to `docs/style-stack-plan.md` without saying so in the commit message.
 

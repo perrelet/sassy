@@ -10,8 +10,8 @@ namespace Sassy;
  */
 class Asset {
 
-    /** @var string[] Extensions Sassy can build. */
-    const COMPILABLE = ['scss', 'sass'];
+    /** @var string[] Extensions Sassy can build. Indented syntax is engine work; see plan phase 3. */
+    const COMPILABLE = ['scss'];
 
     /** @var string Enqueue handle. */
     public $handle;

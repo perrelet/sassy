@@ -11,8 +11,6 @@ use WP_CLI\Utils;
  */
 class Sassy_CLI_Command extends WP_CLI_Command {
 
-    const CONTEXTS = ['frontend', 'admin', 'editor'];
-
     public function __construct () {
 
         // WP-CLI makes no HTTPS request, so is_ssl() is false and everything WordPress derives
@@ -211,9 +209,12 @@ class Sassy_CLI_Command extends WP_CLI_Command {
     }
 
     /**
-     * List discovered SCSS styles and their cache state.
+     * List every discovered style, and the cache state of the ones Sassy builds.
      *
      * ## OPTIONS
+     *
+     * [--compilable]
+     * : Only styles Sassy can build.
      *
      * [--hooks=<hooks>]
      * : Which enqueue hooks to fire before looking for styles. Comma-separated, or "all".
@@ -238,33 +239,50 @@ class Sassy_CLI_Command extends WP_CLI_Command {
      */
     public function list_ ($args, $assoc_args) {
 
-        $items = [];
+        $format = $assoc_args['format'] ?? 'table';
+        $stack  = $this->stack($assoc_args);
+        $assets = empty($assoc_args['compilable']) ? $stack->all() : $stack->compilable();
+        $items  = [];
 
-        foreach ($this->discover($assoc_args) as $style) {
+        foreach ($assets as $asset) {
 
-            $compiler = (new SCSS_Compiler())->prepare($style->src, $style->handle);
-            $graph    = Import_Graph::from_array(get_transient('sassy-filemtimes-' . $style->handle));
-            $built    = $compiler->get_build_file();
-
-            if      (!file_exists($compiler->get_src_path())) $state = 'no source';
-            else if (!file_exists($built))                    $state = 'not built';
-            else                                              $state = $compiler->is_current() ? 'current' : 'stale';
-
-            $items[] = [
-                'handle'  => $style->handle,
-                'source'  => $compiler->get_src_path(),
-                'built'   => $built,
-                'state'   => $state,
-                'deps'    => $graph ? count($graph->deps) : 0,
-                'engine'  => $compiler->get_engine_class(),
-                'time'    => ($t = $compiler->get_last_compile_time()) ? sprintf('%.3fs', $t) : '',
+            $item = [
+                'handle'  => $asset->handle,
+                'type'    => $asset->type,
+                'state'   => '',
+                // An array survives json and yaml; the row formats cannot render one.
+                'deps'    => in_array($format, ['json', 'yaml'], true) ? $asset->deps : implode(',', $asset->deps),
+                'imports' => '',
+                'engine'  => '',
+                'time'    => '',
+                'source'  => $asset->get_source_path() ?? (is_string($asset->src) ? $asset->src : ''),
+                'built'   => '',
             ];
+
+            if ($asset->is_compilable()) {
+
+                $compiler = (new SCSS_Compiler())->prepare($asset->src, $asset->handle);
+                $graph    = Import_Graph::from_array(get_transient('sassy-filemtimes-' . $asset->handle));
+                $built    = $compiler->get_build_file();
+
+                if      (!file_exists($compiler->get_src_path())) $item['state'] = 'no source';
+                else if (!file_exists($built))                    $item['state'] = 'not built';
+                else                                              $item['state'] = $compiler->is_current() ? 'current' : 'stale';
+
+                $item['imports'] = $graph ? count($graph->deps) : 0;
+                $item['engine']  = $compiler->get_engine_class();
+                $item['time']    = ($t = $compiler->get_last_compile_time()) ? sprintf('%.3fs', $t) : '';
+                $item['built']   = $built;
+
+            }
+
+            $items[] = $item;
 
         }
 
-        if (!$items) WP_CLI::warning('No SCSS styles found. Try --hooks=all.');
+        if (!$items) WP_CLI::warning('No styles found. Try --hooks=all.');
 
-        Utils\format_items($assoc_args['format'] ?? 'table', $items, ['handle', 'state', 'deps', 'engine', 'time', 'source', 'built']);
+        Utils\format_items($format, $items, ['handle', 'type', 'state', 'deps', 'imports', 'engine', 'time', 'source', 'built']);
 
     }
 
@@ -490,43 +508,47 @@ class Sassy_CLI_Command extends WP_CLI_Command {
      * @param array $handles    Optional handle filter.
      * @return array<string, object>
      */
-    protected function discover ($assoc_args, $handles = []) {
+    /**
+     * Every discovered style, with any context that raised already reported.
+     */
+    protected function stack ($assoc_args) {
 
-        $context  = $assoc_args['hooks'] ?? 'frontend';
-        $contexts = ($context === 'all') ? self::CONTEXTS : array_map('trim', explode(',', $context));
+        $hooks    = $assoc_args['hooks'] ?? 'frontend';
+        $contexts = ($hooks === 'all') ? Style_Stack::CONTEXTS : array_map('trim', explode(',', $hooks));
 
         foreach ($contexts as $context) {
-
-            if (!in_array($context, self::CONTEXTS, true)) {
-                WP_CLI::error(sprintf("Unknown hook set '%s'. Use: %s, all.", $context, implode(', ', self::CONTEXTS)));
+            if (!in_array($context, Style_Stack::CONTEXTS, true)) {
+                WP_CLI::error(sprintf("Unknown hook set '%s'. Use: %s, all.", $context, implode(', ', Style_Stack::CONTEXTS)));
             }
-
-            ob_start();
-
-            try {
-                $this->fire_context($context);
-            } catch (\Throwable $e) {
-                // Third-party callbacks on the admin and editor hooks assume a request that
-                // WP-CLI is not making. Skip the context rather than losing the whole run.
-                ob_end_clean();
-                WP_CLI::warning(sprintf("Context '%s' raised: %s", $context, $e->getMessage()));
-                continue;
-            }
-
-            ob_end_clean();
-
         }
 
-        $styles = Sassy::get_scss_styles();
+        $stack = Style_Stack::discover($contexts);
+
+        foreach ($stack->errors() as $context => $message) {
+            WP_CLI::warning(sprintf("Context '%s' raised: %s", $context, $message));
+        }
+
+        return $stack;
+
+    }
+
+    /**
+     * The styles Sassy can build, narrowed to $handles if given.
+     *
+     * @return Asset[]
+     */
+    protected function discover ($assoc_args, $handles = []) {
+
+        $stack  = $this->stack($assoc_args);
+        $styles = $stack->compilable();
 
         if ($handles) {
 
-            $styles = array_filter($styles, function ($style) use ($handles) {
-                return in_array($style->handle, $handles, true);
-            });
+            $styles = array_intersect_key($styles, array_flip($handles));
 
             foreach ($handles as $handle) {
-                if (!isset($styles[$handle])) WP_CLI::warning(sprintf("No SCSS style registered for handle '%s'.", $handle));
+                if (isset($styles[$handle])) continue;
+                WP_CLI::warning($this->why_not($stack, $handle));
             }
 
         }
@@ -535,44 +557,30 @@ class Sassy_CLI_Command extends WP_CLI_Command {
 
     }
 
-    protected function fire_context ($context) {
+    /**
+     * Why a requested handle is not in the compilable set. Every answer names something the
+     * caller can act on.
+     */
+    protected function why_not ($stack, $handle) {
 
-        switch ($context) {
+        $asset = $stack->handle($handle);
 
-            case 'frontend':
-                do_action('wp_enqueue_scripts');
-                break;
+        if (!$asset)                return sprintf("No style registered for handle '%s'. Try --hooks=all.", $handle);
+        if ($asset->src === false)  return sprintf("Handle '%s' registers no source of its own.", $handle);
+        if (!$asset->is_local())    return sprintf("Handle '%s' is not a local file: %s", $handle, $asset->src);
 
-            case 'admin':
-                $this->admin_screen('dashboard');
-                do_action('admin_enqueue_scripts', 'index.php');
-                break;
-
-            case 'editor':
-                $this->admin_screen('post');
-                do_action('enqueue_block_editor_assets');
-                break;
-
-        }
-
-    }
-
-    protected function admin_screen ($screen) {
-
-        // Callbacks on these hooks routinely dereference get_current_screen(), which is null
-        // outside wp-admin.
-        if (!function_exists('set_current_screen')) require_once ABSPATH . 'wp-admin/includes/screen.php';
-        if (function_exists('set_current_screen')) set_current_screen($screen);
+        return sprintf("Handle '%s' is not compilable: %s", $handle, $asset->extension ? '.' . $asset->extension : 'no extension');
 
     }
 
     protected function find_style ($assoc_args, $handle) {
 
-        $styles = $this->discover($assoc_args, [$handle]);
+        $stack = $this->stack($assoc_args);
+        $asset = $stack->compilable()[$handle] ?? null;
 
-        if (!isset($styles[$handle])) WP_CLI::error(sprintf("No SCSS style registered for handle '%s'.", $handle));
+        if (!$asset) WP_CLI::error($this->why_not($stack, $handle));
 
-        return $styles[$handle];
+        return $asset;
 
     }
 

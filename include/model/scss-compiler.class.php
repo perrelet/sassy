@@ -29,6 +29,7 @@ class SCSS_Compiler {
     protected $build_name;
     protected $build_file;
     protected $src_path;
+    protected $asset;
     protected $src_map_options;
     protected $import_paths;
 
@@ -55,6 +56,7 @@ class SCSS_Compiler {
         $this->build_name       = null;
         $this->build_file       = null;
         $this->src_path         = null;
+        $this->asset            = null;
         $this->src_map_options  = null;
         $this->import_paths     = null;
 
@@ -387,30 +389,26 @@ class SCSS_Compiler {
 
         if (is_null($this->src_path)) {
 
-            // Compare host + path of the source URL against site_url(), scheme-agnostically. WP-CLI runs without HTTPS request context can yield plugin_dir_url()-derived URLs starting `http://` while the option-stored siteurl is `https://`; a strict prefix-strip of site_url() would fail and we'd treat our own SCSS as remote.
-            $url_parts  = parse_url($this->src);
-            $site_host  = parse_url(site_url(), PHP_URL_HOST);
+            $path = $this->get_asset()->get_source_path();
 
-            // Reject CDNs / other domains / relative-or-malformed URLs.
-            if (empty($url_parts['host']) || empty($url_parts['path'])) return $this->src;
-            if (strcasecmp($url_parts['host'], $site_host) !== 0)       return $this->src;
-
-            $path = ABSPATH . ltrim($url_parts['path'], '/');
-            if (!file_exists($path)) {
-                $path = rtrim($_SERVER['DOCUMENT_ROOT'], '/') . $url_parts['path'];
-            }
-
-            // If it is part of a multi-site then the 'domain' must be removed
-            if (is_multisite()) {
-                $blog_details_path = get_blog_details()->path;
-                if ($blog_details_path != PATH_CURRENT_SITE) $path = str_replace($blog_details_path, PATH_CURRENT_SITE, $path);
-            }
-
-            $this->src_path = apply_filters('sassy-src-path', $path, $this->src, $this->handle, $this);
+            // Callers file_exists() this and report it, so an unmappable URL keeps 2.x's shape
+            // rather than becoming null here.
+            $this->src_path = ($path === null) ? $this->src : $path;
 
         }
 
         return $this->src_path;
+
+    }
+
+    /**
+     * The Asset this compiler is pointed at. Sole owner of URL -> path resolution.
+     */
+    public function get_asset () {
+
+        if (is_null($this->asset)) $this->asset = new Asset($this->handle, $this->src);
+
+        return $this->asset;
 
     }
 

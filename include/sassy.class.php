@@ -120,8 +120,8 @@ class Sassy {
 	
 	public function style_loader_src ($src, $handle) {
 
-		$path_parts = pathinfo(parse_url($src)['path']);
-		if (!isset($path_parts['extension']) || ($path_parts['extension'] != 'scss')) return $src;
+		$asset = new Asset($handle, $src);
+		if (!in_array($asset->extension, Asset::COMPILABLE, true)) return $src;
 
 		if (!apply_filters('sassy-compile', true, $src, $handle)) return $src;
 
@@ -131,31 +131,6 @@ class Sassy {
 		
 	}
 
-	/**
-	 * Registered styles whose source is a .scss file, from both queues.
-	 *
-	 * @return array<string, object>
-	 */
-	public static function get_scss_styles () {
-
-		global $digitalis_styles;
-
-		$styles = wp_styles()->registered;
-		if ($digitalis_styles) $styles = array_merge($styles, $digitalis_styles->registered);
-
-		return array_filter($styles, function ($style) {
-
-			// Dependency-only handles register with src === false.
-			if (empty($style->src) || !is_string($style->src)) return false;
-
-			$path = parse_url($style->src, PHP_URL_PATH);
-
-			return $path && strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'scss';
-
-		});
-
-	}
-
 	public function compile_all () {
 
 		if (!wp_verify_nonce($_REQUEST['nonce'], 'sassy_compile')) {
@@ -163,18 +138,14 @@ class Sassy {
 			wp_die(); 
 		}
 
-		ob_start();
-		do_action('wp_enqueue_scripts');
-		ob_end_clean();
-
 		$response = [];
 
-		foreach (static::get_scss_styles() as $style) {
+		foreach (Style_Stack::discover(['frontend'])->compilable() as $asset) {
 
             $compiler = new SCSS_Compiler();
             $this->compilers[] = $compiler;
 
-            $href     = $compiler->compile($style->src, $style->handle);
+            $href     = $compiler->compile($asset->src, $asset->handle);
             $warnings = $compiler->get_warnings();
 
             $meta = [
@@ -192,7 +163,7 @@ class Sassy {
                 'compile_time'   => $compiler->get_compile_time(),
             ];
 
-            $response[$style->handle] = [
+            $response[$asset->handle] = [
                 'href'      => $href,
                 'warnings'  => $warnings ?: [],
                 'meta'      => $meta,

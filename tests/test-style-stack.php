@@ -28,7 +28,9 @@ check('is compilable',          $asset->is_compilable());
 
 section('Extensions');
 
-check('.sass is compilable',  (new Asset('s', $BASE . 'a.sass'))->is_compilable());
+// Wanted, but neither engine takes an indented-syntax entry file as configured -- plan phase 3.
+check('.sass is not compilable yet', !(new Asset('s', $BASE . 'a.sass'))->is_compilable());
+check('.sass still resolves',        (new Asset('s', $BASE . 'a.sass'))->is_local());
 check('.SCSS is normalized',  (new Asset('s', $BASE . 'a.SCSS'))->extension === 'scss');
 check('.css is not compilable', !(new Asset('s', $BASE . 'a.css'))->is_compilable());
 check('.css is still local',   (new Asset('s', $BASE . 'a.css'))->is_local());
@@ -146,5 +148,40 @@ check('the first queue is kept',   $merged->handle('base') instanceof Asset);
 check('later queues win',          $merged->handle('theme')->src === $BASE . 'override.scss');
 
 unset($GLOBALS['filter_overrides']['sassy-style-queues']);
+
+section('SCSS_Compiler delegates rather than duplicating');
+
+$SCSS = WP_CONTENT_DIR . '/themes/t/scss';
+@mkdir($SCSS, 0777, true);
+fixture("$SCSS/entry.scss", ".a { color: red; }\n");
+
+$compiler = (new Sassy\SCSS_Compiler())->prepare($BASE . 'entry.scss', 'entry');
+
+check('the compiler and the Asset agree',
+    $compiler->get_src_path() === (new Asset('entry', $BASE . 'entry.scss'))->get_source_path(),
+    $compiler->get_src_path());
+
+check('and it is the real file', file_exists($compiler->get_src_path()));
+
+// The one place the two deliberately differ: callers file_exists() this value and print it.
+$unmappable = 'https://cdn.example.com/x.scss';
+$remote_compiler = (new Sassy\SCSS_Compiler())->prepare($unmappable, 'cdn');
+
+check('an unmappable URL is null on the Asset',   (new Asset('cdn', $unmappable))->get_source_path() === null);
+check('and comes back as the URL on the compiler', $remote_compiler->get_src_path() === $unmappable);
+
+section('sassy-src-path reaches both call sites');
+
+$GLOBALS['filter_overrides']['sassy-src-path'] = function ($path, $src) use ($SCSS) {
+    return "$SCSS/entry.scss";
+};
+
+check('the compiler honours it',
+    (new Sassy\SCSS_Compiler())->prepare($unmappable, 'cdn')->get_src_path() === "$SCSS/entry.scss");
+
+check('the Asset honours it',
+    (new Asset('cdn', $unmappable))->get_source_path() === "$SCSS/entry.scss");
+
+unset($GLOBALS['filter_overrides']['sassy-src-path']);
 
 finish();

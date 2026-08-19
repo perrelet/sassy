@@ -163,11 +163,9 @@ after phase 1. Three rules, because the 2.x version got each of them slightly wr
 a local file*, naming the URL — rather than 2.x's `Source file not found: <url>`, which formats a
 URL as though it were a path and sends an agent looking for a file that was never named.
 
-`is_compilable()` is `is_local()` **and** an extension of `scss` or `sass`. Including `sass` is
-a deliberate widening: `Import_Resolver` already resolves both extensions and `Import_Scanner`
-already watches directories holding either, so 2.x can *import* an indented-syntax partial but
-cannot *enter* on one — an asymmetry with no reason behind it. Both engines compile `.sass`
-entry files. `style_loader_src` widens to match; over-inclusion is safe.
+`is_compilable()` is `is_local()` **and** an extension of `scss`. Widening it to `sass` was
+tried in phase 1 and **deferred to phase 3** — neither engine accepts an indented-syntax entry
+file as they stand, and under Dart the fix costs source-map accuracy. See phase 3.
 
 **`Style_Stack`**:
 
@@ -265,6 +263,28 @@ supports(string $c): bool
 `Scssphp_Engine` declares no `modules` support and refuses `@use`/`@forward` with a message
 naming the file and suggesting the Dart engine, rather than letting `Sass modules are not
 implemented yet` surface from four frames inside the vendor.
+
+#### Indented syntax (`.sass`) entry files
+
+Carried from phase 1, which found the extension list is not where this lives. Both engines can
+compile indented syntax; neither does so as configured. Verified on this box, so do not
+re-derive:
+
+- **scssphp**: `compileString($source, $url, $importer, Syntax::SASS)` compiles indented syntax
+  cleanly. `Syntax` is an enum of `SCSS` / `SASS` / `CSS` — note the case is `SASS`, not
+  `INDENTED`. Variables arrive through `addVariables()`, so there is no prelude and no shift.
+  This engine is free.
+- **Dart**: the CLI infers syntax from the file extension, and the engine hard-codes its temp
+  input as `.tmp.scss`. Renaming it after the source fixes parsing — but variable injection then
+  breaks, because indented syntax rejects the single-line prelude 2.1 relies on
+  (`multiple statements on one line are not supported in the indented syntax`). A
+  newline-separated prelude parses and shifts every source-map line by the number of injected
+  variables — five on the reference install.
+
+So `sass` is a **capability**, not an extension: `Scssphp_Engine` supports it outright, and
+`Dart_Sass_Engine` supports it only where no variables are injected. That is exactly what
+`capabilities()` exists to express, and why this waited for this phase. `Asset::is_compilable()`
+asks the active engine rather than consulting a flat list.
 
 #### Diagnostics
 
@@ -713,7 +733,7 @@ change to what hot-wiring feels like, so it is named rather than implied.
 | Auto-reload polling | Opt-in only, via the Logging menu; never a default |
 | Keybinding | Configurable via `sassy-keybinding` filter (default `['ctrl+space', 'meta+space']`, preserving 2.x; `false` disables). The collision has bitten in practice |
 | Unresolvable source paths | `source_path` is `?string` and never falls back to the URL. `sassy-src-path` applies unconditionally, including over a `null`, so the filter can rescue a URL Sassy cannot resolve |
-| `.sass` entry files? | **Yes** — `is_compilable()` accepts `scss` and `sass`. The resolver already resolved both; only the entry point disagreed |
+| `.sass` entry files? | **Deferred to phase 3.** Wanted — the resolver already resolves both and only the entry point disagrees — but it is engine work, not extension-list work, and under Dart it trades away source-map accuracy |
 | Fourth filter argument | The **`Asset`**. Not `Printer` — that rebuilds the god-object access the phase 2 split removes |
 | `sassy-src-map-options` | **Removed, not renamed.** Its value surface is scssphp option names; `map_path` / `map_url` replace the legitimate uses and the rest moves inside the engine |
 | `wp sassy check` hook set | **`--hooks=all` by default**, alone among the commands — a narrower set makes every admin/editor output look orphaned |
