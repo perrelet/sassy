@@ -1,6 +1,7 @@
 # Sassy 3.0 — The Style Stack
 
-Architecture plan. Written to be built from, including by agents. **WIP — not committed.**
+Architecture plan. Written to be built from, including by agents. **This document is the spec
+of record for the `style-stack` branch** — see §8 for how to change it.
 
 ---
 
@@ -23,6 +24,12 @@ The PHP→SCSS variable bridge — the thing the whole integration architecture 
 unused by the project that uses Sassy most heavily. That project solved dynamic values a better
 way: tokens authored as CSS custom properties, read *into* PHP, with variation by cascade scope
 at render time.
+
+Unused, not unsupported. The bridge is a live API — Lattice's `Design_System::add_variables()`
+takes an `scss` flag defaulting to *true*, and Lattice injects two variables of its own — it
+simply carries nothing the SCSS reads. The measured variable set on the reference install is
+five: three Sassy defaults plus those two. So `sassy-variables` stays first-class in phase 4;
+what dies is the integration architecture built to feed it.
 
 Meanwhile Sassy discards 99.7% of what it can see.
 
@@ -138,6 +145,30 @@ is_compilable() bool
 is_local()      bool
 ```
 
+**`source_path` resolves lazily, and `sassy-src-path` filters the `null`.** URL→path resolution
+moves out of `SCSS_Compiler::get_src_path()` and into `Asset`, which is the only place it exists
+after phase 1. Three rules, because the 2.x version got each of them slightly wrong:
+
+- The resolver returns `?string` — `null` for a remote host, a malformed URL, or a path that
+  resolves nowhere. It never returns the URL as a consolation; a URL in a variable named
+  `source_path` is exactly the class of lie §1 rules out.
+- `sassy-src-path` applies **unconditionally, including over a `null`**. In 2.x it applies only
+  on the branch that already succeeded, so the one filter documented as "override the source
+  path" cannot rescue the one case that needs overriding — a CDN-hosted or otherwise unresolvable
+  URL. A filter returning a path is honoured whether or not resolution found one; returning
+  `null` leaves it unresolved.
+- Resolution is lazy, so the filter receives a fully constructed `Asset` as its fourth argument.
+
+`Printer` reports an unresolved asset as its own `Diagnostic` — *source could not be resolved to
+a local file*, naming the URL — rather than 2.x's `Source file not found: <url>`, which formats a
+URL as though it were a path and sends an agent looking for a file that was never named.
+
+`is_compilable()` is `is_local()` **and** an extension of `scss` or `sass`. Including `sass` is
+a deliberate widening: `Import_Resolver` already resolves both extensions and `Import_Scanner`
+already watches directories holding either, so 2.x can *import* an indented-syntax partial but
+cannot *enter* on one — an asymmetry with no reason behind it. Both engines compile `.sass`
+entry files. `style_loader_src` widens to match; over-inclusion is safe.
+
 **`Style_Stack`**:
 
 ```
@@ -158,7 +189,9 @@ adds it through the filter.
 **Acceptance:**
 - `wp sassy list --format=json` returns every registered handle (329 on the reference install at
   time of writing — assert against the live registry, never a constant) with WP deps populated;
-  `--compilable` narrows to those Sassy can build.
+  `--compilable` narrows to those Sassy can build. The count is per hook set, not a property of
+  the install: 329 under the default `--hooks=frontend`, 336 under `--hooks=all`. A discovery
+  run that reports more handles than §1 quotes is doing its job.
 - Discovery tests cover each context and the multi-queue filter.
 - No caller outside `Style_Stack` reaches into `wp_styles()->registered`.
 
@@ -177,6 +210,19 @@ adds it through the filter.
 
 All surfaces call `Printer` and render its result. They may format; they may not decide.
 
+Staleness has two inputs and they live in different classes: the import graph (`Compile_Cache`)
+and the variable signature (`Variable_Resolver`). `Compile_Cache` owns the *decision* and calls
+`Variable_Resolver` for the signature — it does not receive it from a caller, or the rule leaks
+back out to the surfaces it was extracted from.
+
+**The fourth filter argument.** Every per-compile filter is documented as
+`($value, $src, $handle, $compiler)`, and `sassy-engine` as `($engine, $compiler)`. With
+`SCSS_Compiler` gone the fourth argument becomes the **`Asset`** — the identity of what is being
+built, available before a `Compile_Request` exists, and a value object rather than a handle onto
+the executor. Arity is unchanged, so a callback ignoring the argument (all four of d-pace's do)
+is unaffected. Passing `Printer` instead would rebuild the god-object access the split exists to
+remove.
+
 **Acceptance:**
 - No transient key or staleness rule exists outside `Compile_Cache`.
 - The same failure produces identical message text on all surfaces.
@@ -189,6 +235,14 @@ All surfaces call `Printer` and render its result. They may format; they may not
 **`Compile_Request`** replaces the untyped `$args` bag. The current bag carries scssphp's own
 option names (`sourceMapWriteTo`, `sourceMapBasepath`, `sourceMapRootpath`) which the Dart engine
 reverse-engineers — the abstraction leaking its first implementation.
+
+**`sassy-src-map-options` is removed**, not renamed: it is a public filter whose entire value
+surface is scssphp option names, so preserving it would preserve the leak. `map_path` and
+`map_url` replace what callers legitimately reached for. The remaining keys were never
+configuration — `sourceMapBasepath` and `sourceMapRootpath` exist to make scssphp write correct
+relative `sources`, which is the engine's own business and moves inside `Scssphp_Engine`, derived
+from `map_path`. The Dart engine already achieves the same by writing output and map into the
+build directory. No consumer on the reference install binds the filter.
 
 ```
 source        string        SCSS text
@@ -262,16 +316,26 @@ raw text in `message`. Never dropped, never guessed at.
 **Canonical text rendering** — one function used by CLI, console, panel and clipboard:
 
 ```
-ERROR  _layout.scss:41:10  Undefined variable: $gap
-  41 │     gap: $gap;
-     │          ^^^^
-  _layout.scss 41:10   layout()
-  frontend.scss 12:1   root stylesheet
+ERROR  _layout.scss:41:10  Undefined variable.
+   ╷
+41 │     gap: $gap;
+   │          ^^^^
+   ╵
+  _layout.scss 41:10  layout()
+  frontend.scss 12:1  root stylesheet
 ```
 
 The header names the file, line and column of the caret, matching the top trace frame when a
 trace exists (Sassy-source notices have neither frame nor trace). This example is the formatter's
 spec; keep it self-consistent.
+
+Everything below the header is the engine's own drawing, reproduced verbatim — `frame` keeps the
+`╷`/`╵` gutter rules and Dart's line-number padding, `trace` keeps its column alignment. The
+formatter composes; it does not redraw. `message` is likewise verbatim, which is why the header
+above reads `Undefined variable.` and not `Undefined variable: $gap`: Dart names the offending
+token only in the frame, and synthesizing a richer one-liner would mean guessing at output the
+over-inclusion rule says to carry intact. Verified against sass 1.92.0 — the example is a real
+trace, not a sketch.
 
 **Acceptance:**
 - `wp sassy status` reports the active engine's capabilities.
@@ -279,6 +343,10 @@ spec; keep it self-consistent.
 - No scssphp-shaped key in `Dart_Sass_Engine`.
 - Dart's deprecation output round-trips into `Diagnostic` with file, line, code and url intact.
 - Unparseable engine output survives as a `warning`.
+- Every consumer of the old string-array contract is migrated with the schema: `get_warnings()`
+  fed `WP_CLI::warning()` and `tests/test-source-maps.php` by string interpolation, which fatals
+  on an object. Phase 2's "the 2.1 suite passes unchanged except for renames" stops holding here,
+  and that is expected — the suite moves to the canonical formatter in this phase.
 
 ---
 
@@ -320,6 +388,15 @@ is affected**. The third needs the graph inverted; the data is already recorded.
 - **`wp sassy check`** — one call, one exit code: everything current, nothing erroring, no
   orphaned outputs, no truncated graphs.
 - `--strict` promotes warnings to failures; `--strict=all` adds deprecations. Off by default.
+
+An **orphaned output** is a file in the build directory that no discovered asset claims as its
+`Build_Target` — CSS and maps left behind by a handle that was renamed, deregistered or had its
+source deleted. They are reported, never auto-removed; `wp sassy clear` is the eraser.
+
+Orphan detection is the reason **`check` defaults to `--hooks=all`**, alone among the commands.
+Under any narrower hook set every admin- and editor-built file looks orphaned, because the
+handle that owns it was never registered. Same principle as truncation: a `check` that cannot
+see the whole build set cannot answer its own question.
 
 Truncation fails `check` by default even though its severity is `warning`. The principle:
 **`check` fails on anything that makes its own answer untrustworthy.** Its promise is "everything
@@ -436,7 +513,8 @@ intended categories.
 
 **Verification.** The suite is PHP-only; nothing here gets a browser harness. Browser behaviour
 is verified by a manual acceptance checklist kept at `tests/manual.md` and walked before each
-release; the paintbrush spike page is kept as a fixture. Untested surface is named, never
+release; the paintbrush spike page is kept as a fixture. **Phase 6 creates that file** — it does
+not inherit one — covering every browser behaviour this phase ships. Untested surface is named, never
 implied covered — the `watch` precedent.
 
 **Acceptance:**
@@ -444,8 +522,10 @@ implied covered — the `watch` precedent.
   markup, no localized params, no admin bar node. (The compiled CSS itself always ships — that
   is the product, not the dev surface.)
 - A compile error renders identically (same text) in CLI, console and panel; copy reproduces it.
-- A user holding the d-pace `dev` capability sees the UI on production; an administrator without
-  it does not.
+- With the reference binding in place (`sassy-dev` → `current_user_can('dev')`), a user holding
+  the d-pace `dev` capability sees the UI on production and an administrator without it does not.
+  Stated against the binding, not the default: the default policy *is* `edit_theme_options`, which
+  every administrator holds.
 - `sassy:compiled` fires with diagnostics attached; a five-line listener can forward it into an
   iframe.
 
@@ -481,6 +561,17 @@ loop are the same pipe.
 > **SPIKE FIRST.** The tier stands on one assumption: styles-pane edits are visible to page JS
 > via `document.styleSheets` in the browsers the team uses. Believed true for Chromium;
 > unverified. If the spike fails, tier 1 dies and tier 0 is the story.
+
+Two costs the tier carries, named here so they are priced before the spike rather than after:
+
+- **Mapping requires decoding the map in the browser.** `{file, line}` comes from the `mappings`
+  field, which is VLQ-encoded — roughly a hundred lines of hand-rolled decoder, against a
+  frontend committed to zero dependencies. It is the one place in phase 6–7 where "hand-rolled
+  minimal" is not also "small". The spike should decode one real mapping, not merely prove
+  CSSOM visibility.
+- **Tier 1 requires a reachable map.** Lightning CSS strips `sourceMappingURL` from the CSS it
+  emits (the canonical `notice` in phase 4), so wherever it is enabled the paintbrush has
+  nothing to map through and must degrade to copy-without-location rather than fail silently.
 
 **Tier 2 — push to source.** POST the patch. The server applies it iff:
 - the phase 6 endpoint contract passes, plus `sassy-write-source` (its own gate, checked
@@ -532,13 +623,16 @@ Rows 2 and 3 must be distinguished from the start. Cascades are gated by attribu
 `el.style.setProperty('--theme','dark')` is the *future primary mechanism*; filing it under
 "inline style pollution" would report the intended design as a defect.
 
-Reference baseline, 29 files: `classList` 11, `data-theme`/`dataset` 8, `.style.` 7,
-`ResizeObserver` 5, `getBoundingClientRect` 5, `matchMedia` 4, CSSOM injection **0**.
+Reference baseline — `d-pace/`, 28 files, excluding `node_modules` and `*.min.js`: `classList`
+10, `dataset` 8, `.style.` 7, `ResizeObserver` 5, `getBoundingClientRect` 4, `matchMedia` 4,
+`data-theme` **1**, CSSOM injection **0**. Note `dataset` and `data-theme` are separate markers
+with separate counts; an earlier draft fused them at 8, which is the `dataset` figure.
 
 **Acceptance:**
 - `wp sassy list --type=script --format=json` reports each script's surface categories.
-- Every file touching `data-theme` on the reference install is identified (8 at time of writing —
-  assert against grep ground truth, never a constant).
+- Every file touching `data-theme` on the reference install is identified (one at time of
+  writing, `d-pace/assets/js/site-header.js` — assert against grep ground truth, never a
+  constant).
 - Run over Sassy's own UI, the profiler reports only intended categories — the phase 6 design
   intent, verified here.
 - No JS parsing beyond marker detection.
@@ -567,13 +661,14 @@ Updating staging is part of the work, not a follow-up.
 | Change | Action |
 |---|---|
 | `Sassy\Dart_Sass_Engine` may move namespace/directory | Update `sassy.integration.php` |
-| `sassy-engine`, `sassy-import-paths`, `sassy-style` signatures | Re-verify against the phase 4 API |
-| `Sassy::get_scss_styles()` removed | No d-pace usage; check `lattice` |
-| `$digitalis_styles` no longer read | **Delete the dead code**: `Theme::enqueue_style_last` and the `WP_Styles` construction in `lattice/include/objects/theme.abstract.php` |
-| `Digitalis` integration removed | Confirmed unused (measured: 0 occurrences) |
+| Fourth filter argument becomes `Asset` (phase 2) | All four d-pace callbacks ignore it — `engine($engine, $compiler)` declares it unused, the rest do not declare it. **No change needed**; verified, not assumed |
+| `sassy-src-map-options` removed (phase 3) | No d-pace or lattice binding. Nothing to do |
+| `Sassy::get_scss_styles()` removed | Verified: no usage in d-pace *or* lattice |
+| `$digitalis_styles` no longer read | **Delete the dead code**: `Theme::enqueue_style_last` and the `WP_Styles` construction in `lattice/include/objects/theme.abstract.php`. Verified zero callers anywhere under `wp-content/` |
+| `Digitalis` integration removed | Confirmed unused (measured: 0 live occurrences — the only hits are two commented-out `@import`s in `scss-template/front.scss`). Note `lattice/load.php` injects the *same two variables* through `sassy-variables`, so removal changes nothing at runtime. That duplicate is dead too, but it is outside this table: **punch-list, not an edit** |
 | New: register the dev gate | `add_filter('sassy-dev', fn () => current_user_can('dev'))` in the Sassy integration |
 | `wp_tempnam` workaround comment | Unnecessary since 2.1; remove |
-| Comment claiming source maps resolve | True since 2.1; predates the fix |
+| Comment claiming source maps resolve | Now accurate. Row kept so nobody "corrects" a correct comment |
 
 Production policy to adopt alongside (all built in 2.1):
 
@@ -617,6 +712,12 @@ change to what hot-wiring feels like, so it is named rather than implied.
 | Clear Cache | Admin page + CLI only; dropped from the bar |
 | Auto-reload polling | Opt-in only, via the Logging menu; never a default |
 | Keybinding | Configurable via `sassy-keybinding` filter (default `['ctrl+space', 'meta+space']`, preserving 2.x; `false` disables). The collision has bitten in practice |
+| Unresolvable source paths | `source_path` is `?string` and never falls back to the URL. `sassy-src-path` applies unconditionally, including over a `null`, so the filter can rescue a URL Sassy cannot resolve |
+| `.sass` entry files? | **Yes** — `is_compilable()` accepts `scss` and `sass`. The resolver already resolved both; only the entry point disagreed |
+| Fourth filter argument | The **`Asset`**. Not `Printer` — that rebuilds the god-object access the phase 2 split removes |
+| `sassy-src-map-options` | **Removed, not renamed.** Its value surface is scssphp option names; `map_path` / `map_url` replace the legitimate uses and the rest moves inside the engine |
+| `wp sassy check` hook set | **`--hooks=all` by default**, alone among the commands — a narrower set makes every admin/editor output look orphaned |
+| Orphaned outputs | Reported, never auto-removed. `wp sassy clear` is the eraser |
 | Execution | One builder at a time, in place on `style-stack` — no worktrees. The plugin works at every commit (strangler-style refactors) |
 | d-pace access | Builders may edit d-pace/lattice **under `/staging/` only**, limited to the §4 breaks table |
 | Version / branch | 3.0.0 / `style-stack` |
@@ -634,8 +735,11 @@ For builder agents. Every rule here exists because of something that actually ha
 the 2.x work.
 
 **One builder at a time, on `style-stack`, in place.** No worktrees, no parallel phases. The
-phases are serial by dependency anyway; the only parallelizable pairs (5∥4, 8∥anything) are not
-worth the coordination cost.
+phases are *mostly* serial by dependency; by §3's graph the genuinely parallelizable pairs are
+4∥5, 4∥6, 5∥6 and 8∥anything-after-1, and none are worth the coordination cost. Note one
+ordering consequence that is not a dependency: phase 6's "profiler reports only intended
+categories" acceptance cannot close until phase 8 exists, so it is carried forward explicitly
+rather than waived.
 
 **This directory is the live plugin on staging.d-pace.com.** Real pages compile through this code
 while you edit it. Therefore:

@@ -31,6 +31,9 @@ handle-dependency graph. Build the spine that models all of them: an `Asset` val
   `Sassy::get_scss_styles()`.
 - `wp sassy list` now lists **every** discovered handle, with a `--compilable` flag to narrow.
   This is a deliberate behavioural change, not a regression. Columns gain `type` and WP `deps`.
+- `is_compilable()` accepts `scss` **and** `sass` (plan §3 phase 1). `Sassy::style_loader_src()`
+  widens its extension check to match — the resolver already resolved both, so this closes an
+  asymmetry rather than adding a feature. It is the one build-path edit phase 1 makes.
 
 ## Path resolution — the one judgement call, pre-made
 
@@ -41,23 +44,42 @@ it owns) and have `SCSS_Compiler::get_src_path()` delegate to it. Two implementa
 URL→path is how the 2.x scheme bugs happened. The `sassy-src-path` filter keeps working from
 both call sites.
 
+The extraction is not a straight move — see plan §3 phase 1 for the contract. Two things change,
+and a naive copy gets both wrong:
+
+- **The resolver returns `null` where 2.x returns the URL.** `get_src_path()` bails out of its
+  own caching and hands back `$this->src` for a remote host or malformed URL, and `compile()`
+  then `file_exists()`es a URL and reports `Source file not found: <url>`. `Asset::source_path`
+  is `?string`. Keep `SCSS_Compiler::get_src_path()`'s existing return shape at *its* call site
+  if you need to — phase 2 replaces that error with a `Diagnostic` — but the shared resolver
+  returns `null`.
+- **`sassy-src-path` now applies over that `null` too.** In 2.x it is applied only on the
+  success branch, so a filter cannot rescue an unresolvable URL, which is the one thing it
+  exists for. Apply it unconditionally, from both call sites, with the `Asset` as the fourth
+  argument — which means resolving lazily, so the `Asset` is fully built when the filter runs.
+
 ## Definition of done
 
 Every acceptance item in plan §3 phase 1, plus:
 
 - `tests/test-style-stack.php`: discovery per context, the multi-queue filter, `--compilable`
   narrowing, `Asset` field resolution (local, remote, `src === false` dependency-only handles),
-  and path resolution delegating rather than duplicating (assert `SCSS_Compiler::get_src_path()`
-  and `Asset::source_path` agree for the same URL).
+  and path resolution delegating rather than duplicating. Assert `SCSS_Compiler::get_src_path()`
+  and `Asset::source_path` agree **for a resolvable URL**; that an unresolvable one yields `null`
+  from `Asset`; and that a `sassy-src-path` filter is honoured from both call sites *including*
+  over an unresolvable URL — the case 2.x cannot express.
 - `php tests/run.php` fully green.
 - Live verification recorded in the handoff note: `wp sassy list --hooks=all --format=json`
   returns every handle with deps populated; `wp sassy compile --hooks=all` still compiles the
-  three d-pace handles; `wp sassy status` unchanged.
+  three d-pace handles; `wp sassy status` unchanged. Expect **336** handles under `--hooks=all`
+  and 329 under the default `--hooks=frontend` — §1's headline figure is the frontend one, so
+  the larger number is correct, not over-reporting.
 
 ## Out of bounds
 
 - Anything in phase 2's territory: do not split `SCSS_Compiler`, do not touch `should_compile()`,
-  transients, engines, or the build pipeline beyond the `get_src_path()` delegation above.
+  transients, engines, or the build pipeline beyond the `get_src_path()` delegation and the
+  `.sass` extension widening above.
 - No d-pace edits — phase 1 requires none.
 - No changes to `docs/style-stack-plan.md` without saying so in the commit message.
 
