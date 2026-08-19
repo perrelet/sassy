@@ -28,11 +28,22 @@ $_SERVER['DOCUMENT_ROOT'] = $SASSY_ROOT;
 
 $GLOBALS['transients']       = [];
 $GLOBALS['filter_overrides'] = [];
+$GLOBALS['actions']          = [];
+$GLOBALS['action_callbacks'] = [];
 
 function apply_filters ($tag, $value) {
-    return $GLOBALS['filter_overrides'][$tag] ?? $value;
+    $override = $GLOBALS['filter_overrides'][$tag] ?? null;
+    if ($override instanceof Closure) {
+        $args = func_get_args();
+        array_shift($args);
+        return $override(...$args);
+    }
+    return $override ?? $value;
 }
-function do_action ($tag, ...$args) {}
+function do_action ($tag, ...$args) {
+    $GLOBALS['actions'][] = $tag;
+    foreach ($GLOBALS['action_callbacks'][$tag] ?? [] as $callback) $callback(...$args);
+}
 function get_transient ($key)              { return $GLOBALS['transients'][$key] ?? false; }
 function set_transient ($key, $v, $e = 0)  { $GLOBALS['transients'][$key] = $v; return true; }
 function delete_transient ($key)           { unset($GLOBALS['transients'][$key]); return true; }
@@ -46,6 +57,22 @@ function get_option ($k, $default = false) { return $k === 'home' ? 'http://test
 function get_template_directory_uri ()     { return 'http://test.local/wp-content/themes/t'; }
 function get_stylesheet_directory_uri ()   { return 'http://test.local/wp-content/themes/t'; }
 
+class Sassy_Test_Queue {
+
+    public $registered = [];
+
+    public function add ($handle, $src, $deps = []) {
+        $this->registered[$handle] = (object) ['handle' => $handle, 'src' => $src, 'deps' => $deps];
+        return $this;
+    }
+
+}
+
+$GLOBALS['wp_styles'] = new Sassy_Test_Queue();
+
+function wp_styles ()                      { return $GLOBALS['wp_styles']; }
+function on_action ($tag, $callback)       { $GLOBALS['action_callbacks'][$tag][] = $callback; }
+
 // --- Plugin ------------------------------------------------------------------
 
 require $SASSY_PLUGIN . 'vendor/autoload.php';
@@ -54,6 +81,8 @@ foreach ([
     'include/model/compile-result.class.php',
     'include/model/lightning-css-postprocessor.class.php',
     'include/model/scss-map.class.php',
+    'include/model/asset.class.php',
+    'include/model/style-stack.class.php',
     'include/model/import-graph.class.php',
     'include/model/import-resolver.class.php',
     'include/model/import-scanner.class.php',

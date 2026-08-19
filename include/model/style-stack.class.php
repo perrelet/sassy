@@ -1,0 +1,147 @@
+<?php
+
+namespace Sassy;
+
+/**
+ * Every style WordPress knows about: discovery over the enqueue queues, and queries across them.
+ *
+ * Nothing outside this class reaches into wp_styles()->registered.
+ */
+class Style_Stack {
+
+    /** @var string[] Enqueue hook sets discovery can fire. */
+    const CONTEXTS = ['frontend', 'admin', 'editor'];
+
+    protected $assets  = [];
+    protected $errors  = [];
+
+    /**
+     * Fire the given enqueue contexts, then read every registered style.
+     *
+     * Contexts that raise are recorded rather than thrown: third-party callbacks on the admin
+     * and editor hooks assume a request WP-CLI is not making, and losing the whole run to one
+     * of them is worse than reporting it. Surfaces render errors(); they do not decide.
+     */
+    public static function discover (array $contexts = []) {
+
+        $stack = new static();
+
+        foreach ($contexts as $context) $stack->fire($context);
+
+        $stack->read_queues();
+
+        return $stack;
+
+    }
+
+    /**
+     * @return Asset[] Keyed by handle.
+     */
+    public function all () {
+
+        return $this->assets;
+
+    }
+
+    /**
+     * @return Asset[] Those Sassy can build, keyed by handle.
+     */
+    public function compilable () {
+
+        return array_filter($this->assets, function ($asset) {
+            return $asset->is_compilable();
+        });
+
+    }
+
+    public function handle ($handle) {
+
+        return $this->assets[$handle] ?? null;
+
+    }
+
+    /**
+     * Handles whose import graph contains the given file. Phase 5 inverts the graph; until
+     * then this is honestly empty rather than approximately right.
+     */
+    public function dependents_of ($file) {
+
+        return [];
+
+    }
+
+    /**
+     * @return array<string, string> context => message, for contexts that raised.
+     */
+    public function errors () {
+
+        return $this->errors;
+
+    }
+
+    protected function fire ($context) {
+
+        ob_start();
+
+        try {
+            $this->fire_context($context);
+        } catch (\Throwable $e) {
+            ob_end_clean();
+            $this->errors[$context] = $e->getMessage();
+            return;
+        }
+
+        ob_end_clean();
+
+    }
+
+    protected function fire_context ($context) {
+
+        switch ($context) {
+
+            case 'frontend':
+                do_action('wp_enqueue_scripts');
+                break;
+
+            case 'admin':
+                $this->admin_screen('dashboard');
+                do_action('admin_enqueue_scripts', 'index.php');
+                break;
+
+            case 'editor':
+                $this->admin_screen('post');
+                do_action('enqueue_block_editor_assets');
+                break;
+
+        }
+
+    }
+
+    protected function admin_screen ($screen) {
+
+        // Callbacks on these hooks routinely dereference get_current_screen(), which is null
+        // outside wp-admin.
+        if (!function_exists('set_current_screen') && defined('ABSPATH') && file_exists(ABSPATH . 'wp-admin/includes/screen.php')) {
+            require_once ABSPATH . 'wp-admin/includes/screen.php';
+        }
+
+        if (function_exists('set_current_screen')) set_current_screen($screen);
+
+    }
+
+    protected function read_queues () {
+
+        foreach (apply_filters('sassy-style-queues', [wp_styles()]) as $queue) {
+
+            if (!$queue || !isset($queue->registered)) continue;
+
+            // Later queues win, matching the array_merge 2.x used for $digitalis_styles.
+            foreach ($queue->registered as $dependency) {
+                $this->assets[$dependency->handle] = Asset::from_dependency($dependency);
+            }
+
+        }
+
+    }
+
+}
