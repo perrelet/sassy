@@ -1,5 +1,11 @@
 # AGENTS.md — Sassy WordPress Plugin
 
+> **On the `style-stack` branch, [docs/style-stack-plan.md](docs/style-stack-plan.md) is
+> authoritative for all new work**, including its §8 execution protocol. This file describes the
+> 2.1 codebase — the thing the plan refactors. Read this to understand what exists; read the plan
+> to know what to build. Where they disagree about the future, the plan wins; where they disagree
+> about the present, this file wins.
+
 ## Overview
 
 **Sassy** is a WordPress plugin (v2.1.0, by Digitalis Web Build Co.) that compiles SCSS files on-demand. The core premise: enqueue `.scss` files exactly as you would `.css` files via `wp_enqueue_style`, and Sassy intercepts the URL, compiles the SCSS to CSS, writes the result to disk, and returns the compiled CSS URL to WordPress instead.
