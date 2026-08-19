@@ -2,9 +2,13 @@
 
 > **On the `style-stack` branch, [docs/style-stack-plan.md](docs/style-stack-plan.md) is
 > authoritative for all new work**, including its §8 execution protocol. This file describes the
-> 2.1 codebase — the thing the plan refactors. Read this to understand what exists; read the plan
-> to know what to build. Where they disagree about the future, the plan wins; where they disagree
-> about the present, this file wins.
+> codebase as it currently stands. Read this to understand what exists; read the plan to know
+> what to build. Where they disagree about the future, the plan wins; where they disagree about
+> the present, this file wins — so **each phase updates this file as part of landing**, or the
+> sentence you are reading becomes a trap.
+>
+> **Phase 1 has landed** (`Asset`, `Style_Stack`). Phases 2–9 are still as the plan describes
+> them; the 2.1 architecture below is accurate everywhere else.
 
 ## Overview
 
@@ -30,6 +34,8 @@ sassy/
 │   │   ├── scss-compiler.class.php    # Per-file compilation orchestrator
 │   │   ├── compile-result.class.php   # DTO returned by compiler engines
 │   │   ├── scss-map.class.php         # PHP array → SCSS map syntax converter
+│   │   ├── asset.class.php            # One enqueued thing; owns URL → filesystem resolution
+│   │   ├── style-stack.class.php      # Discovery over the enqueue queues, and queries across them
 │   │   ├── import-graph.class.php     # Recorded dependency set; answers "has anything changed?"
 │   │   ├── import-resolver.class.php  # Sass file-resolution rules (partials, _index, load paths)
 │   │   ├── import-scanner.class.php   # Walks the @use/@forward/@import graph into an Import_Graph
@@ -64,7 +70,7 @@ sassy/
 1. **`sassy.php`** — Defines constants, creates `new Sassy\Sassy()` stored in `$Sassy` global, registers `SASSY()` helper. Registers WP-CLI command if `WP_CLI` is defined.
 2. **`plugins_loaded`** → `Sassy::boot()`:
    - Loads vendors (Composer autoload)
-   - Loads model classes (require_once in order: `Compile_Result`, `Lightning_CSS_Postprocessor`, `Scss_Map`, `Import_Graph`, `Import_Resolver`, `Import_Scanner`, `Compiler_Engine` interface, engine implementations, `SCSS_Compiler`)
+   - Loads model classes (require_once in order: `Compile_Result`, `Lightning_CSS_Postprocessor`, `Scss_Map`, `Asset`, `Style_Stack`, `Import_Graph`, `Import_Resolver`, `Import_Scanner`, `Compiler_Engine` interface, engine implementations, `SCSS_Compiler`)
    - Loads view (`UI` class, instantiated immediately)
    - Registers `Lightning_CSS_Postprocessor::filter` on `sassy-css` at priority 20
    - If `is_admin()`: loads and boots `Admin` → `Updater`
@@ -81,7 +87,7 @@ sassy/
 
 ### `SCSS_Compiler::compile($src, $handle)`
 
-1. **Resolve source path** — converts the `.scss` URL to an absolute filesystem path. Handles multisite by normalizing the blog path. Filterable via `sassy-src-path`.
+1. **Resolve source path** — delegates to `Asset`, which is the only implementation of URL → filesystem resolution. Handles multisite by normalizing the blog path. Filterable via `sassy-src-path`. See [The style stack](#the-style-stack) for what `null` means, and what it does not.
 2. **Cache check** (`should_compile`) — skips actual compilation if:
    - `sassy-force-compile` filter returns false, AND
    - No file in the recorded import graph has changed (see [Dependency tracking](#dependency-tracking)), AND
@@ -335,7 +341,7 @@ Registered only when `WP_CLI` is defined. Command group: `sassy`.
 | Command | Purpose |
 |---|---|
 | `wp sassy status` | Engine, binaries and versions, build path, Lightning CSS state, constants |
-| `wp sassy list` | Discovered SCSS styles with cache state, dependency count and last compile time |
+| `wp sassy list` | Every discovered style; `--compilable` narrows to the ones Sassy builds |
 | `wp sassy compile [<handle>...]` | Compile; `--force` ignores the cache |
 | `wp sassy vars [<handle>]` | Resolved SCSS variables, after integrations and filters |
 | `wp sassy deps <handle>` | The recorded import graph, with each file's state |
@@ -346,8 +352,8 @@ All data commands take `--format=table|csv|json|yaml`; `vars` also accepts `--fo
 
 ### Style discovery and `--hooks`
 
-Styles are found by firing enqueue hooks and then reading both queues via
-`Sassy::get_scss_styles()`. `--hooks` selects which:
+Styles are found by `Style_Stack::discover()`, which fires enqueue hooks and then reads every
+queue. `--hooks` selects which:
 
 | Value | Fires |
 |---|---|
@@ -361,6 +367,17 @@ the default, which is why deploy-time priming needs `--hooks=all`.
 
 > The flag is `--hooks`, not `--context`: WP-CLI reserves `--context` as a global parameter and
 > rejects the value before the command is reached.
+
+`wp sassy list` reports **every** discovered handle, not only the buildable ones — 337 here
+under `--hooks=all`, of which 3 compile. Columns: `handle`, `type`, `state`, `deps`, `imports`,
+`engine`, `time`, `source`, `built`. `deps` is the WordPress handle dependency list (an array
+under `json` and `yaml`, comma-joined for the row formats); `imports` is the file count in the
+recorded import graph, which is what `deps` meant before phase 1. Handles Sassy does not build
+carry identity and `source` only — no engine is constructed for them. `--compilable` narrows to
+the buildable set.
+
+Asking to compile a handle that cannot be says why: unregistered, registers no source of its
+own, not a local file, or not compilable with the extension named.
 
 Firing admin and editor hooks outside a real request runs third-party callbacks that assume a
 screen exists, so `set_current_screen()` is called first and each hook set is wrapped in a
@@ -406,6 +423,7 @@ binary is absent.
 | `test-multiple-handles.php` | Handles sharing a source directory do not invalidate each other |
 | `test-source-maps.php` | Every map source resolves from where the map is served, and line numbers are unshifted |
 | `test-output-style.php` | `sassy-style` accepts the enum and the string, on both engines |
+| `test-style-stack.php` | `Asset` field resolution (local, root-relative, remote, `src === false`), `sassy-src-path` over an unresolvable URL, discovery per context, a context that raises, the multi-queue filter, and `SCSS_Compiler` delegating rather than duplicating |
 
 The second argument is what makes these worth having: point the runner at a checkout from before
 a fix and the relevant tests should fail. A test that passes against both is not testing the fix.
@@ -430,7 +448,8 @@ a fix and the relevant tests should fail. A test that passes against both is not
 | `sassy-import-paths` | `[dirname($src_path), SASSY_PATH]` (+ `DIGITALIS_FRAMEWORK_PATH` if defined) | Filesystem paths searched by `@import`/`@use` |
 | `sassy-src-map` | `true` | Whether to generate source maps |
 | `sassy-src-map-options` | (sourceMapWriteTo, sourceMapURL, etc.) | Source map config array |
-| `sassy-src-path` | (resolved from URL) | Override source SCSS filesystem path |
+| `sassy-src-path` | (resolved from URL, or `null`) | Override the source filesystem path. Applies even when resolution returned `null`, which is how a source Sassy cannot resolve gets placed. Receives `($path, $src, $handle, $asset)` |
+| `sassy-style-queues` | `[wp_styles()]` | Registries discovery reads. Later queues win on a duplicate handle |
 | `sassy-engine` | `null` (→ Scssphp_Engine) | Return a `Compiler_Engine` instance to override |
 | `sassy-dart-sass-binary` | `null` (→ `"sass"`) | Dart Sass binary path |
 | `sassy-css` | N/A | Post-process compiled CSS string |
@@ -489,14 +508,73 @@ Used throughout the plugin to access compilers, variables, UI, and error state f
 
 ---
 
-## `$digitalis_styles` Global
+## The style stack
 
-An alternative `WP_Styles` registry used by the Digitalis framework to register SCSS styles outside the standard WordPress queue. Both `Sassy::compile_all()` (AJAX) and the WP-CLI command merge this registry with `wp_styles()->registered` before iterating.
+Phase 1 of the 3.0 plan. `Style_Stack` is the only thing that reads `wp_styles()->registered`;
+everything else asks it.
+
+### `Asset`
+
+A value object over a `_WP_Dependency`. On the reference install 337 of these exist under
+`--hooks=all` and Sassy builds 3 of them.
+
+| Member | Notes |
+|---|---|
+| `handle`, `type`, `src`, `deps` | As registered. `type` is `'style'`; scripts arrive in phase 8. `src` is `false` for dependency-only handles (90 of them here) |
+| `extension` | Lowercased, read from the URL path. `null` when there is none |
+| `get_source_path()` | Filesystem path, or `null`. Resolved lazily and cached |
+| `is_local()` | Whether Sassy has a path for it — i.e. `get_source_path() !== null` |
+| `is_compilable()` | `is_local()` and an extension in `Asset::COMPILABLE` (`scss` only; `.sass` is deferred to plan phase 3, where it belongs as an engine capability) |
+
+**`null` means the URL maps nowhere** — a remote host, a hostless src that is not root-relative,
+or `src === false`. It does **not** mean the file is missing: a local URL resolves whether or not
+anything is there, so callers can name the path they looked at. That is why
+`SCSS_Compiler::compile()` can still report `Source file not found: /var/www/…/style.scss`
+rather than echoing the URL back.
+
+Two things it does that `SCSS_Compiler::get_src_path()` did not:
+
+- **Root-relative sources resolve.** 65 of this install's handles register as
+  `/wp-admin/css/common.min.css` — every wp-admin stylesheet. Treating a missing host as remote
+  put a fifth of the stack out of reach.
+- **The `DOCUMENT_ROOT` fallback is taken only when it names a real file.** WP-CLI leaves
+  `DOCUMENT_ROOT` unset, so the old unconditional swap built a rootless path and reported it as
+  the file it had looked for.
+
+`sassy-src-path` applies **unconditionally, including over a `null`** — it is the only way to
+place an asset Sassy cannot resolve itself. It receives `($path, $src, $handle, $asset)`.
+
+`SCSS_Compiler::get_src_path()` delegates here and keeps returning the URL when resolution comes
+back `null`, because its callers `file_exists()` that value and print it. Phase 2 turns both
+outcomes into `Diagnostic`s.
+
+### `Style_Stack`
+
+```php
+Style_Stack::discover(['frontend', 'admin'])   // fires those enqueue hooks, then reads the queues
+    ->all()            // Asset[] keyed by handle
+    ->compilable()     // just the ones Sassy builds
+    ->handle('x')      // ?Asset
+    ->dependents_of($file)   // [] until phase 5 inverts the import graph
+    ->errors()         // context => message, for contexts that raised
+```
+
+`discover()` fires each context inside an output buffer and records anything that raises rather
+than losing the run — third-party callbacks on the admin and editor hooks assume a request
+WP-CLI is not making. Surfaces render `errors()`; they do not decide. Passing no contexts reads
+the queues as they stand.
+
+Queues come from the **`sassy-style-queues`** filter, defaulting to `[wp_styles()]`; later
+queues win on a duplicate handle. This replaces the `$digitalis_styles` global, which
+`get_scss_styles()` used to merge by hand — it is dead code in Lattice
+(`Theme::enqueue_style_last`, zero callers) and is no longer special-cased. Anything still
+needing a second registry adds it through the filter.
 
 ---
 
 ## Key Architectural Decisions
 
+- **`Style_Stack` owns discovery** — nothing else reads `wp_styles()->registered`, and nothing else resolves a URL to a path. Both were duplicated before phase 1, which is how the scheme bugs and the divergent staleness rules happened.
 - **One `SCSS_Compiler` per file** — stateful, tracks compile result, errors, warnings, and metadata for that file.
 - **Transient-based caching** — avoids recompilation on every page load; invalidated by file changes or variable changes.
 - **Engine abstraction** — `Compiler_Engine` interface allows swapping scssphp for Dart Sass (or a custom engine) without changing the orchestration layer.
