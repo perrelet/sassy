@@ -556,12 +556,12 @@ Style_Stack::discover(['frontend', 'admin'])   // fires those enqueue hooks, the
     ->compilable()     // just the ones Sassy builds
     ->handle('x')      // ?Asset
     ->dependents_of($file)   // [] until phase 5 inverts the import graph
-    ->errors()         // context => message, for contexts that raised
+    ->context_errors() // context => message, for contexts that raised
 ```
 
 `discover()` fires each context inside an output buffer and records anything that raises rather
 than losing the run — third-party callbacks on the admin and editor hooks assume a request
-WP-CLI is not making. Surfaces render `errors()`; they do not decide. Passing no contexts reads
+WP-CLI is not making. Surfaces render `context_errors()`; they do not decide. Passing no contexts reads
 the queues as they stand.
 
 Queues come from the **`sassy-style-queues`** filter, defaulting to `[wp_styles()]`; later

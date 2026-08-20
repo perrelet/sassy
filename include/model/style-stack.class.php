@@ -13,14 +13,14 @@ class Style_Stack {
     const CONTEXTS = ['frontend', 'admin', 'editor'];
 
     protected $assets  = [];
-    protected $errors  = [];
+    protected $context_errors = [];
 
     /**
      * Fire the given enqueue contexts, then read every registered style.
      *
      * Contexts that raise are recorded rather than thrown: third-party callbacks on the admin
      * and editor hooks assume a request WP-CLI is not making, and losing the whole run to one
-     * of them is worse than reporting it. Surfaces render errors(); they do not decide.
+     * of them is worse than reporting it. Surfaces render context_errors(); they do not decide.
      */
     public static function discover (array $contexts = []) {
 
@@ -73,9 +73,9 @@ class Style_Stack {
     /**
      * @return array<string, string> context => message, for contexts that raised.
      */
-    public function errors () {
+    public function context_errors () {
 
-        return $this->errors;
+        return $this->context_errors;
 
     }
 
@@ -87,7 +87,7 @@ class Style_Stack {
             $this->fire_context($context);
         } catch (\Throwable $e) {
             ob_end_clean();
-            $this->errors[$context] = $e->getMessage();
+            $this->context_errors[$context] = $e->getMessage();
             return;
         }
 

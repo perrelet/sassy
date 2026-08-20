@@ -63,9 +63,19 @@ does not know a Sass import tree. Only the intersection does, and that intersect
 Breaking: renamed classes, changed engine contract, changed filter surface, integrations removed.
 **3.0.0.** Branch: `style-stack`.
 
-**3.0.0 ships phases 1–6.** Phases 7 and 8 land as 3.x minors; phase 9 is unversioned. The
-digitalis.ca update JSON is version-fenced before 3.0 publishes — wild consumers on 1.x poll it
-and must not be offered a breaking auto-update.
+**3.0.0 ships phases 1–6.** Phases 7 and 8 land as 3.x minors; phase 9 is unversioned.
+
+Two release preconditions, named here because neither belongs to a phase's acceptance and both
+were drifting unowned:
+
+- **The version constant is bumped by phase 6, not before.** `SASSY_VERSION` and the plugin
+  header stay at `2.1.0` for phases 1–5 and move together — the updater compares the constant, so
+  a builder bumping it early on a branch that has not shipped offers a half-built 3.0 to anything
+  polling. Phases 1–5 leave it alone deliberately; that is not an oversight to fix.
+- **The digitalis.ca update JSON is version-fenced before 3.0 publishes.** Wild consumers on 1.x
+  poll it and must not be offered a breaking auto-update. This lives outside this repository, so
+  no builder will trip over it and no acceptance criterion can catch it — **Jamie's, and the one
+  item here that can do damage off this machine.**
 
 ---
 
@@ -149,9 +159,18 @@ is_local()      bool
 moves out of `SCSS_Compiler::get_src_path()` and into `Asset`, which is the only place it exists
 after phase 1. Three rules, because the 2.x version got each of them slightly wrong:
 
-- The resolver returns `?string` — `null` for a remote host, a malformed URL, or a path that
-  resolves nowhere. It never returns the URL as a consolation; a URL in a variable named
+- The resolver returns `?string`. `null` means **the URL maps nowhere** — a remote host, a
+  hostless src that is not root-relative, `src === false`. It does **not** mean the file is
+  missing: a local URL resolves whether or not anything is there, so callers can name the path
+  they looked at rather than echoing the URL back. Existence is a separate `file_exists()`,
+  asked where it matters. It never returns the URL as a consolation; a URL in a variable named
   `source_path` is exactly the class of lie §1 rules out.
+- **Root-relative sources resolve.** 65 of the 337 handles register as
+  `/wp-admin/css/common.min.css` — every wp-admin stylesheet. 2.x reads a missing host as remote,
+  which puts a fifth of the stack out of reach of the model this phase exists to build.
+- **The `DOCUMENT_ROOT` fallback is taken only when it names a real file.** WP-CLI leaves
+  `DOCUMENT_ROOT` unset, so 2.x's unconditional swap builds a rootless path whenever the ABSPATH
+  candidate is missing, and reports that as the file it looked for.
 - `sassy-src-path` applies **unconditionally, including over a `null`**. In 2.x it applies only
   on the branch that already succeeded, so the one filter documented as "override the source
   path" cannot rescue the one case that needs overriding — a CDN-hosted or otherwise unresolvable
@@ -159,9 +178,11 @@ after phase 1. Three rules, because the 2.x version got each of them slightly wr
   `null` leaves it unresolved.
 - Resolution is lazy, so the filter receives a fully constructed `Asset` as its fourth argument.
 
-`Printer` reports an unresolved asset as its own `Diagnostic` — *source could not be resolved to
-a local file*, naming the URL — rather than 2.x's `Source file not found: <url>`, which formats a
-URL as though it were a path and sends an agent looking for a file that was never named.
+`Printer` reports the two failures differently, because they are different: a local source that
+is absent names **the path it looked at**, and an asset that maps nowhere gets *source could not
+be resolved to a local file*, naming the URL. 2.x emitted `Source file not found: <url>` for the
+second, formatting a URL as though it were a path and sending an agent after a file that was
+never named.
 
 `is_compilable()` is `is_local()` **and** an extension of `scss`. Widening it to `sass` was
 tried in phase 1 and **deferred to phase 3** — neither engine accepts an indented-syntax entry
@@ -175,7 +196,15 @@ all(): Asset[]
 compilable(): Asset[]
 handle(string $h): ?Asset
 dependents_of(string $file): Asset[]     phase 5 fills this in
+context_errors(): array                  context => message, for contexts that raised
 ```
+
+Discovery fires each context inside an output buffer and **records** anything that raises rather
+than losing the run — third-party callbacks on the admin and editor hooks assume a request
+WP-CLI is not making, and 2.x already guarded for it inside the CLI. Moving the guard here is
+what lets the surfaces render the failure without owning the policy. The method is
+`context_errors()`, not `errors()`: `Compile_Result::errors()` returns `Diagnostic[]` in phase 3,
+and one name for two things is what the naming table exists to prevent.
 
 Queues come from a `sassy-style-queues` filter defaulting to `[wp_styles()]`. The
 `$digitalis_styles` global is **not** special-cased — it is dead code in Lattice
@@ -188,7 +217,7 @@ adds it through the filter.
 - `wp sassy list --format=json` returns every registered handle (329 on the reference install at
   time of writing — assert against the live registry, never a constant) with WP deps populated;
   `--compilable` narrows to those Sassy can build. The count is per hook set, not a property of
-  the install: 329 under the default `--hooks=frontend`, 336 under `--hooks=all`. A discovery
+  the install: 329 under the default `--hooks=frontend`, 337 under `--hooks=all`. A discovery
   run that reports more handles than §1 quotes is doing its job.
 - Discovery tests cover each context and the multi-queue filter.
 - No caller outside `Style_Stack` reaches into `wp_styles()->registered`.
@@ -199,8 +228,10 @@ adds it through the filter.
 
 `SCSS_Compiler` (≈600 lines, five responsibilities) splits into:
 
-- **`Printer`** — takes an `Asset`, consults `Compile_Cache`, builds a `Compile_Request`, invokes
-  the engine, post-processes, writes, records. Returns `Compile_Result`.
+- **`Printer`** — takes an `Asset`, consults `Compile_Cache`, assembles the engine arguments,
+  invokes the engine, post-processes, writes, records. Returns `Compile_Result`. The argument bag
+  stays the untyped array until phase 3 replaces it with `Compile_Request`; pulling that forward
+  is how a phase boundary stops being a review gate.
 - **`Build_Target`** — pure path math. Every `get_build_*` and `sassy-build-*`.
 - **`Compile_Cache`** — `is_current(Asset)`, `record(Asset, Import_Graph)`, `forget(Asset)`.
 - **`Variable_Resolver`** — defaults, `sassy-variables`, map conversion, URL scheme
@@ -283,8 +314,16 @@ re-derive:
 
 So `sass` is a **capability**, not an extension: `Scssphp_Engine` supports it outright, and
 `Dart_Sass_Engine` supports it only where no variables are injected. That is exactly what
-`capabilities()` exists to express, and why this waited for this phase. `Asset::is_compilable()`
-asks the active engine rather than consulting a flat list.
+`capabilities()` exists to express, and why this waited for this phase.
+
+`Asset::is_compilable()` does **not** consult the engine. It stays a property of the asset —
+local, and an extension Sassy builds — because engine selection runs through `sassy-engine`,
+which receives the `Asset`, so an `Asset` that resolved an engine would re-enter itself; and
+`Style_Stack::compilable()` would resolve one 337 times to answer a question about file
+extensions. The engine **refuses** what it cannot take, as a `Diagnostic` naming the file and the
+remedy — the same shape as `@use` under scssphp, one paragraph down. `sass` joins
+`Asset::COMPILABLE`; whether the *active* engine can build it is a compile-time answer, not a
+discovery-time one.
 
 #### Diagnostics
 
@@ -676,19 +715,21 @@ with a different extractor. Not scheduled; recorded so earlier phases do not for
 
 ## 4. What breaks in d-pace
 
-Updating staging is part of the work, not a follow-up.
+Updating staging is part of the work, not a follow-up — which means every row names the phase
+that owns it. An unpinned row is a follow-up by another name, and the `$digitalis_styles`
+deletion sat unscheduled through phase 1 proving it.
 
-| Change | Action |
-|---|---|
-| `Sassy\Dart_Sass_Engine` may move namespace/directory | Update `sassy.integration.php` |
-| Fourth filter argument becomes `Asset` (phase 2) | All four d-pace callbacks ignore it — `engine($engine, $compiler)` declares it unused, the rest do not declare it. **No change needed**; verified, not assumed |
-| `sassy-src-map-options` removed (phase 3) | No d-pace or lattice binding. Nothing to do |
-| `Sassy::get_scss_styles()` removed | Verified: no usage in d-pace *or* lattice |
-| `$digitalis_styles` no longer read | **Delete the dead code**: `Theme::enqueue_style_last` and the `WP_Styles` construction in `lattice/include/objects/theme.abstract.php`. Verified zero callers anywhere under `wp-content/` |
-| `Digitalis` integration removed | Confirmed unused (measured: 0 live occurrences — the only hits are two commented-out `@import`s in `scss-template/front.scss`). Note `lattice/load.php` injects the *same two variables* through `sassy-variables`, so removal changes nothing at runtime. That duplicate is dead too, but it is outside this table: **punch-list, not an edit** |
-| New: register the dev gate | `add_filter('sassy-dev', fn () => current_user_can('dev'))` in the Sassy integration |
-| `wp_tempnam` workaround comment | Unnecessary since 2.1; remove |
-| Comment claiming source maps resolve | Now accurate. Row kept so nobody "corrects" a correct comment |
+| Phase | Change | Action |
+|---|---|---|
+| 1 ✅ | `Sassy::get_scss_styles()` removed | Verified: no usage in d-pace *or* lattice. Nothing to do |
+| **1, due** | `$digitalis_styles` no longer read | **Delete the dead code**: `Theme::enqueue_style_last` and the `WP_Styles` construction in `lattice/include/objects/theme.abstract.php`. Verified zero callers anywhere under `wp-content/`. Actionable since phase 1 landed |
+| 2 | Fourth filter argument becomes `Asset` | All four d-pace callbacks ignore it — `engine($engine, $compiler)` declares it unused, the rest do not declare it. **No change needed**; verified, not assumed |
+| 3 | `sassy-src-map-options` removed | No d-pace or lattice binding. Nothing to do |
+| 4 | `Digitalis` integration removed | Confirmed unused (measured: 0 live occurrences — the only hits are two commented-out `@import`s in `scss-template/front.scss`). Note `lattice/load.php` injects the *same two variables* through `sassy-variables`, so removal changes nothing at runtime. That duplicate is dead too, but it is outside this table: **punch-list, not an edit** |
+| 4 | `Sassy\Dart_Sass_Engine` may move namespace/directory | Update `sassy.integration.php` |
+| 6 | New: register the dev gate | `add_filter('sassy-dev', fn () => current_user_can('dev'))` in the Sassy integration |
+| any | `wp_tempnam` workaround comment | Unnecessary since 2.1; remove |
+| — | Comment claiming source maps resolve | Now accurate. Row kept so nobody "corrects" a correct comment |
 
 Production policy to adopt alongside (all built in 2.1):
 

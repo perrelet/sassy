@@ -120,7 +120,7 @@ check('the frontend handle is not', $admin->handle('front') === null);
 $all = Style_Stack::discover(Style_Stack::CONTEXTS);
 
 check('all three contexts register', $all->handle('front') && $all->handle('admin') && $all->handle('editor'));
-check('no context raised',           $all->errors() === []);
+check('no context raised',           $all->context_errors() === []);
 
 section('A context that raises is recorded, not fatal');
 
@@ -128,8 +128,8 @@ on_action('enqueue_block_editor_assets', function () { throw new \RuntimeExcepti
 
 $guarded = Style_Stack::discover(Style_Stack::CONTEXTS);
 
-check('the raise is recorded',       isset($guarded->errors()['editor']));
-check('it carries the message',      ($guarded->errors()['editor'] ?? '') === 'screen missing');
+check('the raise is recorded',       isset($guarded->context_errors()['editor']));
+check('it carries the message',      ($guarded->context_errors()['editor'] ?? '') === 'screen missing');
 check('earlier contexts still ran',  $guarded->handle('front') instanceof Asset);
 check('discovery still returned',    count($guarded->all()) > 0);
 

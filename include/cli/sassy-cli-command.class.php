@@ -524,7 +524,7 @@ class Sassy_CLI_Command extends WP_CLI_Command {
 
         $stack = Style_Stack::discover($contexts);
 
-        foreach ($stack->errors() as $context => $message) {
+        foreach ($stack->context_errors() as $context => $message) {
             WP_CLI::warning(sprintf("Context '%s' raised: %s", $context, $message));
         }
 
