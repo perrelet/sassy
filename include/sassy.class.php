@@ -150,7 +150,7 @@ class Sassy {
             $compiler = $this->add_printer(new Printer());
 
             $href     = $compiler->compile($asset->src, $asset->handle);
-            $warnings = $compiler->get_warnings();
+            $warnings = array_map(function ($diagnostic) { return $diagnostic->to_array(); }, $compiler->get_warnings());
 
             $meta = [
                 'engine'         => $compiler->get_engine_class(),
@@ -223,7 +223,7 @@ class Sassy {
 				if (!$printer->has_error()) continue;
 
 				$basename = basename(explode('?', $printer->get_src())[0]);
-				$this->errors[$index] = "SASSY -> {$basename} -> " . $printer->get_error();
+				$this->errors[$index] = "SASSY -> {$basename}\n" . Diagnostic::render_all($printer->get_errors());
 
 			}
 

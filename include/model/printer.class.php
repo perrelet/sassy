@@ -24,9 +24,8 @@ class Printer {
     protected $import_paths;
 
     protected $compiled;
-    protected $error;
     protected $src_map;
-    protected $warnings = [];
+    protected $diagnostics = [];
     protected $compile_time = null;
 
     /**
@@ -42,9 +41,8 @@ class Printer {
         $this->import_paths     = null;
 
         $this->compiled = false;
-        $this->error    = false;
         $this->src_map  = false;
-        $this->warnings = [];
+        $this->diagnostics = [];
         $this->compile_time = null;
 
     }
@@ -103,7 +101,7 @@ class Printer {
         $parse_src = parse_url($this->src);
 
         if (!file_exists($src_path)) {
-            $this->error('Source file not found: ' . $src_path);
+            $this->fail($this->unresolved());
             return $this->src;
         }
 
@@ -127,18 +125,15 @@ class Printer {
             $this->compile_time = microtime(true) - $start;
 
             if (!$result->ok()) {
-                $this->error('A compiler error occurred: ' . $result->error);
+
+                $this->diagnostics = $result->diagnostics;
+                if (!$result->has_errors()) $this->fail(new Diagnostic(Diagnostic::ERROR, (string) $result->error));
+
                 return $this->get_build_url();
+
             }
 
-            $this->warnings = [];
-            if (isset($result->info) && $result->info !== null) {
-                if (is_array($result->info)) {
-                    $this->warnings = $result->info;
-                } else {
-                    $this->warnings = [$result->info];
-                }
-            }
+            $this->diagnostics = $result->diagnostics;
 
             $this->src_map = !empty($args['source_map']);
             $css = $result->css;
@@ -157,10 +152,10 @@ class Printer {
             $graph = Import_Scanner::scan($src_path, $this->get_import_paths($src_path));
 
             if ($graph->truncated) {
-                $this->warnings[] = sprintf(
+                $this->diagnostics[] = new Diagnostic(Diagnostic::WARNING, sprintf(
                     'Import graph truncated at %d files. Changes beyond that will not invalidate the cache.',
                     Import_Scanner::MAX_FILES
-                );
+                ), ['file' => $src_path, 'source' => 'sassy']);
             }
 
             $this->get_cache()->record($graph, $this->compile_time);
@@ -187,14 +182,14 @@ class Printer {
 
         if (!is_dir($build_path)) {
             if (!wp_mkdir_p($build_path)) {
-                $this->error('File Permissions Error, unable to create cache directory: ' . $build_path);
+                $this->fail(new Diagnostic(Diagnostic::ERROR, 'Unable to create the build directory: ' . $build_path, ['source' => 'sassy']));
                 $this->get_cache()->forget();
                 return false;
             }
         }
 
         if (!is_writable($build_path)) {
-            $this->error('File Permissions Error, permission denied. Please make the directory writable: ' . $build_path);
+            $this->fail(new Diagnostic(Diagnostic::ERROR, 'Build directory is not writable: ' . $build_path, ['source' => 'sassy']));
             $this->get_cache()->forget();
             return false;
         }
@@ -227,9 +222,25 @@ class Printer {
      *
      * @param string $e Error message.
      */
-    protected function error ($e) {
+    protected function fail (Diagnostic $diagnostic) {
 
-        $this->error = $e;
+        $this->diagnostics[] = $diagnostic;
+
+    }
+
+    /**
+     * A source that is absent names the path it looked at; one that maps nowhere names the URL,
+     * because there is no path to name.
+     */
+    protected function unresolved () {
+
+        $path = $this->get_asset()->get_source_path();
+
+        if ($path === null) {
+            return new Diagnostic(Diagnostic::ERROR, 'Source could not be resolved to a local file: ' . $this->src, ['source' => 'sassy']);
+        }
+
+        return new Diagnostic(Diagnostic::ERROR, 'Source file not found.', ['file' => $path, 'source' => 'sassy']);
 
     }
 
@@ -241,19 +252,56 @@ class Printer {
 
     public function has_error () {
 
-        return $this->error ? true : false;
+        return (bool) $this->get_errors();
 
     }
 
+    /**
+     * @return Diagnostic|null The first error, which is the one surfaces lead with.
+     */
     public function get_error () {
 
-        return $this->error;
+        return $this->get_errors()[0] ?? null;
 
     }
 
+    /**
+     * @return Diagnostic[]
+     */
+    public function get_diagnostics () {
+
+        return $this->diagnostics;
+
+    }
+
+    /**
+     * @return Diagnostic[]
+     */
+    public function get_errors () {
+
+        return $this->of(Diagnostic::ERROR);
+
+    }
+
+    /**
+     * Everything that did not stop the compile: warnings, deprecations and notices. Phase 5
+     * splits them by severity for --strict.
+     *
+     * @return Diagnostic[]
+     */
     public function get_warnings () {
 
-        return $this->warnings;
+        return array_values(array_filter($this->diagnostics, function ($diagnostic) {
+            return !$diagnostic->is_error();
+        }));
+
+    }
+
+    protected function of ($severity) {
+
+        return array_values(array_filter($this->diagnostics, function ($diagnostic) use ($severity) {
+            return $diagnostic->severity === $severity;
+        }));
 
     }
 

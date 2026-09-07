@@ -82,7 +82,7 @@ section('Diagnostics name the file the author wrote');
 // Dart Sass cites whatever file it was handed, which is the temp copy, path and all.
 fixture("$SCSS/warns.scss", ".a { content: unquote(\"x\"); }\n");
 $warned = compile('http://test.local/wp-content/themes/t/scss/warns.scss', 'warns');
-$text   = implode("\n", $warned->get_warnings());
+$text   = Sassy\Diagnostic::render_all($warned->get_warnings());
 
 check('a warning was produced', $text !== '', 'nothing to check against');
 check('no temp basename leaks',  !str_contains($text, '.tmp.scss'), $text);
@@ -94,7 +94,9 @@ fixture("$SCSS/broken.scss", ".a { padding: ; }\n");
 $broken = compile('http://test.local/wp-content/themes/t/scss/broken.scss', 'broken');
 
 check('the compile failed',        $broken->has_error());
-check('no temp path in the error', !str_contains((string) $broken->get_error(), '.sassy-tmp'), (string) $broken->get_error());
+$error = Sassy\Diagnostic::render_all($broken->get_errors());
+check('no temp path in the error', !str_contains($error, '.sassy-tmp'), $error);
+check('the error is a Diagnostic',  $broken->get_error() instanceof Sassy\Diagnostic);
 
 section('Cleanup');
 $strays = array_merge(

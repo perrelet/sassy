@@ -184,4 +184,24 @@ check('the Asset honours it',
 
 unset($GLOBALS['filter_overrides']['sassy-src-path']);
 
+section('Sassy reports its own failures as diagnostics');
+
+$missing = (new Sassy\Printer())->compile($BASE . 'absent.scss', 'absent');
+$m = (new Sassy\Printer());
+$m->compile($BASE . 'absent.scss', 'absent');
+$d = $m->get_error();
+
+check('a missing source is an error',   $d && $d->severity === 'error');
+check('attributed to Sassy',            $d && $d->source === 'sassy');
+check('naming the path it looked at',   $d && $d->file === ABSPATH . 'wp-content/themes/t/scss/absent.scss', $d ? (string) $d->file : 'none');
+check('without repeating it in the message', $d && !str_contains($d->message, ABSPATH));
+
+$remote = new Sassy\Printer();
+$remote->compile('https://cdn.example.com/x.scss', 'cdn');
+$r = $remote->get_error();
+
+check('one that maps nowhere is an error', $r && $r->severity === 'error');
+check('has no file to name',               $r && $r->file === null);
+check('so it names the URL',               $r && str_contains($r->message, 'cdn.example.com'));
+
 finish();

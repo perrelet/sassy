@@ -69,12 +69,12 @@ class Sassy_CLI_Command extends WP_CLI_Command {
             $href     = $compiler->compile($style->src, $style->handle);
 
             if ($compiler->has_error()) {
-                $errors[] = sprintf('%s -> %s', $style->handle, $compiler->get_error());
+                $errors[] = sprintf("%s\n%s", $style->handle, Diagnostic::render_all($compiler->get_errors()));
                 continue;
             }
 
             foreach ($compiler->get_warnings() as $warning) {
-                WP_CLI::warning(sprintf('%s: %s', $style->handle, $warning));
+                WP_CLI::warning(sprintf("%s\n%s", $style->handle, $warning->render()));
             }
 
             if ($compiler->has_compiled()) {
@@ -184,7 +184,7 @@ class Sassy_CLI_Command extends WP_CLI_Command {
 
             WP_CLI::log(sprintf('%s  %s  %s', $stamp, $style->handle, \WP_CLI::colorize('%RERROR%n')));
 
-            foreach (preg_split('/\R/', (string) $compiler->get_error()) as $line) {
+            foreach (preg_split('/\R/', Diagnostic::render_all($compiler->get_errors())) as $line) {
                 WP_CLI::log('           ' . $line);
             }
 
