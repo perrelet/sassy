@@ -463,8 +463,19 @@ source deleted. They are reported, never auto-removed; `wp sassy clear` is the e
 
 Orphan detection is the reason **`check` defaults to `--hooks=all`**, alone among the commands.
 Under any narrower hook set every admin- and editor-built file looks orphaned, because the
-handle that owns it was never registered. Same principle as truncation: a `check` that cannot
-see the whole build set cannot answer its own question.
+handle that owns it was never registered.
+
+**An orphan is a `warning`, not a failure.** It is the one thing `check` reports that it cannot
+be certain about: a handle enqueued only on some template is discovered by no hook set at all, so
+its perfectly valid output looks unclaimed. Measured on the reference install, a naive
+implementation also flags `.sassy-tmp`, which is the Dart engine's own directory. Detection is
+therefore scoped to files matching the build-name pattern, skipping dotfiles and directories, and
+graduating to a failure only under `--strict`.
+
+That is a deliberate exception to the principle below rather than a hole in it. Truncation makes
+`check`'s answer *unknowable*, so it fails. An orphan makes `check`'s answer *noisy*, and a check
+that cries wolf on its first run teaches people to ignore it, which costs more than the orphan
+did.
 
 Truncation fails `check` by default even though its severity is `warning`. The principle:
 **`check` fails on anything that makes its own answer untrustworthy.** Its promise is "everything
@@ -475,9 +486,10 @@ does not wait for `--strict`.
 
 **Acceptance:**
 - Editing a shared partial and running `deps --file` names exactly the handles that recompile.
-- `check` exits non-zero on a stale handle, a compile error, an orphaned output and a truncated
-  graph; zero otherwise. Non-zero under `--strict` when warnings exist; under `--strict=all` when
-  deprecations exist.
+- `check` exits non-zero on a stale handle, a compile error and a truncated graph; zero
+  otherwise. An orphaned output is reported as a `warning`, so it fails only under `--strict`.
+- Orphan detection ignores dotfiles, directories and anything not matching the build-name
+  pattern. On the reference install it reports the one real orphan and not `.sassy-tmp`.
 
 ---
 
@@ -826,7 +838,7 @@ change to what hot-wiring feels like, so it is named rather than implied.
 | Fourth filter argument | The **`Asset`**. Not `Printer` — that rebuilds the god-object access the phase 2 split removes |
 | `sassy-src-map-options` | **Removed, not renamed.** Its value surface is scssphp option names; `map_path` / `map_url` replace the legitimate uses and the rest moves inside the engine |
 | `wp sassy check` hook set | **`--hooks=all` by default**, alone among the commands — a narrower set makes every admin/editor output look orphaned |
-| Orphaned outputs | Reported, never auto-removed. `wp sassy clear` is the eraser |
+| Orphaned outputs | Reported as a `warning`, never auto-removed, failing `check` only under `--strict`. It is the one thing `check` cannot be certain about: a conditionally enqueued handle's output is indistinguishable from an abandoned one. `wp sassy clear` is the eraser |
 | `--strict=all` differs per engine? | **Accepted.** scssphp implements a fraction of Dart's deprecations (of four probed, only `elseif` fired), so the same source yields different sets. That is `capabilities()` working, not a defect to reconcile. Document it; do not try to normalise one engine to the other |
 | Execution | One builder at a time, in place on `style-stack` — no worktrees. The plugin works at every commit (strangler-style refactors) |
 | d-pace access | Builders may edit d-pace/lattice **under `/staging/` only**, limited to the §4 breaks table |
