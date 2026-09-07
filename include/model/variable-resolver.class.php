@@ -27,6 +27,7 @@ class Variable_Resolver {
             ];
 
             $variables = apply_filters('sassy-variables', $variables, $this->asset->src, $this->asset->handle, $this->asset);
+            $variables = Extensions::apply_variables($variables, $this->asset);
 
             foreach ($variables as $key => $value) {
                 if (is_array($value)) $variables[$key] = Scss_Map::from_array($value);

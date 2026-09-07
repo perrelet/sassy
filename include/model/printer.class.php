@@ -58,7 +58,7 @@ class Printer {
             return $this->engine;
         }
 
-        $engine = apply_filters('sassy-engine', null, $this->get_asset());
+        $engine = Extensions::resolve_engine(apply_filters('sassy-engine', null, $this->get_asset()), $this->get_asset());
 
         if ($engine instanceof Compiler_Engine) {
             $this->engine = $engine;
@@ -140,6 +140,10 @@ class Printer {
 
             $css = preg_replace('#(url\((?![\'"]?(?:[a-z][a-z0-9+.\-]*:|/|\#))[\'"]?)#miu', '$1' . dirname($parse_src['path']) . '/', $css);
             $css = apply_filters('sassy-css', $css, $this->src, $this->handle, $this->get_asset());
+
+            $context = new Post_Process_Context($this->get_asset());
+            $css     = Extensions::post_process($css, $context);
+            $this->diagnostics = array_merge($this->diagnostics, $context->get_diagnostics());
 
             file_put_contents($build_file, $css);
             if ($result->map !== null && $request->map_path) file_put_contents($request->map_path, $result->map);
@@ -373,6 +377,7 @@ class Printer {
             }
 
             $this->import_paths = apply_filters('sassy-import-paths', $import_paths, $src_path, $this->handle, $this->get_asset());
+            $this->import_paths = Extensions::apply_load_paths($this->import_paths, $this->get_asset());
 
         }
 

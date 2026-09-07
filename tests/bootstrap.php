@@ -84,6 +84,8 @@ foreach ([
     'include/model/lightning-css-postprocessor.class.php',
     'include/model/scss-map.class.php',
     'include/model/asset.class.php',
+    'include/model/post-process-context.class.php',
+    'include/model/extensions.class.php',
     'include/model/style-stack.class.php',
     'include/model/build-target.class.php',
     'include/model/variable-resolver.class.php',

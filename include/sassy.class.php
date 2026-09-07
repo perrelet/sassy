@@ -29,6 +29,7 @@ class Sassy {
 		add_filter('sassy-css', [Lightning_CSS_Postprocessor::class, 'filter'], 20, 4);
 
 		add_action('after_setup_theme', [$this, 'load_integrations']);
+		add_action('after_setup_theme', [Extensions::class, 'boot'], 20);
 
 		if (is_admin()) $this->load_admin();
 	
@@ -55,6 +56,8 @@ class Sassy {
 		require_once(SASSY_PATH . 'include/model/lightning-css-postprocessor.class.php');
 		require_once(SASSY_PATH . 'include/model/scss-map.class.php');
 		require_once(SASSY_PATH . 'include/model/asset.class.php');
+		require_once(SASSY_PATH . 'include/model/post-process-context.class.php');
+		require_once(SASSY_PATH . 'include/model/extensions.class.php');
 		require_once(SASSY_PATH . 'include/model/style-stack.class.php');
 		require_once(SASSY_PATH . 'include/model/build-target.class.php');
 		require_once(SASSY_PATH . 'include/model/variable-resolver.class.php');
