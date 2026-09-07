@@ -28,8 +28,7 @@ class Sassy {
 
 		Extensions::register_post_processor('lightning-css', [Lightning_CSS_Postprocessor::class, 'process']);
 
-		add_action('after_setup_theme', [$this, 'load_integrations']);
-		add_action('after_setup_theme', [Extensions::class, 'boot'], 20);
+		add_action('after_setup_theme', [Extensions::class, 'boot']);
 
 		if (is_admin()) $this->load_admin();
 	
@@ -71,19 +70,6 @@ class Sassy {
 		require_once(SASSY_PATH . 'include/engines/dart-sass-parser.class.php');
 		require_once(SASSY_PATH . 'include/engines/dart-sass-engine.compiler-engine.php');
 		require_once(SASSY_PATH . 'include/model/printer.class.php');
-
-	}
-	
-	public function load_integrations () {
-
-		require_once(SASSY_PATH . "include/integrations/integration.abstract.php");
-		require_once(SASSY_PATH . "include/integrations/bricks.integration.php");
-		require_once(SASSY_PATH . "include/integrations/digitalis.integration.php");
-		require_once(SASSY_PATH . "include/integrations/oxygen.integration.php");
-
-		new Bricks();
-		new Oxygen();
-		new Digitalis();
 
 	}
 	

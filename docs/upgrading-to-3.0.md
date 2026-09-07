@@ -2,7 +2,7 @@
 
 What changes for a site running Sassy, and what to do about it.
 
-**In progress.** 3.0 ships phases 1-6 of [style-stack-plan.md](style-stack-plan.md), and each phase adds its breaks here as it lands. Anything not listed below has not changed yet. Landed so far: **phases 1 to 3**.
+**In progress.** 3.0 ships phases 1-6 of [style-stack-plan.md](style-stack-plan.md), and each phase adds its breaks here as it lands. Anything not listed below has not changed yet. Landed so far: **phases 1 to 4**.
 
 Nothing on 1.x is auto-updated to 3.0. The digitalis.ca update JSON is version-fenced before 3.0 publishes, so a wild 1.x install is never offered a breaking upgrade.
 
@@ -166,3 +166,55 @@ The untyped `$args` array is gone. `$request` carries `source`, `source_path`, `
 ### Dart Sass runs with `--verbose`
 
 Dart withholds repeated deprecations by default and reports only that it did. Sassy now asks for all of them, so expect more diagnostics from the same source than 2.x reported, and all of them were always there.
+
+---
+
+## Phase 4: extension API
+
+### The built-in builder integrations are removed
+
+**Who this affects:** anyone running Bricks Builder, Oxygen Builder or the Digitalis Framework and relying on Sassy to turn their settings into SCSS variables. This is the most visible break in 3.0.
+
+Gone with them: `$c-*` colours, `$f-*` fonts, `$b-*` breakpoints, the `$breakpoints` map, `$sec-px`, `$sec-py`, `$col-px`, `$col-py`, `$digitalis_path` and `$digitalis_uri`. SCSS referencing any of those stops compiling with an undefined variable error, which is at least loud.
+
+**What to do:** copy the fixture. `tests/fixtures/bricks.php`, `oxygen.php` and `digitalis.php` in the plugin are each integration rebuilt on the extension API, roughly forty lines, and they produce exactly what the built-in versions produced. Drop one into your theme or plugin and register it.
+
+**Why:** neither builder is installed on the machine Sassy is developed on, so the code shipped with no test surface. Two real bugs got in that way. As fixtures they are tested against stubbed builder APIs on every run, and as your code they are visible and yours to change.
+
+### There is now a registry alongside the filters
+
+**Who this affects:** nobody who has to act. Every filter works exactly as before.
+
+Four points can be extended: load paths, variables, post-processors and engines. Registering gives a provider a name, a typed signature and a line in `wp sassy status`.
+
+```php
+add_action('sassy-register', function () {
+
+    Sassy\Extensions::register_variables('my-theme', function (array $variables, Sassy\Asset $asset) {
+        $variables['brand'] = '#ff0000';
+        return $variables;
+    });
+
+});
+```
+
+Registering later than `sassy-register` works, as long as it happens before the asset in question compiles. Timing is per asset: each `Printer` resolves variables lazily, so a provider registered between two compiles applies to the second and not the first.
+
+### A post-processor can report; a `sassy-css` filter still cannot
+
+**Who this affects:** anyone whose `sassy-css` callback can fail.
+
+A filter takes a string and returns a string, so it has no way to say it did not run. Lightning CSS is the case in point: a missing binary or a failed process returned the CSS untouched and wrote to the PHP error log, which looked identical to success on every Sassy surface. It now reports, and so can yours if you register instead of filtering:
+
+```php
+Sassy\Extensions::register_post_processor('my-minifier', function ($css, $context) {
+    $context->warn('my-minifier did not run; the CSS is unprocessed.');
+    return $css;
+});
+```
+
+`Lightning_CSS_Postprocessor::filter()` is replaced by `::process($css, $context)`.
+
+### A new notice when the source map link disappears
+
+If source maps are on and a map is written but the CSS coming out of post-processing has no `sourceMappingURL`, Sassy reports a notice naming the map. Any post-processor can cause this; Lightning CSS is the common one.

@@ -7,7 +7,7 @@
 > the present, this file wins — so **each phase updates this file as part of landing**, or the
 > sentence you are reading becomes a trap.
 >
-> **Phases 1 to 3 have landed**: `Asset`, `Style_Stack`, `Printer`, `Build_Target`, `Compile_Cache`, `Variable_Resolver`, `Diagnostic`, `Compile_Request`. Phases 4 to 9 are still as the plan describes them.
+> **Phases 1 to 4 have landed**: `Asset`, `Style_Stack`, `Printer`, `Build_Target`, `Compile_Cache`, `Variable_Resolver`, `Diagnostic`, `Compile_Request`, `Extensions`. Phases 5 to 9 are still as the plan describes them.
 
 ## Overview
 
@@ -34,7 +34,11 @@ sassy/
 │   │   ├── build-target.class.php     # Where output goes: path, URL, filename, source map
 │   │   ├── compile-cache.class.php    # Is it current? Sole owner of the cache transients
 │   │   ├── variable-resolver.class.php # What values an asset compiles with
-│   │   ├── compile-result.class.php   # DTO returned by compiler engines
+│   │   ├── compile-request.class.php  # What an engine is asked to build
+│   │   ├── compile-result.class.php   # What it produced, diagnostics included
+│   │   ├── diagnostic.class.php       # One reportable event, and the canonical rendering
+│   │   ├── extensions.class.php       # The four extension points, and who is extending them
+│   │   ├── post-process-context.class.php  # What a post-processor gets besides the CSS
 │   │   ├── scss-map.class.php         # PHP array → SCSS map syntax converter
 │   │   ├── asset.class.php            # One enqueued thing; owns URL → filesystem resolution
 │   │   ├── style-stack.class.php      # Discovery over the enqueue queues, and queries across them
@@ -48,11 +52,6 @@ sassy/
 │   │   ├── dart-sass-engine.compiler-engine.php     # Alternative: shells out to Dart Sass CLI
 │   │   ├── dart-sass-parser.class.php               # Dart stderr into Diagnostics
 │   │   └── scssphp-logger.class.php                 # scssphp warnings into Diagnostics
-│   ├── integrations/
-│   │   ├── integration.abstract.php   # Base class: condition check, variable injection via filter
-│   │   ├── bricks.integration.php     # Bricks Builder — breakpoints, spacing vars
-│   │   ├── oxygen.integration.php     # Oxygen Builder — colors, fonts, breakpoints, spacing
-│   │   └── digitalis.integration.php  # Digitalis Framework — path/URI vars
 │   ├── admin/
 │   │   ├── admin.class.php            # Admin loader (just boots Updater)
 │   │   └── updater.class.php          # Custom update checker against digitalis.ca
@@ -76,10 +75,10 @@ sassy/
    - Loads vendors (Composer autoload)
    - Loads model classes (require_once in order: `Diagnostic`, `Compile_Request`, `Compile_Result`, `Lightning_CSS_Postprocessor`, `Scss_Map`, `Asset`, `Style_Stack`, `Build_Target`, `Variable_Resolver`, `Compile_Cache`, `Import_Graph`, `Import_Resolver`, `Import_Scanner`, `Compiler_Engine` interface, engine implementations, `Printer`)
    - Loads view (`UI` class, instantiated immediately)
-   - Registers `Lightning_CSS_Postprocessor::filter` on `sassy-css` at priority 20
+   - Registers `Lightning_CSS_Postprocessor::process` as the `lightning-css` post-processor
    - If `is_admin()`: loads and boots `Admin` → `Updater`
    - Registers `style_loader_src`, `wp_enqueue_scripts`, `wp_footer`, `admin_enqueue_scripts`, `admin_footer` hooks
-3. **`after_setup_theme`** → `Sassy::load_integrations()`: requires integration files, instantiates `Bricks`, `Oxygen`, and `Digitalis` (their constructors check `condition()` before activating).
+3. **`after_setup_theme`** → `Extensions::boot()`, which fires the `sassy-register` action so providers have a place to register.
 
 ---
 
@@ -275,48 +274,29 @@ Default CLI options: `--minify`. Customizable via `sassy-lightning-css-options` 
 
 ---
 
-## Integrations
+## Extension API
 
-All integrations extend `Sassy\Integration`. The base constructor:
-1. Calls `condition()` — returns false to abort.
-2. Adds `compiler_variables()` to the `sassy-variables` filter.
-3. Calls `run()` (hook for additional setup).
+Four things are extensible: **load paths**, **variables**, **post-processors** and **engines**. Each keeps its filter, and each gains a registration that carries a name.
 
-Integrations declare `get_variables()` returning `['scss-var-name' => 'value']` pairs.
+```php
+add_action('sassy-register', function () {
+    Sassy\Extensions::register_variables('my-theme', function (array $variables, Sassy\Asset $asset) { … });
+});
+```
 
-### Bricks Builder (`BRICKS_VERSION` defined)
+`register_load_paths()`, `register_post_processor()` and `register_engine()` follow the same shape. Re-registering a slug replaces it. `Extensions::providers()` returns kind => slugs, which is what `wp sassy status` prints.
 
-| SCSS variable | Source |
-|---|---|
-| `$b-{key}` | Each Bricks breakpoint (numeric px value) |
-| `$b-page`, `$b-tablet`, `$b-phone-landscape`, `$b-phone-portrait` | Mapped aliases for standard breakpoint keys |
-| `$breakpoints` | Sass map of all breakpoints with `px` suffix |
-| `$col-px` | Column gap from active theme style |
-| `$sec-px` | Section horizontal padding |
-| `$sec-py` | Section vertical padding |
+**Registration timing is per asset, not global.** Each `Printer` resolves its variables lazily, so a provider registered between two compiles applies to the second and not the first. `sassy-register` fires on `after_setup_theme` because that is where integrations used to load, not because later is forbidden.
 
-### Oxygen Builder (`CT_VERSION` defined, Digitalis OXY_SCSS module absent)
+**The two routes are not equal.** A filter binds and works exactly as before, but a `sassy-css` callback takes a string and returns a string, so it cannot report anything. A registered post-processor is handed a `Post_Process_Context` carrying the `Asset` plus `report()`, `warn()` and `notice()`, and whatever it reports joins the compile's diagnostics. That asymmetry is the reason the registry exists at all: Lightning CSS could fail on every request and look identical to success.
 
-| SCSS variable | Source |
-|---|---|
-| `$c-{color-name}` | Global colors (`oxy_get_global_colors()`) |
-| `$b-{breakpoint-name}` | Each breakpoint (`oxygen_vsb_get_breakpoint_width()`) |
-| `$b-page` | Page width (`oxygen_vsb_get_page_width()`) |
-| `$breakpoints` | Sass map of all breakpoints |
-| `$f-{font-name}` | Global fonts (`ct_get_global_settings()`) |
-| `$sec-px`, `$sec-py` | Section padding |
-| `$col-px`, `$col-py` | Column padding |
+`sassy-compiler` is not one of the four. It hands out scssphp's own `Compiler` object, so it is an engine-specific escape hatch with no equivalent under Dart Sass, and the registry does not describe it.
 
-Note: The Oxygen integration is suppressed when `Digitalis\Module\OXY_SCSS\OXY_SCSS` exists (Digitalis framework handles it).
+### Builder integrations are gone
 
-### Digitalis Framework (`DIGITALIS_FRAMEWORK_VERSION` defined)
+Bricks, Oxygen and Digitalis shipped as built-in integrations through 2.x. Neither builder is installed on the development machine, so the code had no test surface, which is how the `resolve_bin()` and output-style bugs got in. They now live in `tests/fixtures/` as worked examples, rebuilt on the extension API and tested against stubbed builder APIs (`Bricks\Breakpoints`, `Bricks\Theme_Styles`, `oxy_get_global_colors()`, `ct_get_global_settings()` and friends). `tests/test-fixtures.php` asserts each one still produces what it used to, including Oxygen standing down when the Digitalis framework handles SCSS itself.
 
-Instantiated automatically by `load_integrations()` alongside Bricks and Oxygen.
-
-| SCSS variable | Value |
-|---|---|
-| `$digitalis_path` | `DIGITALIS_FRAMEWORK_PATH` (filesystem) |
-| `$digitalis_uri` | `DIGITALIS_FRAMEWORK_URI` (web URL) |
+If the extension API ever cannot express one of them, the API is wrong. That is what those fixtures are for.
 
 ---
 
@@ -430,6 +410,8 @@ binary is absent.
 | `test-source-maps.php` | Every map source resolves from where the map is served, and line numbers are unshifted |
 | `test-output-style.php` | `sassy-style` accepts the enum and the string, on both engines |
 | `test-printer.php` | `Build_Target` path math and its filters; `Variable_Resolver` defaults, Sass maps, scheme normalization and signatures; `Compile_Cache` currency across a partial edit, a variable change, a missing build file and both cache filters; `Printer` agreeing with all three |
+| `test-extensions.php` | The registry: four kinds, named providers, re-registration replacing by slug, per-asset timing, and a post-processor's report reaching the `Printer` |
+| `test-fixtures.php` | The retired Bricks, Oxygen and Digitalis integrations rebuilt on the extension API, against stubbed builder APIs |
 | `test-diagnostics.php` | The `Diagnostic` schema and its rendering; Dart stderr parsing for all three shapes plus unrecognised output; the scssphp logger and its structured exceptions; engine capabilities |
 | `test-style-stack.php` | `Asset` field resolution (local, root-relative, remote, `src === false`), `sassy-src-path` over an unresolvable URL, discovery per context, a context that raises, the multi-queue filter, and `Printer` delegating rather than duplicating |
 
@@ -641,6 +623,5 @@ need the filter or they stop being discovered — see
 
 - The plugin's own admin CSS is `assets/css/sassy.css`, edited directly — the SCSS source was dropped in `398e1c6`, so the VS Code Sass task in `.vscode/tasks.json` no longer has an input.
 - The `Scssphp_Engine` is the only engine that needs no external binaries — safe default for all environments.
-- When adding a new integration: extend `Integration`, implement `condition()` and `get_variables()`, then add `new YourIntegration()` in `Sassy::load_integrations()`.
 - When adding a new per-compile filter, keep the signature consistent: `($value, $src, $handle, $asset)`.
 - The `Compile_Result::info` field carries warnings (array of strings) from the engine. `Dart_Sass_Engine` populates it from stderr output; `Scssphp_Engine` currently returns `null` (reserved for future use).

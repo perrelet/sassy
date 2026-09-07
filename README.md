@@ -49,7 +49,7 @@ Sassy will compile a source file if any of the following are met:
 
 ## Variables
 
-By default only the following variables are defined, however others may be added via the `sassy-variables` filter. See [Integrations](#integrations) below.
+By default only the following variables are defined, however others may be added via the `sassy-variables` filter or a registered provider. See [Extending Sassy](#extending-sassy) below.
 
 ```php
 [
@@ -204,38 +204,45 @@ add_filter('sassy-lightning-css-options', function ($options, $src, $handle, $co
 
 ## Source Maps
 
-Source maps can be selectively generated via the `sassy-src-map` filter. The source map configuration can be hooked via the `sassy-src-map-options` filter. Refer to (https://scssphp.github.io/scssphp/docs/) for further information on these parameters.
+Source maps can be selectively generated via the `sassy-src-map` filter. Where the map is written follows the build target, so `sassy-build-path` and `sassy-build-directory` relocate it.
 
-## Integrations
+## Extending Sassy
 
-### Bricks Builder
+There are four things you can extend: **load paths**, **variables**, **post-processors** and **engines**. Each has a filter, and each has a registration that gives your provider a name, a typed signature and a line in `wp sassy status`.
 
-Sassy automatically converts the following from Bricks Builder's configuration into SCSS variables:
+```php
+add_action('sassy-register', function () {
 
- - 📱 Break Points (`$b-desktop`, `$b-tablet`, `$b-page`, `$b-phone-landscape`, `$b-phone-portrait`, etc.)
- - 📐 Section & Column Spacing (`$sec-px`, `$sec-py`, `$col-px`)
+    Sassy\Extensions::register_variables('my-theme', function (array $variables, Sassy\Asset $asset) {
+        $variables['brand'] = '#ff0000';
+        return $variables;
+    });
 
-Sassy also generates a list of breakpoints as a sass map called `$breakpoints`.
+});
+```
 
-### Oxygen Builder
+The same shape applies to `register_load_paths()`, `register_engine()` and `register_post_processor()`. Registering a slug that already exists replaces it, so a provider can be overridden by name. Registering later than `sassy-register` still works, as long as it happens before the asset in question compiles.
 
-Sassy automatically converts the following global styles from Oxygen Builder's configuration into scss variables:
+Filters keep working exactly as before and need no changes. What they cannot do is report: a `sassy-css` callback returns a string and has no way to tell you it did not run. A registered post-processor is handed a context and can say so:
 
- - 🎨 Global Colors (`$c-color-name`, `$c-another-color`, etc)
- - 🔠 Global Fonts (`$f-text`, `$f-display`, etc)
- - 📱 Break Points (`$b-page`, `$b-tablet`, `$b-phone-landscape`, `$b-phone-portrait`)
- - 📐 Section & Column Spacing (`$sec-px`, `$sec-py`, `$col-px`)
+```php
+Sassy\Extensions::register_post_processor('my-minifier', function ($css, $context) {
 
-Sassy also generates a list of breakpoints as a sass map called `$breakpoints`.
+    if (!$binary_exists) {
+        $context->warn('my-minifier did not run; the CSS is unprocessed.');
+        return $css;
+    }
 
-### Digitalis Framework
+    return minify($css);
 
-When the [Digitalis Framework](https://digitalis.ca/) is active (`DIGITALIS_FRAMEWORK_VERSION` defined), Sassy automatically exposes the following SCSS variables:
+});
+```
 
-- `$digitalis_path` — absolute filesystem path to the Digitalis framework directory
-- `$digitalis_uri` — web URL to the Digitalis framework directory
+### Builder integrations
 
-These are useful for referencing framework assets (fonts, images, partials) from within any SCSS file without hardcoding paths.
+Sassy 2.x shipped built-in integrations for Bricks Builder, Oxygen Builder and the Digitalis Framework, which turned their settings into SCSS variables. **These are not part of 3.0.** Neither builder is installed on the machine Sassy is developed on, so the code had no test surface, and shipping it that way is how two real bugs got in.
+
+They live on as worked examples: `tests/fixtures/` contains each of them rebuilt on the extension API and tested against stubbed builder APIs. If you need one, copy the fixture into your theme or plugin and register it. It is roughly forty lines and it is yours to change, which is better than a version of it you cannot see.
 
 ## Credits
 
