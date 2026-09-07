@@ -7,7 +7,7 @@
 > the present, this file wins — so **each phase updates this file as part of landing**, or the
 > sentence you are reading becomes a trap.
 >
-> **Phases 1 and 2 have landed**: `Asset`, `Style_Stack`, `Printer`, `Build_Target`, `Compile_Cache`, `Variable_Resolver`. Phases 3 to 9 are still as the plan describes them.
+> **Phases 1 to 3 have landed**: `Asset`, `Style_Stack`, `Printer`, `Build_Target`, `Compile_Cache`, `Variable_Resolver`, `Diagnostic`, `Compile_Request`. Phases 4 to 9 are still as the plan describes them.
 
 ## Overview
 
@@ -97,8 +97,8 @@ sassy/
    - No file in the recorded import graph has changed (see [Dependency tracking](#dependency-tracking)), AND
    - `sassy-vars-sig-{handle}` transient matches sha1 of current serialized variables, AND
    - The compiled build file already exists on disk.
-3. **Build compile args** — assembles `$args`: scss content, src_path, import_paths (source dir + SASSY_PATH + DIGITALIS_FRAMEWORK_PATH if defined), variables (resolved via `get_variables()`), output style, source map settings.
-4. **Delegate to engine** — calls `Compiler_Engine::compile($args)`, returns `Compile_Result`.
+3. **Build the request** — a `Compile_Request` carrying source, source_path, load_paths (source dir + SASSY_PATH + DIGITALIS_FRAMEWORK_PATH if defined), variables, style, source_map, map_path and map_url. No key is any engine's option name.
+4. **Delegate to engine** — calls `Compiler_Engine::compile($request)`, returns `Compile_Result` carrying `Diagnostic[]` whether it succeeded or failed.
 5. **URL rewriting** — rewrites relative `url()` references in the compiled CSS to absolute paths based on the source SCSS location.
 6. **`sassy-css` filter** — passes CSS through registered post-processors (Lightning CSS hooks here at priority 20).
 7. **Write to disk** — CSS to `wp-content/scss/{name}.css`; source map alongside if enabled.
