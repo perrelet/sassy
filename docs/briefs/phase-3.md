@@ -26,6 +26,22 @@ Plus one item carried from phase 1, which described it but had nowhere to put it
 
 This also settles the plan's note that `Scssphp_Engine` populates no warnings: it is not a missing feature, it is an unimplemented `LoggerInterface`.
 
+**What the logger actually hands you, probed on 2.1.0 rather than read off the interface:**
+
+| Case | `$deprecation` | `$span` | `$trace` |
+|---|---|---|---|
+| `@warn`, top level or in a mixin | null | **null** | present, one frame per level |
+| `elseif` deprecation | `elseif` | present, file plus line and column | **null** |
+| `global-builtin`, `slash-div`, `moz-document` | never fires | | |
+
+Three things follow, and each will cost you an hour if you meet it by surprise:
+
+- **`span` and `trace` are alternatives, not a pair.** A `@warn` gives you a trace and no span, a deprecation gives you a span and no trace. Take file, line and column from whichever arrived. This mirrors Dart exactly, where `@warn` has a trace and no frame.
+- **Trace source URLs are percent-encoded** (`file%3A///var/www/...`) while the span's are not. Decode before the path reaches a `Diagnostic`, or you emit something no editor will open, which §1 rules out.
+- **scssphp implements a small subset of Dart's deprecations.** Of the four tried, only `elseif` fired. So the same source yields different deprecation sets on different engines, and `--strict=all` is engine-dependent by nature. That is a consequence of `capabilities()` working, not a bug to reconcile, but say it in the docs or someone will file it.
+
+**A logger that throws takes the compile with it.** `warn()` runs inside compilation, so an exception there surfaces as a compile failure with a message that has nothing to do with the stylesheet. Mine did exactly this by calling `(string) $trace`, which is not supported: the accessor is `Trace::getFormattedTrace()`. Keep the logger total, and let a diagnostic you cannot parse fall back to the raw message rather than raising.
+
 **Dart hides diagnostics from you by default.** After a few repeats it prints `WARNING: N repetitive deprecation warnings omitted. Run in verbose mode to see all warnings.` and drops the rest. `--strict=all` is supposed to gate on deprecations, and a gate that cannot see its input is not a gate, so **pass `--verbose`** and take the volume. Expect the reference install's per-compile deprecation count to rise once nothing is withheld; that is the true number, and the plan's figure of 48 was measured through the cap.
 
 **Carry `url` verbatim even when Dart is wrong.** A `global-builtin` deprecation cites `https://sass-lang.com/d/import`, which is the wrong page. Verified in isolation on sass 1.92.0. It is not yours to correct: the field records what the engine said.
