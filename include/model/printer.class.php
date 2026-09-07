@@ -58,7 +58,7 @@ class Printer {
             return $this->engine;
         }
 
-        $engine = apply_filters('sassy-engine', null, $this);
+        $engine = apply_filters('sassy-engine', null, $this->get_asset());
 
         if ($engine instanceof Compiler_Engine) {
             $this->engine = $engine;
@@ -139,7 +139,7 @@ class Printer {
             $css = $result->css;
 
             $css = preg_replace('#(url\((?![\'"]?(?:[a-z][a-z0-9+.\-]*:|/|\#))[\'"]?)#miu', '$1' . dirname($parse_src['path']) . '/', $css);
-            $css = apply_filters('sassy-css', $css, $this->src, $this->handle, $this);
+            $css = apply_filters('sassy-css', $css, $this->src, $this->handle, $this->get_asset());
 
             file_put_contents($build_file, $css);
             if ($result->map !== null && $request->map_path) file_put_contents($request->map_path, $result->map);
@@ -372,7 +372,7 @@ class Printer {
                 $import_paths[] = DIGITALIS_FRAMEWORK_PATH;
             }
 
-            $this->import_paths = apply_filters('sassy-import-paths', $import_paths, $src_path, $this->handle, $this);
+            $this->import_paths = apply_filters('sassy-import-paths', $import_paths, $src_path, $this->handle, $this->get_asset());
 
         }
 
@@ -479,7 +479,7 @@ class Printer {
     
     public function get_style () {
 
-        $style = apply_filters('sassy-style', $this->style, $this->src, $this->handle, $this);
+        $style = apply_filters('sassy-style', $this->style, $this->src, $this->handle, $this->get_asset());
 
         // Engines are handed a string. The filter's default is an OutputStyle case, and an enum
         // never equals a string, so returning OutputStyle::COMPRESSED used to silently expand.

@@ -20,10 +20,10 @@ class Lightning_CSS_Postprocessor {
      * @param Asset $asset The asset being built.
      * @return string
      */
-    public static function filter ($css, $src, $handle, $compiler) {
+    public static function filter ($css, $src, $handle, $asset = null) {
 
         // Only run when enabled
-        if (!apply_filters('sassy-lightning-css', true, $src, $handle, $compiler)) {
+        if (!apply_filters('sassy-lightning-css', true, $src, $handle, $asset)) {
             return $css;
         }
 

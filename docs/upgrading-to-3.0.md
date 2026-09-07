@@ -105,6 +105,8 @@ Path math moved to `Build_Target`, currency to `Compile_Cache`, values to `Varia
 
 Every per-compile filter (`sassy-build-*`, `sassy-variables`, `sassy-style`, `sassy-import-paths`, `sassy-src-map`, `sassy-css`, `sassy-force-compile`, `sassy-check-dependencies` and the rest) now receives `($value, $src, $handle, $asset)` instead of the compiler. `sassy-engine` receives `($engine, $asset)`.
 
+Two exceptions to the shape, unchanged from 2.x: `sassy-import-paths` passes the resolved *source path* as its second argument rather than the source URL, and the `sassy-compiler` action is engine-specific, receiving scssphp's own compiler object plus the `Compile_Request`.
+
 The `Asset` is available before a compile starts and carries no build state, so a filter can no longer reach through it into paths or the cache. Ask `Build_Target` or `Compile_Cache` for those.
 
 ### Cache transients are owned by `Compile_Cache`

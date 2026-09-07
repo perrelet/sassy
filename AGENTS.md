@@ -221,7 +221,7 @@ deploy hook remains sufficient. What stops happening is noticing edits on disk.
 Uses `scssphp/scssphp` v2.x — pure PHP, no external processes.
 
 - Variables passed as `ScssPhp\ScssPhp\Value\Value` instances (parsed via `ValueConverter::parseValue()`).
-- Exposes `sassy-compiler` WordPress action, passing the raw `ScssPhp\ScssPhp\Compiler` object — allows direct manipulation before compile.
+- Exposes the `sassy-compiler` action, passing the raw `ScssPhp\ScssPhp\Compiler` object for direct manipulation before compile. Engine-specific by nature, so it has no equivalent on Dart Sass.
 - Source maps generated via `Compiler::SOURCE_MAP_FILE`.
 - Warnings returned in `Compile_Result::info`.
 
@@ -471,7 +471,7 @@ All per-compile filters receive `($value, $src, $handle, $asset)`. The fourth ar
 
 | Action | When |
 |---|---|
-| `sassy-compiler` | Inside `Scssphp_Engine::compile()` before compilation — receives `(Compiler $compiler, array $args)` |
+| `sassy-compiler` | Inside `Scssphp_Engine::compile()` before compilation — receives `(Compiler $compiler, Compile_Request $request)`. An engine-specific escape hatch: it hands out scssphp's own compiler and does nothing under Dart Sass |
 | `sassy-admin-bar` | Inside admin bar build — receives `$admin_bar` for extending the SCSS menu |
 
 ### Actions registered by Sassy
