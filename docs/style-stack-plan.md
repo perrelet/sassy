@@ -870,6 +870,12 @@ protocol.
 - Every fix ships with a test that fails against the pre-fix tree. Prove it:
   `php tests/run.php /path/to/old/checkout` — a test that passes against both versions is not
   testing the fix.
+- **A contract change is past what that proof can reach.** Phase 3 replaced the engine argument
+  and the result's warning type, so four existing test files had to be rewritten against the new
+  API and now fail against any earlier checkout. That is not a regression signal, it is the rule
+  hitting its limit: it proves a *new* test fails before the fix, and cannot prove anything about
+  a *migrated* one. Expect the same in phase 4 and phase 6. Say in the handoff which failures are
+  migration and which are the proof.
 - **A rename breaks that proof unless you keep the harness bilingual.** Phase 2 renamed
   `SCSS_Compiler` to `Printer` and every test file failed against the old tree at once, which
   proves nothing and costs the suite its ability to report on any earlier checkout. Two moves fix

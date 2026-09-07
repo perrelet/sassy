@@ -45,7 +45,9 @@ sassy/
 │   ├── engines/
 │   │   ├── compiler-engine.interface.php            # Contract for engine implementations
 │   │   ├── scssphp-engine.compiler-engine.php       # Default: PHP-native scssphp v2
-│   │   └── dart-sass-engine.compiler-engine.php     # Alternative: shells out to Dart Sass CLI
+│   │   ├── dart-sass-engine.compiler-engine.php     # Alternative: shells out to Dart Sass CLI
+│   │   ├── dart-sass-parser.class.php               # Dart stderr into Diagnostics
+│   │   └── scssphp-logger.class.php                 # scssphp warnings into Diagnostics
 │   ├── integrations/
 │   │   ├── integration.abstract.php   # Base class: condition check, variable injection via filter
 │   │   ├── bricks.integration.php     # Bricks Builder — breakpoints, spacing vars
@@ -72,7 +74,7 @@ sassy/
 1. **`sassy.php`** — Defines constants, creates `new Sassy\Sassy()` stored in `$Sassy` global, registers `SASSY()` helper. Registers WP-CLI command if `WP_CLI` is defined.
 2. **`plugins_loaded`** → `Sassy::boot()`:
    - Loads vendors (Composer autoload)
-   - Loads model classes (require_once in order: `Compile_Result`, `Lightning_CSS_Postprocessor`, `Scss_Map`, `Asset`, `Style_Stack`, `Build_Target`, `Variable_Resolver`, `Compile_Cache`, `Import_Graph`, `Import_Resolver`, `Import_Scanner`, `Compiler_Engine` interface, engine implementations, `Printer`)
+   - Loads model classes (require_once in order: `Diagnostic`, `Compile_Request`, `Compile_Result`, `Lightning_CSS_Postprocessor`, `Scss_Map`, `Asset`, `Style_Stack`, `Build_Target`, `Variable_Resolver`, `Compile_Cache`, `Import_Graph`, `Import_Resolver`, `Import_Scanner`, `Compiler_Engine` interface, engine implementations, `Printer`)
    - Loads view (`UI` class, instantiated immediately)
    - Registers `Lightning_CSS_Postprocessor::filter` on `sassy-css` at priority 20
    - If `is_admin()`: loads and boots `Admin` → `Updater`
@@ -244,7 +246,7 @@ The CLI can only compile a file, so variable injection means compiling a temp co
 
 - The temp input goes in **`{build_dir}/.sassy-tmp/`**, never a source or load-path directory. Dependency tracking watches directory mtimes, so a temp file written into a watched directory invalidates every handle compiled from it — three handles sharing one source directory would recompile each other on every request. Restoring the mtime afterwards is not an option: setting an explicit mtime requires *ownership* of the directory, not merely write access, so it fails silently whenever CLI and web-server users differ.
 - Output and map are written **into the build directory**, so the `sources` paths Dart Sass emits — which are relative to the map — are already correct for where the map is served from.
-- `sources` entry for the temp copy is rewritten to the real file, and the `sourceMappingURL` comment (which Dart Sass names after the temp output) is replaced with `sourceMapURL` from `sassy-src-map-options`.
+- `sources` entry for the temp copy is rewritten to the real file, and the `sourceMappingURL` comment (which Dart Sass names after the temp output) is replaced with the request's `map_url`.
 
 Because the temp input is not co-located with the real source, explicitly relative imports (`@use "./x"`, `@use "../x"`) resolve against `.sassy-tmp/`. Bare and subdirectory forms are unaffected — `dirname($src_path)` is always a load path.
 
@@ -428,6 +430,7 @@ binary is absent.
 | `test-source-maps.php` | Every map source resolves from where the map is served, and line numbers are unshifted |
 | `test-output-style.php` | `sassy-style` accepts the enum and the string, on both engines |
 | `test-printer.php` | `Build_Target` path math and its filters; `Variable_Resolver` defaults, Sass maps, scheme normalization and signatures; `Compile_Cache` currency across a partial edit, a variable change, a missing build file and both cache filters; `Printer` agreeing with all three |
+| `test-diagnostics.php` | The `Diagnostic` schema and its rendering; Dart stderr parsing for all three shapes plus unrecognised output; the scssphp logger and its structured exceptions; engine capabilities |
 | `test-style-stack.php` | `Asset` field resolution (local, root-relative, remote, `src === false`), `sassy-src-path` over an unresolvable URL, discovery per context, a context that raises, the multi-queue filter, and `Printer` delegating rather than duplicating |
 
 The second argument is what makes these worth having: point the runner at a checkout from before
@@ -452,7 +455,6 @@ a fix and the relevant tests should fail. A test that passes against both is not
 | `sassy-variables` | (see defaults above) | SCSS variables array |
 | `sassy-import-paths` | `[dirname($src_path), SASSY_PATH]` (+ `DIGITALIS_FRAMEWORK_PATH` if defined) | Filesystem paths searched by `@import`/`@use` |
 | `sassy-src-map` | `true` | Whether to generate source maps |
-| `sassy-src-map-options` | (sourceMapWriteTo, sourceMapURL, etc.) | Source map config array |
 | `sassy-src-path` | (resolved from URL, or `null`) | Override the source filesystem path. Applies even when resolution returned `null`, which is how a source Sassy cannot resolve gets placed. Receives `($path, $src, $handle, $asset)` |
 | `sassy-style-queues` | `[wp_styles()]` | Registries discovery reads. Later queues win on a duplicate handle |
 | `sassy-engine` | `null` (→ Scssphp_Engine) | Return a `Compiler_Engine` instance to override |
@@ -510,6 +512,46 @@ SASSY() // Returns the global Sassy\Sassy instance
 ```
 
 Used throughout the plugin to access compilers, variables, UI, and error state from any context.
+
+---
+
+## Diagnostics
+
+Every reportable event from a compile is a `Diagnostic`, and every surface renders it through
+`Diagnostic::render_all()`. 2.x flattened an error to a string and warnings to an array of stderr
+*lines*, which reported 97 warnings for the 10 diagnostics in one real compile.
+
+| Field | Notes |
+|---|---|
+| `severity` | `error`, `warning`, `deprecation` or `notice` |
+| `message` | The engine's own, verbatim. May wrap; the header takes the first line and the rest follows |
+| `file`, `line`, `column` | The caret's position, matching the top trace frame |
+| `frame`, `trace` | The engine's own drawing, reproduced verbatim, gutters and all |
+| `code`, `url` | Engine identifiers, e.g. `global-builtin` and its documentation link |
+| `source` | `engine`, or `sassy` for Sassy's own advisories |
+
+The two engines are read differently because they offer different things:
+
+- **scssphp is structured.** `Compiler::setLogger()` takes a `LoggerInterface`, and
+  `SassException` exposes `getSpan()`, `getSassTrace()` and `getOriginalMessage()`. Nothing is
+  parsed. Note a `@warn` arrives with a trace and no span while a deprecation arrives with a span
+  and no trace, so the location comes from whichever is present. The logger runs inside
+  compilation, so `Scssphp_Logger` never throws: an exception there would surface as a compile
+  failure describing the logger.
+- **Dart is text.** `Dart_Sass_Parser` reads stderr. Anything it cannot recognise survives as a
+  single `warning` carrying the raw text. The engine passes `--verbose`, because Dart otherwise
+  drops repeated deprecations and reports only that it did, which `--strict=all` could not gate
+  on.
+
+A `url` is carried exactly as the engine printed it, including when it is wrong: Dart cites
+`https://sass-lang.com/d/import` for `global-builtin` deprecations.
+
+Engines declare what they can do. `Scssphp_Engine` reports `source_maps, compressed`;
+`Dart_Sass_Engine` adds `modules`. `wp sassy status` lists them, and a `@use` under scssphp is
+refused with the file, the line and the remedy.
+
+Because the engines implement different deprecation sets, **`--strict=all` is engine-dependent by
+design**: scssphp fires a fraction of what Dart does. See plan §6.
 
 ---
 

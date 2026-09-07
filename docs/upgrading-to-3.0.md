@@ -2,7 +2,7 @@
 
 What changes for a site running Sassy, and what to do about it.
 
-**In progress.** 3.0 ships phases 1-6 of [style-stack-plan.md](style-stack-plan.md), and each phase adds its breaks here as it lands. Anything not listed below has not changed yet. Landed so far: **phases 1 and 2**.
+**In progress.** 3.0 ships phases 1-6 of [style-stack-plan.md](style-stack-plan.md), and each phase adds its breaks here as it lands. Anything not listed below has not changed yet. Landed so far: **phases 1 to 3**.
 
 Nothing on 1.x is auto-updated to 3.0. The digitalis.ca update JSON is version-fenced before 3.0 publishes, so a wild 1.x install is never offered a breaking upgrade.
 
@@ -112,3 +112,55 @@ The `Asset` is available before a compile starts and carries no build state, so 
 **Who this affects:** anything reading `sassy-filemtimes-{handle}` or `sassy-vars-sig-{handle}` directly.
 
 The keys are unchanged, but treat them as private. `Compile_Cache::get_graph($handle)`, `::get_last_compile_time($handle)`, `::forget_handle($handle)` and `::forget_all()` are the supported way in.
+
+---
+
+## Phase 3: engine contract and diagnostics
+
+### Warnings and errors are `Diagnostic` objects
+
+**Who this affects:** anything reading `get_warnings()` or `get_error()` off a printer, or `Compile_Result::$info`.
+
+`get_warnings()` returned an array of strings and now returns `Sassy\Diagnostic` objects; `get_error()` returned a string and now returns the first error `Diagnostic`, or `null`. Interpolating either into a string fatals.
+
+```php
+// before
+implode("\n", $compiler->get_warnings());
+echo $compiler->get_error();
+
+// after
+Sassy\Diagnostic::render_all($compiler->get_warnings());
+Sassy\Diagnostic::render_all($compiler->get_errors());
+```
+
+`Diagnostic` carries `severity` (`error`, `warning`, `deprecation`, `notice`), `message`, `file`, `line`, `column`, `frame`, `trace`, `code`, `url` and `source`. `render()` produces the canonical text every surface uses; `to_array()` is the JSON shape. `Compile_Result::$info` is removed, replaced by `$diagnostics` with `errors()`, `warnings()`, `deprecations()` and `has_errors()`.
+
+Counts change meaning. A single Dart diagnostic was previously reported as one warning per line of stderr, so the numbers drop sharply: one real compile went from 97 to 10.
+
+### `sassy-src-map-options` is removed
+
+**Who this affects:** anyone filtering it.
+
+The filter's entire value surface was scssphp's own option names, so it leaked one engine's API into the contract. `Compile_Request` carries `map_path` and `map_url` instead, and `Scssphp_Engine` derives `sourceMapBasepath` and `sourceMapRootpath` internally. To relocate a map, filter `sassy-build-path` or `sassy-build-directory`.
+
+`Printer::get_src_map_options()` is gone. Use `get_map_path()` and `get_map_url()`.
+
+### Engines take a `Compile_Request` and declare capabilities
+
+**Who this affects:** anyone with a custom `Compiler_Engine`.
+
+```php
+public function compile (Compile_Request $request) : Compile_Result;
+public function capabilities () : array;   // e.g. ['modules', 'source_maps', 'compressed']
+public function supports (string $capability) : bool;
+```
+
+The untyped `$args` array is gone. `$request` carries `source`, `source_path`, `load_paths`, `variables`, `style`, `source_map`, `map_path` and `map_url`. The `sassy-compiler` action now receives the request as its second argument rather than the args array.
+
+`Scssphp_Engine` declares `source_maps` and `compressed`; `Dart_Sass_Engine` adds `modules`. A `@use` or `@forward` under scssphp is refused with the file, the line and the remedy rather than a bare "Sass modules are not implemented yet".
+
+**`--strict=all` will differ per engine** when phase 5 lands, because scssphp implements a fraction of Dart's deprecations. That is intended.
+
+### Dart Sass runs with `--verbose`
+
+Dart withholds repeated deprecations by default and reports only that it did. Sassy now asks for all of them, so expect more diagnostics from the same source than 2.x reported, and all of them were always there.
