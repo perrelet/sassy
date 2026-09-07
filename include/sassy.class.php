@@ -26,7 +26,7 @@ class Sassy {
 		$this->load_models();
 		$this->load_views();
 
-		add_filter('sassy-css', [Lightning_CSS_Postprocessor::class, 'filter'], 20, 4);
+		Extensions::register_post_processor('lightning-css', [Lightning_CSS_Postprocessor::class, 'process']);
 
 		add_action('after_setup_theme', [$this, 'load_integrations']);
 		add_action('after_setup_theme', [Extensions::class, 'boot'], 20);

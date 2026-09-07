@@ -12,17 +12,15 @@ namespace Sassy;
 class Lightning_CSS_Postprocessor {
 
     /**
-     * Filter callback for sassy-css.
-     *
-     * @param string        $css      Compiled CSS from the SCSS engine.
-     * @param string        $src      Original SCSS URL.
-     * @param string        $handle   Style handle.
-     * @param Asset $asset The asset being built.
-     * @return string
+     * The reference post-processor: registered rather than filtered, so it can say when it did
+     * not run. Off unless a binary is configured.
      */
-    public static function filter ($css, $src, $handle, $asset = null) {
+    public static function process ($css, Post_Process_Context $context) {
 
-        // Only run when enabled
+        $asset  = $context->get_asset();
+        $src    = $asset->src;
+        $handle = $asset->handle;
+
         if (!apply_filters('sassy-lightning-css', true, $src, $handle, $asset)) {
             return $css;
         }
@@ -31,11 +29,14 @@ class Lightning_CSS_Postprocessor {
         if (!$bin) {
             return $css;
         }
-    
+
         $in  = static::temp_file('sassy-in-');
         $out = static::temp_file('sassy-out-');
-    
-        if (!$in || !$out) return $css;
+
+        if (!$in || !$out) {
+            $context->warn('Lightning CSS could not create a temp file; the CSS is unprocessed.');
+            return $css;
+        }
     
         file_put_contents($in, $css);
 
@@ -48,7 +49,7 @@ class Lightning_CSS_Postprocessor {
             'error_recovery' => false,
         ];
 
-        $options = apply_filters('sassy-lightning-css-options', $options, $src, $handle, $compiler);
+        $options = apply_filters('sassy-lightning-css-options', $options, $src, $handle, $asset);
 
         // Decide whether $bin is npx or a cli.js
         $cmd = [];
@@ -98,10 +99,19 @@ class Lightning_CSS_Postprocessor {
         $result = self::run_process($cmd, $tools_dir);
     
         if ($result['code'] !== 0 || !file_exists($out)) {
-            // Optionally log $result['stderr']
+
+            // Silence here was the point of giving post-processors a way to report: a failed run
+            // was indistinguishable from a successful one on every surface.
+            $context->warn('Lightning CSS did not run; the CSS is unprocessed.', [
+                'file'  => $asset->get_source_path(),
+                'trace' => trim((string) ($result['stderr'] ?? '')) ?: null,
+            ]);
+
             @unlink($in);
             @unlink($out);
+
             return $css;
+
         }
     
         $processed = file_get_contents($out);

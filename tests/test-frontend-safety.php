@@ -28,13 +28,25 @@ section('Lightning CSS is off unless configured');
 
 check('resolve_bin() returns null rather than guessing at npx', resolve_bin() === null);
 
-$css = '.foo { color: red; }';
-check('filter is a clean no-op on the frontend',
-    Lightning_CSS_Postprocessor::filter($css, 'http://test.local/x.scss', 'h', null) === $css);
+$css     = '.foo { color: red; }';
+$asset   = new Sassy\Asset('h', 'http://test.local/x.scss');
+$context = new Sassy\Post_Process_Context($asset);
+
+check('a no-op on the frontend when nothing is configured',
+    Lightning_CSS_Postprocessor::process($css, $context) === $css);
+check('and it says nothing, because off is not a failure',
+    $context->get_diagnostics() === []);
 
 $GLOBALS['filter_overrides']['sassy-lightning-css-binary'] = '/nonexistent/lightningcss';
+$broken = new Sassy\Post_Process_Context($asset);
+
 check('a configured but broken binary degrades gracefully',
-    Lightning_CSS_Postprocessor::filter($css, 'http://test.local/x.scss', 'h', null) === $css);
+    Lightning_CSS_Postprocessor::process($css, $broken) === $css);
+check('and reports rather than failing silently',
+    count($broken->get_diagnostics()) === 1);
+check('as a warning',
+    ($broken->get_diagnostics()[0] ?? null) && $broken->get_diagnostics()[0]->severity === 'warning');
+
 unset($GLOBALS['filter_overrides']['sassy-lightning-css-binary']);
 
 section('Temp files');

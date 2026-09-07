@@ -145,6 +145,14 @@ class Printer {
             $css     = Extensions::post_process($css, $context);
             $this->diagnostics = array_merge($this->diagnostics, $context->get_diagnostics());
 
+            // Any post-processor can drop the link; the map is then written and unreachable.
+            if ($request->wants_map() && !str_contains($css, 'sourceMappingURL')) {
+                $this->diagnostics[] = new Diagnostic(Diagnostic::NOTICE, 'Source map written but nothing links to it: a post-processor removed the sourceMappingURL comment.', [
+                    'file'   => $request->map_path,
+                    'source' => 'sassy',
+                ]);
+            }
+
             file_put_contents($build_file, $css);
             if ($result->map !== null && $request->map_path) file_put_contents($request->map_path, $result->map);
 

@@ -137,4 +137,38 @@ check('but is not a provider', Extensions::providers('variables') === []);
 
 unset($GLOBALS['filter_overrides']['sassy-variables']);
 
+section('A post-processor that drops the map link is reported');
+
+if (!dart_available()) {
+
+    skip('map link notice', 'sass binary not installed');
+
+} else {
+
+    use_dart_engine();
+    fixture("$SCSS/mapped.scss", ".b { color: blue; }\n");
+
+    $clean = compile($BASE . 'mapped.scss', 'mapped');
+    $notices = array_filter($clean->get_warnings(), function ($d) { return str_contains($d->message, 'nothing links to it'); });
+    check('no notice when the link survives', $notices === [], (string) count($notices));
+
+    Extensions::register_post_processor('strips-the-link', function ($css, $context) {
+        return preg_replace('~/\*#\s*sourceMappingURL=[^\r\n]*\*/~', '', $css);
+    });
+
+    $GLOBALS['filter_overrides']['sassy-force-compile'] = true;
+    $stripped = compile($BASE . 'mapped.scss', 'mapped');
+    unset($GLOBALS['filter_overrides']['sassy-force-compile']);
+
+    $notices = array_values(array_filter($stripped->get_warnings(), function ($d) { return str_contains($d->message, 'nothing links to it'); }));
+
+    check('the notice appears',   count($notices) === 1, (string) count($notices));
+    check('as a notice',          ($notices[0] ?? null) && $notices[0]->severity === 'notice');
+    check('attributed to Sassy',  ($notices[0] ?? null) && $notices[0]->source === 'sassy');
+    check('naming the map file',  ($notices[0] ?? null) && str_ends_with((string) $notices[0]->file, '.map'), $notices[0]->file ?? 'none');
+
+    Extensions::unregister('post_processors', 'strips-the-link');
+
+}
+
 finish();
