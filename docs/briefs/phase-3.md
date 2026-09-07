@@ -18,6 +18,8 @@ An error is a string and warnings are an array of strings, so everything the eng
 
 Per the plan: `Diagnostic`, `Compile_Result` carrying `Diagnostic[]`, `Compile_Request` replacing the untyped args bag, `capabilities()` and `supports()` on the engine contract, the canonical formatter, and indented syntax as a capability.
 
+Plus one item carried from phase 1, which described it but had nowhere to put it: **Sassy's own failures become diagnostics too.** `Printer::compile()` reports an absent source as `Source file not found: <path-or-url>` and appends `Import_Scanner` truncation as a string warning. All three become `source: 'sassy'` diagnostics: an absent local source is an `error` naming the path it looked at, an asset that maps nowhere is an `error` naming the URL (never formatted as though it were a path), and truncation is a `warning`. This is the only work in the phase that is not about the engines, and it is the reason `Diagnostic` carries a `source` field at all.
+
 ## Judgement calls, pre-made
 
 **The two engines are not the same kind of source, and must not be made to be.** scssphp hands you structured data: `Compiler::setLogger()` takes a `LoggerInterface` whose `warn()` receives `(string $message, ?Deprecation $deprecation, ?FileSpan $span, ?Trace $trace)`. That is a `Diagnostic` already: `Deprecation` is a backed enum whose value is exactly the `code` field (`slash-div`, `mixed-decls`, `global-builtin`), and the span carries file, line and column. Dart hands you text on stderr and nothing else. So write a **parser for Dart only**, and a **logger for scssphp**. Do not normalise scssphp into text so one parser can serve both; that discards structure you are being given for free. `Diagnostic` is the common type, not a common code path.
@@ -78,6 +80,7 @@ Steps 5 and 6 are independent of 1 to 4 and of each other. If you run short, sto
 
 Every acceptance item in plan §3 phase 3, plus:
 
+- Sassy-source diagnostics are covered too: a handle whose source file is missing, and one whose URL maps nowhere, each produce an `error` with `source: 'sassy'` and the right subject. `tests/test-style-stack.php` already asserts the two resolution outcomes, so extend rather than duplicate.
 - `tests/test-diagnostics.php`: each Dart shape above parses into the right fields, including a deprecation with a `[code]` and a url, a `@warn` with a trace and no frame, and an error with neither code nor url; unparseable output survives as a `warning` carrying the raw text; the scssphp logger produces the same `Diagnostic` shape from a real `@warn` and a real deprecation; the formatter renders the plan's canonical example byte for byte.
 - No scssphp-shaped key anywhere in `Dart_Sass_Engine`, and none in `Compile_Request`. `grep -rn 'sourceMap' include/` returns hits only inside `Scssphp_Engine`.
 - The phase 2 acceptance this phase completes: the same failure renders identically in the CLI, the footer panel and the AJAX payload, chrome aside.

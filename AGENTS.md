@@ -551,8 +551,8 @@ place an asset Sassy cannot resolve itself. It receives `($path, $src, $handle, 
 
 `Printer::get_src_path()` delegates here and keeps returning the URL when resolution comes
 back `null`, because its callers `file_exists()` that value and print it, so both outcomes are
-still plain strings. Converting them to `Diagnostic`s is described in the plan's phase 1 section
-but is not scheduled by any phase; see the open item there.
+still plain strings. Phase 3 converts them to `Diagnostic`s, an absent local source naming the
+path and one that maps nowhere naming the URL.
 
 ### `Style_Stack`
 

@@ -182,7 +182,8 @@ after phase 1. Three rules, because the 2.x version got each of them slightly wr
 is absent names **the path it looked at**, and an asset that maps nowhere gets *source could not
 be resolved to a local file*, naming the URL. 2.x emitted `Source file not found: <url>` for the
 second, formatting a URL as though it were a path and sending an agent after a file that was
-never named.
+never named. **Phase 3 owns this**, since it needs `Diagnostic` to exist; phase 1 kept the 2.x
+string so that `Printer::get_src_path()` had something to return.
 
 `is_compilable()` is `is_local()` **and** an extension of `scss`. Widening it to `sass` was
 tried in phase 1 and **deferred to phase 3** — neither engine accepts an indented-syntax entry
@@ -277,6 +278,13 @@ remove.
 ---
 
 ### Phase 3 — Engine contract and diagnostics
+
+**Sassy's own failures become diagnostics too.** `Printer::compile()` still reports an absent or
+unresolvable source as a plain string, and `Import_Scanner` truncation as an appended warning.
+Both become `source: 'sassy'` diagnostics here: an absent local source is an `error` naming the
+path it looked at, an asset that maps nowhere is an `error` naming the URL, and truncation is the
+`warning` the severity table already describes. Carried from phase 1, which described the split
+but had nowhere to put it.
 
 **`Compile_Request`** replaces the untyped `$args` bag. The current bag carries scssphp's own
 option names (`sourceMapWriteTo`, `sourceMapBasepath`, `sourceMapRootpath`) which the Dart engine
@@ -419,7 +427,7 @@ token only in the frame, and synthesizing a richer one-liner would mean guessing
 over-inclusion rule says to carry intact. Verified against sass 1.92.0 — the example is a real
 trace, not a sketch.
 
-**Breaks:** `sassy-src-map-options` removed; `Compile_Result::info` replaced by `Diagnostic[]`, so `get_warnings()` returns objects rather than strings; `Compiler_Engine::compile()` takes a `Compile_Request`. `Asset::COMPILABLE` gains `sass`.
+**Breaks:** `sassy-src-map-options` removed; `Compile_Result::info` replaced by `Diagnostic[]`, so `get_warnings()` returns objects rather than strings; `Compiler_Engine::compile()` takes a `Compile_Request`; `Printer::get_error()` returns a `Diagnostic`. `Asset::COMPILABLE` gains `sass`.
 
 **Acceptance:**
 - `wp sassy status` reports the active engine's capabilities.
@@ -427,6 +435,7 @@ trace, not a sketch.
 - No scssphp-shaped key in `Dart_Sass_Engine`.
 - Dart's deprecation output round-trips into `Diagnostic` with file, line, code and url intact.
 - Unparseable engine output survives as a `warning`.
+- A missing local source reports the path it looked at, and one that maps nowhere reports the URL, both as `source: 'sassy'` diagnostics rather than strings.
 - Every consumer of the old string-array contract is migrated with the schema: `get_warnings()`
   fed `WP_CLI::warning()` and `tests/test-source-maps.php` by string interpolation, which fatals
   on an object. Phase 2's "the 2.1 suite passes unchanged except for renames" stops holding here,
