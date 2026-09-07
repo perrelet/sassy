@@ -859,6 +859,7 @@ change to what hot-wiring feels like, so it is named rather than implied.
 | `sassy-src-map-options` | **Removed, not renamed.** Its value surface is scssphp option names; `map_path` / `map_url` replace the legitimate uses and the rest moves inside the engine |
 | `wp sassy check` hook set | **`--hooks=all` by default**, alone among the commands — a narrower set makes every admin/editor output look orphaned |
 | Orphaned outputs | Reported, never auto-removed. `wp sassy clear` is the eraser |
+| `--strict=all` differs per engine? | **Accepted.** scssphp implements a fraction of Dart's deprecations (of four probed, only `elseif` fired), so the same source yields different sets. That is `capabilities()` working, not a defect to reconcile. Document it; do not try to normalise one engine to the other |
 | Execution | One builder at a time, in place on `style-stack` — no worktrees. The plugin works at every commit (strangler-style refactors) |
 | d-pace access | Builders may edit d-pace/lattice **under `/staging/` only**, limited to the §4 breaks table |
 | Version / branch | 3.0.0 / `style-stack` |
