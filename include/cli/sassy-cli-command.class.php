@@ -466,6 +466,10 @@ class Sassy_CLI_Command extends WP_CLI_Command {
         $row('source maps', apply_filters('sassy-src-map', true, null, null, $compiler) ? 'on' : 'off');
         $row('dependency checking', apply_filters('sassy-check-dependencies', true, null, null, $compiler) ? 'on' : 'off (compile explicitly)');
 
+        foreach (Extensions::providers() as $kind => $slugs) {
+            $row(str_replace('_', ' ', $kind), $slugs ? implode(', ', $slugs) : '(none registered)');
+        }
+
         $sass_bin = (new Dart_Sass_Engine())->get_sass_bin();
         $row('dart sass binary', $sass_bin ?: '(not configured)');
         if ($sass_bin) $row('dart sass version', $this->probe($sass_bin . ' --version'));
