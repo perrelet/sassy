@@ -22,12 +22,51 @@ class Compile_Result {
     /** @var mixed Additional information about the compile (e.g. warnings). */
     public $info;
 
-    public function __construct ($css = null, $map = null, $error = null, $info = null) {
+    /** @var Diagnostic[] */
+    public $diagnostics;
 
-        $this->css   = $css;
-        $this->map   = $map;
-        $this->error = $error;
-        $this->info  = $info;
+    public function __construct ($css = null, $map = null, $error = null, $info = null, array $diagnostics = []) {
+
+        $this->css         = $css;
+        $this->map         = $map;
+        $this->error       = $error;
+        $this->info        = $info;
+        $this->diagnostics = $diagnostics;
+
+    }
+
+    /**
+     * @return Diagnostic[]
+     */
+    public function of ($severity) {
+
+        return array_values(array_filter($this->diagnostics, function ($diagnostic) use ($severity) {
+            return $diagnostic->severity === $severity;
+        }));
+
+    }
+
+    public function errors () {
+
+        return $this->of(Diagnostic::ERROR);
+
+    }
+
+    public function warnings () {
+
+        return $this->of(Diagnostic::WARNING);
+
+    }
+
+    public function deprecations () {
+
+        return $this->of(Diagnostic::DEPRECATION);
+
+    }
+
+    public function has_errors () {
+
+        return (bool) $this->errors();
 
     }
 
@@ -36,7 +75,7 @@ class Compile_Result {
      */
     public function ok () : bool {
 
-        return $this->error === null;
+        return $this->error === null && !$this->has_errors();
 
     }
 
