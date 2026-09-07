@@ -96,6 +96,57 @@ $clean = new Sassy\Compile_Result('.a{}', null, null, null, [new Diagnostic(Diag
 check('warnings alone stay ok', $clean->ok());
 check('the legacy error field still fails it', !(new Sassy\Compile_Result(null, null, 'broke'))->ok());
 
+section('Dart stderr parses');
+
+use Sassy\Dart_Sass_Parser;
+
+// Captured verbatim from sass 1.92.0.
+$dart = "DEPRECATION WARNING [import]: Sass @import rules are deprecated and will be removed in Dart Sass 3.0.0.\n"
+      . "\nMore info and automated migrator: https://sass-lang.com/d/import\n\n"
+      . "  ╷\n1 │ @import 'p';\n  │         ^^^\n  ╵\n"
+      . "    e.scss 1:9  root stylesheet\n\n"
+      . "WARNING: a warning from a partial\n"
+      . "    _p.scss 1:1  @import\n    e.scss 1:9   root stylesheet\n\n"
+      . "DEPRECATION WARNING [global-builtin]: Global built-in functions are deprecated.\n"
+      . "Use math.percentage instead.\n\n"
+      . "More info and automated migrator: https://sass-lang.com/d/import\n\n"
+      . "  ╷\n2 │ .a { width: percentage(0.5); }\n  │             ^^^^^^^^^^^^^^^\n  ╵\n"
+      . "    e.scss 2:13  root stylesheet";
+
+$parsed = Dart_Sass_Parser::parse($dart);
+
+check('three diagnostics, not twenty-four lines', count($parsed) === 3, (string) count($parsed));
+
+check('deprecation severity',   $parsed[0]->severity === 'deprecation');
+check('code from the brackets', $parsed[0]->code === 'import');
+check('url is captured',        $parsed[0]->url === 'https://sass-lang.com/d/import');
+check('located from the top trace frame', $parsed[0]->file === 'e.scss' && $parsed[0]->line === 1 && $parsed[0]->column === 9);
+check('frame kept with its gutters', str_contains((string) $parsed[0]->frame, '╷') && str_contains((string) $parsed[0]->frame, '╵'));
+
+check('a @warn is a warning',   $parsed[1]->severity === 'warning');
+check('with no code',           $parsed[1]->code === null);
+check('with no frame',          $parsed[1]->frame === null);
+check('but a two-frame trace',  count(preg_split('/\R/', (string) $parsed[1]->trace)) === 2);
+
+check('a wrapped message keeps its second line', str_contains($parsed[2]->message, 'Use math.percentage instead.'));
+
+// Dart cites /d/import for global-builtin, which is the wrong page. Carry what it said.
+check('a wrong url is carried, not corrected', $parsed[2]->url === 'https://sass-lang.com/d/import');
+
+$error = Dart_Sass_Parser::parse("Error: Undefined variable.\n  ╷\n1 │ .a { color: \$nope; }\n  │             ^^^^^\n  ╵\n  err.scss 1:13  root stylesheet");
+
+check('an error is an error',   $error[0]->severity === 'error');
+check('with no code or url',    $error[0]->code === null && $error[0]->url === null);
+check('and a location',         $error[0]->file === 'err.scss' && $error[0]->column === 13);
+
+section('Unrecognised output survives');
+
+$junk = Dart_Sass_Parser::parse("something from a future version\nspread over two lines");
+
+check('as one warning, not one per line', count($junk) === 1, (string) count($junk));
+check('carrying the raw text',            str_contains($junk[0]->message, 'spread over two lines'));
+check('empty output yields nothing',      Dart_Sass_Parser::parse('') === []);
+
 section('scssphp produces them');
 
 $engine = new Sassy\Scssphp_Engine();

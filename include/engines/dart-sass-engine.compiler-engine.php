@@ -85,6 +85,10 @@ class Dart_Sass_Engine implements Compiler_Engine {
         // Without this Dart Sass writes the error message into the output file as CSS.
         $cmd[] = '--no-error-css';
 
+        // Dart drops repeated deprecations and says so. --strict=all cannot gate on what it
+        // cannot see.
+        $cmd[] = '--verbose';
+
         $output_lines = [];
         $exit_code    = 0;
         exec(implode(' ', $cmd) . ' 2>&1', $output_lines, $exit_code);
@@ -98,8 +102,14 @@ class Dart_Sass_Engine implements Compiler_Engine {
         }
 
         if ($exit_code !== 0 || !file_exists($tmp_out)) {
+
             static::cleanup($tmp_in, $tmp_out, $tmp_map);
-            return new Compile_Result(null, null, $out !== '' ? $out : 'Dart Sass compile failed.', null);
+
+            $diagnostics = Dart_Sass_Parser::parse($out);
+            if (!$diagnostics) $diagnostics = [new Diagnostic(Diagnostic::ERROR, 'Dart Sass compile failed.')];
+
+            return new Compile_Result(null, null, $out !== '' ? $out : 'Dart Sass compile failed.', null, $diagnostics);
+
         }
 
         $css = file_get_contents($tmp_out);
@@ -111,6 +121,8 @@ class Dart_Sass_Engine implements Compiler_Engine {
 
         $css = static::rewrite_map_url($css, $map_opts['sourceMapURL'] ?? null);
 
+        $diagnostics = Dart_Sass_Parser::parse($out);
+
         $warnings = null;
         if ($out !== '') {
             $warnings = array_values(array_filter(preg_split('/\R/', $out), static function ($line) {
@@ -120,7 +132,7 @@ class Dart_Sass_Engine implements Compiler_Engine {
 
         static::cleanup($tmp_in, $tmp_out, $tmp_map);
 
-        return new Compile_Result($css, $map, null, $warnings);
+        return new Compile_Result($css, $map, null, $warnings, $diagnostics);
 
     }
 

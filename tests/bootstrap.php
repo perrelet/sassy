@@ -93,6 +93,7 @@ foreach ([
     'include/engines/compiler-engine.interface.php',
     'include/engines/scssphp-logger.class.php',
     'include/engines/scssphp-engine.compiler-engine.php',
+    'include/engines/dart-sass-parser.class.php',
     'include/engines/dart-sass-engine.compiler-engine.php',
     'include/model/scss-compiler.class.php',
     'include/model/printer.class.php',
