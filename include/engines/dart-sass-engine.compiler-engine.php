@@ -66,7 +66,7 @@ class Dart_Sass_Engine implements Compiler_Engine {
         }
 
         if (file_put_contents($tmp_in, $scss) === false) {
-            return new Compile_Result(null, null, 'Unable to write temporary SCSS file: ' . $tmp_in, null);
+            return new Compile_Result(null, null, 'Unable to write temporary SCSS file: ' . $tmp_in);
         }
 
         $cmd = [];
@@ -108,7 +108,7 @@ class Dart_Sass_Engine implements Compiler_Engine {
             $diagnostics = Dart_Sass_Parser::parse($out);
             if (!$diagnostics) $diagnostics = [new Diagnostic(Diagnostic::ERROR, 'Dart Sass compile failed.')];
 
-            return new Compile_Result(null, null, $out !== '' ? $out : 'Dart Sass compile failed.', null, $diagnostics);
+            return new Compile_Result(null, null, $out !== '' ? $out : 'Dart Sass compile failed.', $diagnostics);
 
         }
 
@@ -123,16 +123,9 @@ class Dart_Sass_Engine implements Compiler_Engine {
 
         $diagnostics = Dart_Sass_Parser::parse($out);
 
-        $warnings = null;
-        if ($out !== '') {
-            $warnings = array_values(array_filter(preg_split('/\R/', $out), static function ($line) {
-                return trim($line) !== '';
-            }));
-        }
-
         static::cleanup($tmp_in, $tmp_out, $tmp_map);
 
-        return new Compile_Result($css, $map, null, $warnings, $diagnostics);
+        return new Compile_Result($css, $map, null, $diagnostics);
 
     }
 

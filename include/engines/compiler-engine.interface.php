@@ -22,7 +22,7 @@ interface Compiler_Engine {
      * Compile SCSS to CSS.
      *
      * @param array $args Normalized compile arguments (see interface docblock).
-     * @return Compile_Result Success with css (and optionally map) or failure with error message.
+     * @return Compile_Result Success with css (and optionally map), or failure. Diagnostics either way.
      */
     public function compile (array $args) : Compile_Result;
 

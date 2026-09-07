@@ -67,19 +67,19 @@ class Scssphp_Engine implements Compiler_Engine {
 
             $result = $this->compiler->compileString($args['scss'], $args['src_path'] ?? null);
 
-            return new Compile_Result($result->getCss(), $result->getSourceMap(), null, null, $logger->get_diagnostics());
+            return new Compile_Result($result->getCss(), $result->getSourceMap(), null, $logger->get_diagnostics());
 
         } catch (SassException $e) {
 
             $diagnostics = array_merge($logger->get_diagnostics(), [static::diagnose($e)]);
 
-            return new Compile_Result(null, null, $e->getOriginalMessage(), null, $diagnostics);
+            return new Compile_Result(null, null, $e->getOriginalMessage(), $diagnostics);
 
         } catch (Exception $e) {
 
             $diagnostics = array_merge($logger->get_diagnostics(), [new Diagnostic(Diagnostic::ERROR, $e->getMessage())]);
 
-            return new Compile_Result(null, null, $e->getMessage(), null, $diagnostics);
+            return new Compile_Result(null, null, $e->getMessage(), $diagnostics);
 
         }
 

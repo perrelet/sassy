@@ -79,7 +79,7 @@ check('empty renders empty',            Diagnostic::render_all([]) === '');
 
 section('Compile_Result carries them');
 
-$result = new Sassy\Compile_Result('.a{}', null, null, null, [
+$result = new Sassy\Compile_Result('.a{}', null, null, [
     new Diagnostic(Diagnostic::ERROR, 'boom'),
     new Diagnostic(Diagnostic::WARNING, 'careful'),
     new Diagnostic(Diagnostic::DEPRECATION, 'going away', ['code' => 'import']),
@@ -92,7 +92,7 @@ check('deprecations',  count($result->deprecations()) === 1);
 check('has_errors',    $result->has_errors());
 check('an error makes it not ok', !$result->ok());
 
-$clean = new Sassy\Compile_Result('.a{}', null, null, null, [new Diagnostic(Diagnostic::WARNING, 'careful')]);
+$clean = new Sassy\Compile_Result('.a{}', null, null, [new Diagnostic(Diagnostic::WARNING, 'careful')]);
 check('warnings alone stay ok', $clean->ok());
 check('the legacy error field still fails it', !(new Sassy\Compile_Result(null, null, 'broke'))->ok());
 

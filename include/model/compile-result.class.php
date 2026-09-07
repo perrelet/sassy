@@ -19,18 +19,14 @@ class Compile_Result {
     /** @var string|null Error message when compilation failed. */
     public $error;
 
-    /** @var mixed Additional information about the compile (e.g. warnings). */
-    public $info;
-
     /** @var Diagnostic[] */
     public $diagnostics;
 
-    public function __construct ($css = null, $map = null, $error = null, $info = null, array $diagnostics = []) {
+    public function __construct ($css = null, $map = null, $error = null, array $diagnostics = []) {
 
         $this->css         = $css;
         $this->map         = $map;
         $this->error       = $error;
-        $this->info        = $info;
         $this->diagnostics = $diagnostics;
 
     }
