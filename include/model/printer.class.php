@@ -52,7 +52,7 @@ class Printer {
      *
      * @return Compiler_Engine
      */
-    protected function get_engine () : Compiler_Engine {
+    public function get_engine () : Compiler_Engine {
 
         if ($this->engine !== null) {
             return $this->engine;

@@ -185,5 +185,13 @@ $m       = $modules->errors()[0] ?? null;
 check('refused',            $m && $m->is_error());
 check('naming the file',    $m && $m->file === $src);
 check('not a vendor trace', $m && !str_contains($m->message, 'vendor'));
+check('and names the remedy',   $m && str_contains($m->message, 'Dart_Sass_Engine'), $m ? $m->message : 'none');
+
+section('Capabilities');
+
+check('scssphp declares no modules', !(new Sassy\Scssphp_Engine())->supports('modules'));
+check('scssphp does source maps',     (new Sassy\Scssphp_Engine())->supports('source_maps'));
+check('dart declares modules',        (new Sassy\Dart_Sass_Engine())->supports('modules'));
+check('an unknown capability is no',  !(new Sassy\Scssphp_Engine())->supports('telepathy'));
 
 finish();

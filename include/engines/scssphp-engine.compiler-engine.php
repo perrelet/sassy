@@ -94,10 +94,16 @@ class Scssphp_Engine implements Compiler_Engine {
 
     protected static function diagnose (SassException $e) {
 
-        $span  = $e->getSpan();
-        $trace = trim($e->getSassTrace()->getFormattedTrace());
+        $span    = $e->getSpan();
+        $trace   = trim($e->getSassTrace()->getFormattedTrace());
+        $message = $e->getOriginalMessage();
 
-        return new Diagnostic(Diagnostic::ERROR, $e->getOriginalMessage(), [
+        // scssphp says what it cannot do; it cannot say what to do instead.
+        if (str_contains($message, 'Sass modules are not implemented')) {
+            $message .= "\nCompile this handle with Dart Sass: return a Sassy\\Dart_Sass_Engine from the sassy-engine filter.";
+        }
+
+        return new Diagnostic(Diagnostic::ERROR, $message, [
             'file'   => preg_replace('#^file://#', '', rawurldecode((string) $span->getSourceUrl())) ?: null,
             'line'   => $span->getStart()->getLine() + 1,
             'column' => $span->getStart()->getColumn() + 1,

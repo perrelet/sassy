@@ -461,6 +461,7 @@ class Sassy_CLI_Command extends WP_CLI_Command {
 
         $row('version',     defined('SASSY_VERSION') ? SASSY_VERSION : '?');
         $row('engine',      $compiler->get_engine_class());
+        $row('capabilities', implode(', ', $compiler->get_engine()->capabilities()));
         $row('output style', $compiler->get_style());
         $row('source maps', apply_filters('sassy-src-map', true, null, null, $compiler) ? 'on' : 'off');
         $row('dependency checking', apply_filters('sassy-check-dependencies', true, null, null, $compiler) ? 'on' : 'off (compile explicitly)');
