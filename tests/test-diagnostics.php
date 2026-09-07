@@ -152,7 +152,7 @@ section('scssphp produces them');
 $engine = new Sassy\Scssphp_Engine();
 $src    = '/var/www/site/scss/frontend.scss';
 
-$warned = $engine->compile(['scss' => "@warn \"careful\";\n.a { color: red; }\n", 'src_path' => $src]);
+$warned = $engine->compile(new Sassy\Compile_Request(['source' => "@warn \"careful\";\n.a { color: red; }\n", 'source_path' => $src]));
 $w      = $warned->warnings()[0] ?? null;
 
 check('a @warn becomes a warning',  $w && $w->severity === 'warning');
@@ -162,14 +162,14 @@ check('carrying the trace',         $w && str_contains((string) $w->trace, 'root
 check('and no frame',               $w && $w->frame === null);
 check('the compile still succeeded', $warned->ok());
 
-$deprecated = (new Sassy\Scssphp_Engine())->compile(['scss' => "@if false {} @elseif true {}\n", 'src_path' => $src]);
+$deprecated = (new Sassy\Scssphp_Engine())->compile(new Sassy\Compile_Request(['source' => "@if false {} @elseif true {}\n", 'source_path' => $src]));
 $d          = $deprecated->deprecations()[0] ?? null;
 
 check('a deprecation is not a warning', $d && $d->severity === 'deprecation');
 check('carrying the engine code',       $d && $d->code === 'elseif', $d ? (string) $d->code : 'none');
 check('located from the span',          $d && $d->file === $src && $d->column === 14);
 
-$failed = (new Sassy\Scssphp_Engine())->compile(['scss' => ".a { color: \$nope; }\n", 'src_path' => $src]);
+$failed = (new Sassy\Scssphp_Engine())->compile(new Sassy\Compile_Request(['source' => ".a { color: \$nope; }\n", 'source_path' => $src]));
 $e      = $failed->errors()[0] ?? null;
 
 check('a SassException becomes an error', $e && $e->severity === 'error');
@@ -179,7 +179,7 @@ check('and the result is not ok',         !$failed->ok());
 
 section('Modules are still unsupported, and say so with a location');
 
-$modules = (new Sassy\Scssphp_Engine())->compile(['scss' => "@use 'x';\n", 'src_path' => $src]);
+$modules = (new Sassy\Scssphp_Engine())->compile(new Sassy\Compile_Request(['source' => "@use 'x';\n", 'source_path' => $src]));
 $m       = $modules->errors()[0] ?? null;
 
 check('refused',            $m && $m->is_error());

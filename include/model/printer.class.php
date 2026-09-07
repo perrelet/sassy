@@ -119,8 +119,8 @@ class Printer {
         if ($run) {
             $start = microtime(true);
 
-            $args   = $this->build_compile_args($src_path, $variables);
-            $result = $this->get_engine()->compile($args);
+            $request = $this->build_request($src_path, $variables);
+            $result  = $this->get_engine()->compile($request);
 
             $this->compile_time = microtime(true) - $start;
 
@@ -135,19 +135,14 @@ class Printer {
 
             $this->diagnostics = $result->diagnostics;
 
-            $this->src_map = !empty($args['source_map']);
+            $this->src_map = $request->source_map;
             $css = $result->css;
 
             $css = preg_replace('#(url\((?![\'"]?(?:[a-z][a-z0-9+.\-]*:|/|\#))[\'"]?)#miu', '$1' . dirname($parse_src['path']) . '/', $css);
             $css = apply_filters('sassy-css', $css, $this->src, $this->handle, $this);
 
             file_put_contents($build_file, $css);
-            if ($result->map !== null) {
-                $map_path = $this->get_src_map_options()['sourceMapWriteTo'] ?? null;
-                if ($map_path) {
-                    file_put_contents($map_path, $result->map);
-                }
-            }
+            if ($result->map !== null && $request->map_path) file_put_contents($request->map_path, $result->map);
 
             $graph = Import_Scanner::scan($src_path, $this->get_import_paths($src_path));
 
@@ -204,17 +199,21 @@ class Printer {
      * @param array  $variables Sass variables (key => string expression).
      * @return array
      */
-    protected function build_compile_args ($src_path, array $variables) {
+    protected function build_request ($src_path, array $variables) {
 
-        return [
-            'scss'               => file_get_contents($src_path),
-            'src_path'           => $src_path,
-            'import_paths'       => $this->get_import_paths($src_path),
-            'variables'          => $variables,
-            'style'              => $this->get_style(),
-            'source_map'         => apply_filters('sassy-src-map', true, $this->src, $this->handle, $this),
-            'source_map_options' => $this->get_src_map_options(),
-        ];
+        $asset = $this->get_asset();
+
+        return new Compile_Request([
+            'source'      => file_get_contents($src_path),
+            'source_path' => $src_path,
+            'load_paths'  => $this->get_import_paths($src_path),
+            'variables'   => $variables,
+            'style'       => $this->get_style(),
+            'source_map'  => (bool) apply_filters('sassy-src-map', true, $asset->src, $asset->handle, $asset),
+            'map_path'    => $this->get_target()->get_map_path(),
+            'map_url'     => $this->get_target()->get_map_url(),
+        ]);
+
     }
     
     /**
@@ -316,8 +315,7 @@ class Printer {
         if ($this->src_map) return true;
 
         // On cache hits src_map is never set; check whether the map file exists.
-        $options = $this->get_src_map_options();
-        return isset($options['sourceMapWriteTo']) && file_exists($options['sourceMapWriteTo']);
+        return file_exists($this->get_map_path());
 
     }
 
@@ -424,6 +422,19 @@ class Printer {
 
     }
 
+    public function get_map_url () {
+
+        return $this->get_target()->get_map_url();
+
+    }
+
+    public function get_map_path () {
+
+        return $this->get_target()->get_map_path();
+
+    }
+
+    /** @deprecated Reports the map URL, despite the name. Kept until phase 6 rewrites the payload. */
     public function get_src_url () {
 
         return $this->get_target()->get_map_url();
@@ -457,12 +468,6 @@ class Printer {
     public function get_build_file () {
 
         return $this->get_target()->get_file();
-
-    }
-
-    public function get_src_map_options () {
-
-        return $this->get_target()->get_map_options();
 
     }
 

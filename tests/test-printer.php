@@ -151,7 +151,8 @@ $printer = (new Printer())->prepare($BASE . 'entry.scss', 'entry');
 
 check('build file agrees with the target',   $printer->get_build_file() === $target->get_file());
 check('build url agrees with the target',    $printer->get_build_url() === $target->get_url());
-check('map options agree with the target',   $printer->get_src_map_options() === $target->get_map_options());
+check('map path agrees with the target',     $printer->get_map_path() === $target->get_map_path());
+check('map url agrees with the target',      $printer->get_map_url() === $target->get_map_url());
 check('variables agree with the resolver',   $printer->get_variables() === (new Variable_Resolver($asset))->get_variables());
 check('currency agrees with the cache',      $printer->is_current() === (new Compile_Cache($asset, $target, new Variable_Resolver($asset)))->is_current());
 

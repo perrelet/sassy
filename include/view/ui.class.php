@@ -128,23 +128,19 @@ class UI {
 
 			if ($compiler->has_src_map()) {
 
-				$src_map_options = $compiler->get_src_map_options();
-
-				if (isset($src_map_options['sourceMapURL'])) {
+				if ($map_url = $compiler->get_map_url()) {
 
 					$admin_bar->add_menu([
 						'id'		=> "sassy-{$index}-map-url",
 						'parent'	=> "sassy-{$index}",
 						'title'		=> 'Source Map',
-						'href'		=> $src_map_options['sourceMapURL'],
+						'href'		=> $map_url,
 						'meta'		=> ['target' => '_blank'],
 					]);
 
 				}
 
-				if (isset($src_map_options['sourceMapWriteTo'])) {
-
-					$src_map_path = $src_map_options['sourceMapWriteTo'];
+				if ($src_map_path = $compiler->get_map_path()) {
 
 					if (file_exists($src_map_path) && $src_map = file_get_contents($src_map_path)) {
 

@@ -50,6 +50,7 @@ class Sassy {
 	protected function load_models () {
 
 		require_once(SASSY_PATH . 'include/model/diagnostic.class.php');
+		require_once(SASSY_PATH . 'include/model/compile-request.class.php');
 		require_once(SASSY_PATH . 'include/model/compile-result.class.php');
 		require_once(SASSY_PATH . 'include/model/lightning-css-postprocessor.class.php');
 		require_once(SASSY_PATH . 'include/model/scss-map.class.php');

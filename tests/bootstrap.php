@@ -79,6 +79,7 @@ require $SASSY_PLUGIN . 'vendor/autoload.php';
 
 foreach ([
     'include/model/diagnostic.class.php',
+    'include/model/compile-request.class.php',
     'include/model/compile-result.class.php',
     'include/model/lightning-css-postprocessor.class.php',
     'include/model/scss-map.class.php',

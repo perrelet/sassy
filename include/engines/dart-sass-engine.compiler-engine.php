@@ -29,20 +29,27 @@ class Dart_Sass_Engine implements Compiler_Engine {
 
     }
 
-    /**
-     * @param array $args Must include scss; optional src_path, variables, import_paths, style,
-     *                    source_map, source_map_options.
-     */
-    public function compile (array $args) : Compile_Result {
+    public function capabilities () : array {
+
+        return ['modules', 'source_maps', 'compressed'];
+
+    }
+
+    public function supports (string $capability) : bool {
+
+        return in_array($capability, $this->capabilities(), true);
+
+    }
+
+    public function compile (Compile_Request $request) : Compile_Result {
 
         if (!$sass_bin = $this->get_sass_bin()) {
-            return new Compile_Result(null, null, 'Dart Sass binary path not set. Define SASSY_DART_SASS_BIN or use the sassy-dart-sass-binary filter.', null);
+            return new Compile_Result(null, null, 'Dart Sass binary path not set. Define SASSY_DART_SASS_BIN or use the sassy-dart-sass-binary filter.');
         }
 
-        $src_path  = $args['src_path'] ?? null;
-        $map_opts  = $args['source_map_options'] ?? [];
-        $build_dir = isset($map_opts['sourceMapWriteTo'])
-            ? rtrim(dirname($map_opts['sourceMapWriteTo']), '/\\')
+        $src_path  = $request->source_path;
+        $build_dir = $request->map_path
+            ? rtrim(dirname($request->map_path), '/\\')
             : rtrim(get_temp_dir(), '/\\');
 
         // The temp input gets its own directory, never a source or load-path one: the import
@@ -60,10 +67,8 @@ class Dart_Sass_Engine implements Compiler_Engine {
         $tmp_out = $build_dir . '/.sassy-' . $uniq . '.tmp.css';
         $tmp_map = $tmp_out . '.map';
 
-        $scss = $args['scss'] ?? '';
-        if (!empty($args['variables'])) {
-            $scss = Variable_Resolver::prepend($scss, $args['variables']);
-        }
+        $scss = $request->source;
+        if ($request->variables) $scss = Variable_Resolver::prepend($scss, $request->variables);
 
         if (file_put_contents($tmp_in, $scss) === false) {
             return new Compile_Result(null, null, 'Unable to write temporary SCSS file: ' . $tmp_in);
@@ -75,12 +80,12 @@ class Dart_Sass_Engine implements Compiler_Engine {
         $cmd[] = escapeshellarg($tmp_in);
         $cmd[] = escapeshellarg($tmp_out);
 
-        foreach (($args['import_paths'] ?? []) as $path) {
+        foreach ($request->load_paths as $path) {
             $cmd[] = '--load-path=' . escapeshellarg($path);
         }
 
-        $cmd[] = !empty($args['source_map']) ? '--source-map' : '--no-source-map';
-        $cmd[] = (($args['style'] ?? '') === 'compressed') ? '--style=compressed' : '--style=expanded';
+        $cmd[] = $request->source_map ? '--source-map' : '--no-source-map';
+        $cmd[] = ($request->style === 'compressed') ? '--style=compressed' : '--style=expanded';
 
         // Without this Dart Sass writes the error message into the output file as CSS.
         $cmd[] = '--no-error-css';
@@ -119,7 +124,7 @@ class Dart_Sass_Engine implements Compiler_Engine {
             $map = static::rewrite_map($map, basename($tmp_in), $build_dir, $src_path);
         }
 
-        $css = static::rewrite_map_url($css, $map_opts['sourceMapURL'] ?? null);
+        $css = static::rewrite_map_url($css, $request->map_url);
 
         $diagnostics = Dart_Sass_Parser::parse($out);
 

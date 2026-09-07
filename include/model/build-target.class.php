@@ -14,7 +14,6 @@ class Build_Target {
     protected $url;
     protected $name;
     protected $file;
-    protected $map_options;
 
     public function __construct (Asset $asset) {
 
@@ -74,32 +73,13 @@ class Build_Target {
 
     public function get_map_path () {
 
-        return $this->get_map_options()['sourceMapWriteTo'] ?? null;
+        return str_replace('\\', '/', $this->get_path()) . $this->get_name() . '.map';
 
     }
 
     public function get_map_url () {
 
-        return $this->get_map_options()['sourceMapURL'] ?? null;
-
-    }
-
-    public function get_map_options () {
-
-        if (is_null($this->map_options)) {
-
-            $this->map_options = $this->filter('sassy-src-map-options', [
-                'sourceMapWriteTo'  => str_replace('\\', '/', $this->get_path()) . $this->get_name() . '.map',
-                'sourceMapURL'      => $this->get_url() . '.map',
-                // Forward slashes even on Windows: https://github.com/scssphp/scssphp/issues/35
-                'sourceMapBasepath' => rtrim(str_replace('\\', '/', ABSPATH), '/'),
-                'sourceMapFilename' => $this->get_url(),
-                'sourceMapRootpath' => trailingslashit(site_url()),
-            ]);
-
-        }
-
-        return $this->map_options;
+        return $this->get_url() . '.map';
 
     }
 

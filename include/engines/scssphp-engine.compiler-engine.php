@@ -24,32 +24,39 @@ class Scssphp_Engine implements Compiler_Engine {
 
     }
 
-    /**
-     * Compile SCSS to CSS using ScssPhp.
-     *
-     * @param array $args Must include scss, src_path; variables as Value[]; optional source_map, source_map_options, style, import_paths.
-     * @return Compile_Result
-     */
-    public function compile (array $args) : Compile_Result {
+    public function capabilities () : array {
+
+        // No 'modules': scssphp 2.1 throws on @use and @forward.
+        return ['source_maps', 'compressed'];
+
+    }
+
+    public function supports (string $capability) : bool {
+
+        return in_array($capability, $this->capabilities(), true);
+
+    }
+
+    public function compile (Compile_Request $request) : Compile_Result {
 
         $logger = new Scssphp_Logger();
 
         try {
 
-            if (!empty($args['source_map'])) {
+            if ($request->wants_map()) {
                 $this->compiler->setSourceMap(Compiler::SOURCE_MAP_FILE);
-                $this->compiler->setSourceMapOptions($args['source_map_options'] ?? []);
+                $this->compiler->setSourceMapOptions(static::map_options($request));
             }
 
-            $style = $args['style'] ?? 'expanded';
+            $style = $request->style;
             if (is_string($style)) {
                 $style = OutputStyle::fromString($style);
             }
             $this->compiler->setOutputStyle($style);
 
-            if (!empty($args['variables'])) {
+            if ($request->variables) {
                 $parsed = [];
-                foreach ($args['variables'] as $name => $value) {
+                foreach ($request->variables as $name => $value) {
                     $parsed[$name] = $value instanceof \ScssPhp\ScssPhp\Value\Value
                         ? $value
                         : ValueConverter::parseValue($value);
@@ -57,15 +64,15 @@ class Scssphp_Engine implements Compiler_Engine {
                 $this->compiler->addVariables($parsed);
             }
 
-            foreach (($args['import_paths'] ?? []) as $path) {
+            foreach ($request->load_paths as $path) {
                 $this->compiler->addImportPath($path);
             }
 
             $this->compiler->setLogger($logger);
 
-            do_action('sassy-compiler', $this->compiler, $args);
+            do_action('sassy-compiler', $this->compiler, $request);
 
-            $result = $this->compiler->compileString($args['scss'], $args['src_path'] ?? null);
+            $result = $this->compiler->compileString($request->source, $request->source_path);
 
             return new Compile_Result($result->getCss(), $result->getSourceMap(), null, $logger->get_diagnostics());
 
@@ -96,6 +103,19 @@ class Scssphp_Engine implements Compiler_Engine {
             'column' => $span->getStart()->getColumn() + 1,
             'trace'  => $trace !== '' ? preg_replace('/^/m', '  ', $trace) : null,
         ]);
+
+    }
+
+    protected static function map_options (Compile_Request $request) {
+
+        return [
+            'sourceMapWriteTo'  => $request->map_path,
+            'sourceMapURL'      => $request->map_url,
+            'sourceMapFilename' => preg_replace('/\.map$/', '', (string) $request->map_url),
+            // Forward slashes even on Windows: https://github.com/scssphp/scssphp/issues/35
+            'sourceMapBasepath' => rtrim(str_replace('\\', '/', ABSPATH), '/'),
+            'sourceMapRootpath' => trailingslashit(site_url()),
+        ];
 
     }
 

@@ -56,14 +56,16 @@ if (!dart_available()) {
     $src = $GLOBALS['SASSY_ROOT'] . '/entry.scss';
     fixture($src, ".bar { padding: \$pad; }\n");
 
-    $result = (new Dart_Sass_Engine('sass'))->compile([
-        'scss'         => file_get_contents($src),
-        'src_path'     => $src,
-        'import_paths' => [dirname($src)],
-        'variables'    => ['pad' => '8px'],
-        'style'        => 'expanded',
-        'source_map'   => true,
-    ]);
+    $result = (new Dart_Sass_Engine('sass'))->compile(new Sassy\Compile_Request([
+        'source'      => file_get_contents($src),
+        'source_path' => $src,
+        'load_paths'  => [dirname($src)],
+        'variables'   => ['pad' => '8px'],
+        'style'       => 'expanded',
+        'source_map'  => true,
+        'map_path'    => $GLOBALS['SASSY_ROOT'] . '/out.css.map',
+        'map_url'     => 'http://test.local/out.css.map',
+    ]));
 
     check('compiles without calling wp_tempnam', $result->ok(), (string) $result->error);
     check('injected variable reached the output', $result->css && str_contains($result->css, '8px'));
