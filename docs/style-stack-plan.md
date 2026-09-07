@@ -650,10 +650,12 @@ implied covered — the `watch` precedent.
 - One vocabulary for asset state and one for file state, owned by `Compile_Cache` and
   `Import_Graph`. No surface computes a state label: `grep -rn "'stale'\|'not built'" include/`
   returns hits in one file each.
-- With the reference binding in place (`sassy-dev` → `current_user_can('dev')`), a user holding
-  the d-pace `dev` capability sees the UI on production and an administrator without it does not.
-  Stated against the binding, not the default: the default policy *is* `edit_theme_options`, which
-  every administrator holds.
+- With the reference binding in place (`sassy-dev` → `current_user_can('dev')`), a user holding the
+  d-pace `dev` capability sees the UI and an administrator without it does not. Stated against the
+  binding, not the default: the default policy *is* `edit_theme_options`, which every administrator
+  holds. **Verified on staging with the capability granted and revoked**, not on production, which
+  §8 puts out of reach. The point being tested is that the gate keys on who rather than where, and
+  staging demonstrates that as well as production would.
 - `sassy:compiled` fires with diagnostics attached; a five-line listener can forward it into an
   iframe.
 
@@ -902,6 +904,13 @@ protocol.
 - Every fix ships with a test that fails against the pre-fix tree. Prove it:
   `php tests/run.php /path/to/old/checkout` — a test that passes against both versions is not
   testing the fix.
+- **A rename breaks that proof unless you keep the harness bilingual.** Phase 2 renamed
+  `SCSS_Compiler` to `Printer` and every test file failed against the old tree at once, which
+  proves nothing and costs the suite its ability to report on any earlier checkout. Two moves fix
+  it, both in `tests/bootstrap.php`: leave the old filename in the require list beside the new one
+  (absent files are skipped by design), and `class_alias()` the old class to the new name when only
+  the old one exists. Expect this again in phase 4, which deletes `include/integrations/`, and in
+  phase 6.
 - New behaviour gets a new `tests/test-*.php` following the existing bootstrap pattern. No
   PHPUnit, no new dev dependencies.
 - After each phase, verify against the live install: `wp sassy status`,
@@ -920,10 +929,20 @@ protocol.
   not an edit.
 - Production (any path outside `/staging/`) is untouchable.
 
-**Commits.** House voice (see 2.x history on `scssphp-v2.x`): what broke, why it was wrong, what
-changed; one concern per commit; `Co-Authored-By` line as established. Comments in code are
-terse and reserved for real gotchas — rationale lives in this document and AGENTS.md, not above
-the method.
+**Commits.** Subjects as terse and clear as possible, one concern per commit, `Co-Authored-By` as
+established. A body is for a genuine gotcha, not a narration of the diff, and most commits need
+none. The 2.x history on `scssphp-v2.x` shows the older, much longer style; do not copy it.
+
+Comments in code are terse and reserved for real gotchas. Scrutinise every comment you touch,
+including ones you did not write: is it obvious from the code, does it need to exist, can it be
+shorter, who is it for?
+
+**Where rationale lives.** This document and AGENTS.md, not above the method. Builder briefs in
+`docs/briefs/` are a third home while a phase is live, and they accumulate real findings: phase 2's
+brief carries the disposition of every member of the class it split, phase 3's carries what the
+scssphp logger does when probed. **A landing phase graduates that into the plan or AGENTS.md**, or
+it ends up in a document nobody reads again. Correct a brief that has been overtaken, or delete
+the claim; a stale brief is worse than no brief, because it reads as current.
 
 **When stuck or surprised.** If reality contradicts this plan — a discovery assumption fails, an
 acceptance criterion is untestable, a d-pace breakage isn't in the table — stop and report rather

@@ -48,8 +48,8 @@ and a naive copy gets both wrong:
   own caching and hands back `$this->src` for a remote host or malformed URL, and `compile()`
   then `file_exists()`es a URL and reports `Source file not found: <url>`. `Asset::source_path`
   is `?string`. Keep `SCSS_Compiler::get_src_path()`'s existing return shape at *its* call site
-  if you need to — phase 2 replaces that error with a `Diagnostic` — but the shared resolver
-  returns `null`.
+  if you need to, but the shared resolver returns `null`. (Historical note: this brief said phase 2
+  would replace that error with a `Diagnostic`. It did not; phase 3 owns it.)
 - **`sassy-src-path` now applies over that `null` too.** In 2.x it is applied only on the
   success branch, so a filter cannot rescue an unresolvable URL, which is the one thing it
   exists for. Apply it unconditionally, from both call sites, with the `Asset` as the fourth
