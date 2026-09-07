@@ -16,7 +16,7 @@ An error is a string and warnings are an array of strings, so everything the eng
 
 ## The work
 
-Per the plan: `Diagnostic`, `Compile_Result` carrying `Diagnostic[]`, `Compile_Request` replacing the untyped args bag, `capabilities()` and `supports()` on the engine contract, the canonical formatter, and indented syntax as a capability.
+Per the plan: `Diagnostic`, `Compile_Result` carrying `Diagnostic[]`, `Compile_Request` replacing the untyped args bag, `capabilities()` and `supports()` on the engine contract, and the canonical formatter.
 
 Plus one item carried from phase 1, which described it but had nowhere to put it: **Sassy's own failures become diagnostics too.** `Printer::compile()` reports an absent source as `Source file not found: <path-or-url>` and appends `Import_Scanner` truncation as a string warning. All three become `source: 'sassy'` diagnostics: an absent local source is an `error` naming the path it looked at, an asset that maps nowhere is an `error` naming the URL (never formatted as though it were a path), and truncation is a `warning`. This is the only work in the phase that is not about the engines, and it is the reason `Diagnostic` carries a `source` field at all.
 
@@ -77,7 +77,7 @@ Count the call sites before you start: `grep -rn 'sourceMap' include/` currently
 
 **Indented syntax lands here, and the extension list is not the whole of it.** `sass` joins `Asset::COMPILABLE`, `is_compilable()` stays extension plus locality (it must not consult an engine: see plan §3 phase 3 for why), `Scssphp_Engine` declares the `sass` capability and passes `Syntax::SASS` to `compileString()`, and `Dart_Sass_Engine` does **not** declare it. An engine refusing a syntax it cannot take is a `Diagnostic` naming the file and the remedy, the same shape as `@use` under scssphp.
 
-**One latent bug this phase will trip on.** `Build_Target::get_name()` does `basename($source, '.scss')`, so the moment `.sass` is compilable a `x.sass` builds to `x.sass.css`. Fix it with the capability work, not before.
+**`capabilities()` is not about indented syntax.** `.sass` entry files are closed as won't-do (plan §6), so do not add `sass` to `Asset::COMPILABLE` and do not touch `Build_Target::get_name()`, whose hard-coded `.scss` is correct while `scss` is the only compilable extension. What `capabilities()` carries is `modules` (the scssphp `@use` refusal below), plus `source_maps` and `compressed`.
 
 ## Strangler order
 
@@ -88,7 +88,7 @@ The plugin works at every commit (§8). Diagnostics are additive until the last 
 3. **Engines fill it:** the scssphp logger, then the Dart parser. `info` still populated.
 4. **Surfaces move to the formatter,** then `info` and the string arrays go.
 5. **`Compile_Request`,** replacing the args bag and `sassy-src-map-options`.
-6. **`capabilities()`, `supports()` and indented syntax.**
+6. **`capabilities()` and `supports()`.**
 
 Steps 5 and 6 are independent of 1 to 4 and of each other. If you run short, stop cleanly after 4 and say so; a phase that lands diagnostics properly and defers the request object is worth more than one that half-lands both.
 
@@ -101,12 +101,13 @@ Every acceptance item in plan §3 phase 3, plus:
 - No scssphp-shaped key anywhere in `Dart_Sass_Engine`, and none in `Compile_Request`. `grep -rn 'sourceMap' include/` returns hits only inside `Scssphp_Engine`.
 - The phase 2 acceptance this phase completes: the same failure renders identically in the CLI, the footer panel and the AJAX payload, chrome aside.
 - `php tests/run.php` green, and green against a pre-phase-3 checkout for everything except the new file.
-- Live: compile `d-pace-editor`, which currently reports 54 warnings for 6 diagnostics, and confirm the count is 6 or higher with `--verbose` no longer withholding any. Then `wp sassy status` for capabilities, and a `.sass` entry file compiling under scssphp and refusing under Dart with a message naming the file.
+- Live: compile `d-pace-editor`, which currently reports 54 warnings for 6 diagnostics, and confirm the count is 10 with `--verbose` withholding nothing. Then `wp sassy status` for capabilities, and a `@use` under scssphp refused with a message naming the file and the remedy.
 
 ## Out of bounds
 
 - Phase 4's territory: no extension registry, no provider discovery, no touching `include/integrations/`.
 - No `--strict` or `wp sassy check`: that is phase 5, and it consumes this schema rather than defining it.
+- No `.sass` support: closed as won't-do, and reopening it is not a builder's call.
 - No changes to the admin bar or the panel beyond rendering through the formatter. Phase 6 owns those surfaces.
 - No VLQ or source map surgery.
 - `docs/style-stack-plan.md` is the spec of record; changing it means saying so in the commit message.

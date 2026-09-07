@@ -193,9 +193,9 @@ second, formatting a URL as though it were a path and sending an agent after a f
 never named. **Phase 3 owns this**, since it needs `Diagnostic` to exist; phase 1 kept the 2.x
 string so that `Printer::get_src_path()` had something to return.
 
-`is_compilable()` is `is_local()` **and** an extension of `scss`. Widening it to `sass` was
-tried in phase 1 and **deferred to phase 3** — neither engine accepts an indented-syntax entry
-file as they stand, and under Dart the fix costs source-map accuracy. See phase 3.
+`is_compilable()` is `is_local()` **and** an extension of `scss`. Indented syntax was tried here
+and is **closed as won't-do**; see §5 and §6. `Import_Resolver` keeps resolving `.sass` partials,
+because consuming what a third-party library wrote is over-inclusion and safe.
 
 **`Style_Stack`**:
 
@@ -326,41 +326,6 @@ supports(string $c): bool
 
 `Scssphp_Engine` declares no `modules` support. What it already produces is better than it looks: scssphp throws a `SimpleSassFormatException` whose message names the real source file, line and column and draws its own frame, and the engine already catches it and returns that message. The gap is the **remedy**, so the work is to add "compile this with `Dart_Sass_Engine`" and to declare the capability, not to rescue a message from inside the vendor.
 
-#### Indented syntax (`.sass`) entry files
-
-Carried from phase 1, which found the extension list is not where this lives. Both engines can
-compile indented syntax; neither does so as configured. Verified on this box, so do not
-re-derive:
-
-- **scssphp**: `compileString($source, $url, $importer, Syntax::SASS)` compiles indented syntax
-  cleanly. `Syntax` is an enum of `SCSS` / `SASS` / `CSS` — note the case is `SASS`, not
-  `INDENTED`. Variables arrive through `addVariables()`, so there is no prelude and no shift.
-  This engine is free.
-- **Dart**: the CLI infers syntax from the file extension, and the engine hard-codes its temp
-  input as `.tmp.scss`. Renaming it after the source fixes parsing — but variable injection then
-  breaks, because indented syntax rejects the single-line prelude 2.1 relies on
-  (`multiple statements on one line are not supported in the indented syntax`). A
-  newline-separated prelude parses and shifts every source-map line by the number of injected
-  variables — five on the reference install.
-
-So `sass` is a **capability**, not an extension. `Scssphp_Engine` declares it; `Dart_Sass_Engine`
-**does not**. Not "only when no variables are injected" — `get_variables()` seeds three defaults
-before any filter runs, so a prelude is always present and that condition never holds on any real
-install. A capability that is true on paper and false everywhere is worse than an absent one: it
-makes `is_compilable()` promise a build the primary engine refuses every time. If the shift ever
-becomes worth trading for, it is a separate decision with its own row in §6, not an implication
-buried in a capability string. That is exactly what `capabilities()` exists to express, and why
-this waited for this phase.
-
-`Asset::is_compilable()` does **not** consult the engine. It stays a property of the asset —
-local, and an extension Sassy builds — because engine selection runs through `sassy-engine`,
-which receives the `Asset`, so an `Asset` that resolved an engine would re-enter itself; and
-`Style_Stack::compilable()` would resolve one 337 times to answer a question about file
-extensions. The engine **refuses** what it cannot take, as a `Diagnostic` naming the file and the
-remedy — the same shape as `@use` under scssphp, one paragraph down. `sass` joins
-`Asset::COMPILABLE`; whether the *active* engine can build it is a compile-time answer, not a
-discovery-time one.
-
 #### Diagnostics
 
 Today an error is a string and warnings are an array of strings. Dart Sass emits file, line,
@@ -435,7 +400,7 @@ token only in the frame, and synthesizing a richer one-liner would mean guessing
 over-inclusion rule says to carry intact. Verified against sass 1.92.0 — the example is a real
 trace, not a sketch.
 
-**Breaks:** `sassy-src-map-options` removed; `Compile_Result::info` replaced by `Diagnostic[]`, so `get_warnings()` returns objects rather than strings; `Compiler_Engine::compile()` takes a `Compile_Request`; `Printer::get_error()` returns a `Diagnostic`, which fatals the two callers that interpolate it today (`Sassy::get_errors()` and the CLI's `compile`), so both move to the formatter. `Asset::COMPILABLE` gains `sass`.
+**Breaks:** `sassy-src-map-options` removed; `Compile_Result::info` replaced by `Diagnostic[]`, so `get_warnings()` returns objects rather than strings; `Compiler_Engine::compile()` takes a `Compile_Request`; `Printer::get_error()` returns a `Diagnostic`, which fatals the two callers that interpolate it today (`Sassy::get_errors()` and the CLI's `compile`), so both move to the formatter.
 
 **Acceptance:**
 - `wp sassy status` reports the active engine's capabilities.
@@ -835,6 +800,7 @@ change to what hot-wiring feels like, so it is named rather than implied.
 - A settings form, anywhere. Config is code
 - Multi-site aggregation
 - Anything about a script beyond its style-mutation surface
+- Indented syntax (`.sass`) as an entry file. Closed, with reasoning, in §6
 - SCSS parsing in the paintbrush — textual patches only, refused when inexact
 
 ---
@@ -856,7 +822,7 @@ change to what hot-wiring feels like, so it is named rather than implied.
 | Auto-reload polling | Opt-in only, via the Logging menu; never a default |
 | Keybinding | Configurable via `sassy-keybinding` filter (default `['ctrl+space', 'meta+space']`, preserving 2.x; `false` disables). The collision has bitten in practice |
 | Unresolvable source paths | `source_path` is `?string` and never falls back to the URL. `sassy-src-path` applies unconditionally, including over a `null`, so the filter can rescue a URL Sassy cannot resolve |
-| `.sass` entry files? | **Deferred to phase 3.** Wanted — the resolver already resolves both and only the entry point disagrees — but it is engine work, not extension-list work, and under Dart it trades away source-map accuracy |
+| `.sass` entry files? | **No. Closed 2026-09-07, do not reopen.** It entered the plan because `Import_Resolver` resolves both extensions while the entry point accepts one. That asymmetry is real and harmless: importing a `.sass` partial someone else wrote is over-inclusion, which §1 calls safe. Entering on one is a feature nobody asked for, and there are zero `.sass` files on the reference install. Against it: §1's own premise. SCSS is being eroded by native CSS and style container queries are expected to finish the job, so a second Sass *syntax* is investment inside a shrinking part of the stack. The value in SCSS is that it is a CSS superset, so anything pasted from devtools or MDN compiles; indented syntax trades that for whitespace significance. **What it would have cost, measured, so nobody re-derives it:** scssphp needs `Syntax::SASS` passed to `compileString()` and is otherwise free; Dart infers syntax from the file extension, so its temp input must be renamed, and it then rejects the single-line variable prelude 2.1 depends on (`multiple statements on one line are not supported in the indented syntax`). A newline-separated prelude parses and shifts every source-map line by the number of injected variables, five here. `Import_Resolver` is unchanged either way |
 | Fourth filter argument | The **`Asset`**. Not `Printer` — that rebuilds the god-object access the phase 2 split removes |
 | `sassy-src-map-options` | **Removed, not renamed.** Its value surface is scssphp option names; `map_path` / `map_url` replace the legitimate uses and the rest moves inside the engine |
 | `wp sassy check` hook set | **`--hooks=all` by default**, alone among the commands — a narrower set makes every admin/editor output look orphaned |

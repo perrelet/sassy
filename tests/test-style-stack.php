@@ -28,9 +28,9 @@ check('is compilable',          $asset->is_compilable());
 
 section('Extensions');
 
-// Wanted, but neither engine takes an indented-syntax entry file as configured -- plan phase 3.
-check('.sass is not compilable yet', !(new Asset('s', $BASE . 'a.sass'))->is_compilable());
-check('.sass still resolves',        (new Asset('s', $BASE . 'a.sass'))->is_local());
+// Indented syntax entry files are closed as won't-do; partials of it still resolve. Plan §6.
+check('.sass is not compilable', !(new Asset('s', $BASE . 'a.sass'))->is_compilable());
+check('.sass still resolves',    (new Asset('s', $BASE . 'a.sass'))->is_local());
 check('.SCSS is normalized',  (new Asset('s', $BASE . 'a.SCSS'))->extension === 'scss');
 check('.css is not compilable', !(new Asset('s', $BASE . 'a.css'))->is_compilable());
 check('.css is still local',   (new Asset('s', $BASE . 'a.css'))->is_local());

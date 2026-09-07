@@ -10,7 +10,7 @@ namespace Sassy;
  */
 class Asset {
 
-    /** @var string[] Extensions Sassy can build. Indented syntax is engine work; see plan phase 3. */
+    /** @var string[] Extensions Sassy can build. Indented syntax is deliberately excluded; see plan §6. */
     const COMPILABLE = ['scss'];
 
     /** @var string Enqueue handle. */
