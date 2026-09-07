@@ -62,7 +62,7 @@ class Dart_Sass_Engine implements Compiler_Engine {
 
         $scss = $args['scss'] ?? '';
         if (!empty($args['variables'])) {
-            $scss = SCSS_Compiler::prepend_variables($scss, $args['variables']);
+            $scss = Variable_Resolver::prepend($scss, $args['variables']);
         }
 
         if (file_put_contents($tmp_in, $scss) === false) {

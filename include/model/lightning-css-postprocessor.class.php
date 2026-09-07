@@ -17,7 +17,7 @@ class Lightning_CSS_Postprocessor {
      * @param string        $css      Compiled CSS from the SCSS engine.
      * @param string        $src      Original SCSS URL.
      * @param string        $handle   Style handle.
-     * @param SCSS_Compiler $compiler Compiler instance.
+     * @param Asset $asset The asset being built.
      * @return string
      */
     public static function filter ($css, $src, $handle, $compiler) {
@@ -32,8 +32,8 @@ class Lightning_CSS_Postprocessor {
             return $css;
         }
     
-        $in  = SCSS_Compiler::temp_file('sassy-in-');
-        $out = SCSS_Compiler::temp_file('sassy-out-');
+        $in  = static::temp_file('sassy-in-');
+        $out = static::temp_file('sassy-out-');
     
         if (!$in || !$out) return $css;
     
@@ -305,6 +305,15 @@ class Lightning_CSS_Postprocessor {
             'stderr' => $stderr,
             'cmd'    => $cmd,
         ];
+
+    }
+
+    /**
+     * Not wp_tempnam(): that lives in wp-admin/includes/file.php and is fatal on the frontend.
+     */
+    protected static function temp_file ($prefix) {
+
+        return tempnam(get_temp_dir(), $prefix);
 
     }
 

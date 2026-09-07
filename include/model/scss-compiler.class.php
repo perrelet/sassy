@@ -21,11 +21,11 @@ class SCSS_Compiler {
     protected $src       = null;
     protected $handle    = null;
     protected $style     = OutputStyle::EXPANDED;
-    protected $variables = null;
 
     protected $src_path;
     protected $asset;
     protected $target;
+    protected $resolver;
     protected $import_paths;
 
     protected $compiled;
@@ -48,6 +48,7 @@ class SCSS_Compiler {
         $this->src_path         = null;
         $this->asset            = null;
         $this->target           = null;
+        $this->resolver         = null;
         $this->import_paths     = null;
 
         $this->compiled = false;
@@ -424,6 +425,20 @@ class SCSS_Compiler {
 
     }
 
+    public function get_resolver () {
+
+        if (is_null($this->resolver)) $this->resolver = new Variable_Resolver($this->get_asset());
+
+        return $this->resolver;
+
+    }
+
+    public function get_variables () {
+
+        return $this->get_resolver()->get_variables();
+
+    }
+
     public function get_target () {
 
         if (is_null($this->target)) $this->target = new Build_Target($this->get_asset());
@@ -490,92 +505,4 @@ class SCSS_Compiler {
 
     }
     
-    public function get_variables () {
-        
-        if (is_null($this->variables)) {
-
-            $variables = [
-                'wp-content-url'           => '"'. wp_normalize_path(WP_CONTENT_URL) . '"',
-                'template-directory-url'   => '"'. wp_normalize_path(get_template_directory_uri()) . '"',
-                'stylesheet-directory-url' => '"'. wp_normalize_path(get_stylesheet_directory_uri()) . '"',
-            ];
-
-            $this->variables = apply_filters('sassy-variables', $variables, $this->src, $this->handle, $this);
-
-            foreach ($this->variables as $key => $value) {
-                if (is_array($value)) {
-                    $this->variables[$key] = Scss_Map::from_array($value);
-                }
-            }
-
-            $this->variables = static::normalize_url_schemes($this->variables);
-
-        }
-
-        return $this->variables;
-        
-    }
-
-    /**
-     * Force site URLs in variable values onto the scheme the site is actually served on.
-     *
-     * Anything derived from is_ssl() comes back http under WP-CLI and under a misconfigured
-     * proxy, which both bakes mixed-content URLs into the CSS and gives the variables a
-     * different signature than a web request would — so a CLI-primed cache is discarded by the
-     * first visitor. Values built from constants at plugin-load time cannot be fixed any
-     * earlier than this.
-     */
-    protected static function normalize_url_schemes (array $variables) {
-
-        $home   = (string) get_option('home');
-        $host   = parse_url($home, PHP_URL_HOST);
-        $scheme = parse_url($home, PHP_URL_SCHEME);
-
-        if (!$host || !$scheme) return $variables;
-
-        $wrong = ($scheme === 'https' ? 'http' : 'https') . '://' . $host;
-        $right = $scheme . '://' . $host;
-
-        foreach ($variables as $key => $value) {
-            if (is_string($value) && strpos($value, $wrong) !== false) {
-                $variables[$key] = str_replace($wrong, $right, $value);
-            }
-        }
-
-        return $variables;
-
-    }
-
-    /**
-     * Prepend SCSS variable declarations to the given source.
-     * Used by engines that inject variables via SCSS content (e.g. Dart Sass CLI).
-     *
-     * @param string $scss SCSS source.
-     * @param array<string, string> $variables Variable name => Sass expression (e.g. quoted string).
-     * @return string SCSS with variables prepended.
-     */
-    public static function prepend_variables ($scss, array $variables) {
-
-        if (!$variables) {
-            return $scss;
-        }
-        $lines = [];
-        foreach ($variables as $key => $value) {
-            $lines[] = '$' . $key . ': ' . $value . ';';
-        }
-        // One line, joined to the source's first: anything taller shifts every source map
-        // line number by the number of variables injected.
-        return implode(' ', $lines) . ' ' . $scss;
-
-    }
-
-    /**
-     * Not wp_tempnam(): that lives in wp-admin/includes/file.php and is fatal on the frontend.
-     */
-    public static function temp_file ($prefix = 'sassy-') {
-
-        return tempnam(get_temp_dir(), $prefix);
-
-    }
-
 }

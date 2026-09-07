@@ -9,16 +9,19 @@
 
 require __DIR__ . '/bootstrap.php';
 
-use Sassy\SCSS_Compiler;
 use Sassy\Lightning_CSS_Postprocessor;
 use Sassy\Dart_Sass_Engine;
 
 assert(!function_exists('wp_tempnam'), 'the harness must simulate a frontend request');
 
 function resolve_bin () {
-    $method = new ReflectionMethod(Lightning_CSS_Postprocessor::class, 'resolve_bin');
+    return invoke_protected('resolve_bin');
+}
+
+function invoke_protected ($name, ...$args) {
+    $method = new ReflectionMethod(Lightning_CSS_Postprocessor::class, $name);
     $method->setAccessible(true);
-    return $method->invoke(null);
+    return $method->invoke(null, ...$args);
 }
 
 section('Lightning CSS is off unless configured');
@@ -36,8 +39,8 @@ unset($GLOBALS['filter_overrides']['sassy-lightning-css-binary']);
 
 section('Temp files');
 
-$a = SCSS_Compiler::temp_file('sassy-in-');
-$b = SCSS_Compiler::temp_file('sassy-in-');
+$a = invoke_protected('temp_file', 'sassy-in-');
+$b = invoke_protected('temp_file', 'sassy-in-');
 check('created',                                      $a && file_exists($a));
 check('unique, so concurrent requests cannot collide', $a !== $b);
 @unlink($a); @unlink($b);
