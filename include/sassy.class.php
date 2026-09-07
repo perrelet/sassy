@@ -53,6 +53,7 @@ class Sassy {
 		require_once(SASSY_PATH . 'include/model/scss-map.class.php');
 		require_once(SASSY_PATH . 'include/model/asset.class.php');
 		require_once(SASSY_PATH . 'include/model/style-stack.class.php');
+		require_once(SASSY_PATH . 'include/model/build-target.class.php');
 		require_once(SASSY_PATH . 'include/model/import-graph.class.php');
 		require_once(SASSY_PATH . 'include/model/import-resolver.class.php');
 		require_once(SASSY_PATH . 'include/model/import-scanner.class.php');

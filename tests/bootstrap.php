@@ -83,6 +83,7 @@ foreach ([
     'include/model/scss-map.class.php',
     'include/model/asset.class.php',
     'include/model/style-stack.class.php',
+    'include/model/build-target.class.php',
     'include/model/import-graph.class.php',
     'include/model/import-resolver.class.php',
     'include/model/import-scanner.class.php',

@@ -23,14 +23,9 @@ class SCSS_Compiler {
     protected $style     = OutputStyle::EXPANDED;
     protected $variables = null;
 
-    protected $build_dir;
-    protected $build_path;
-    protected $build_url;
-    protected $build_name;
-    protected $build_file;
     protected $src_path;
     protected $asset;
-    protected $src_map_options;
+    protected $target;
     protected $import_paths;
 
     protected $compiled;
@@ -50,14 +45,9 @@ class SCSS_Compiler {
      */
     public function init () {
 
-        $this->build_dir        = null;
-        $this->build_path       = null;
-        $this->build_url        = null;
-        $this->build_name       = null;
-        $this->build_file       = null;
         $this->src_path         = null;
         $this->asset            = null;
-        $this->src_map_options  = null;
+        $this->target           = null;
         $this->import_paths     = null;
 
         $this->compiled = false;
@@ -434,81 +424,53 @@ class SCSS_Compiler {
 
     }
 
-    public function get_src_map_options () {
+    public function get_target () {
 
-        if (is_null($this->src_map_options)) {
+        if (is_null($this->target)) $this->target = new Build_Target($this->get_asset());
 
-            $this->src_map_options = apply_filters('sassy-src-map-options', [
-                'sourceMapWriteTo'    => str_replace('\\', '/', $this->get_build_path()) . $this->get_build_name() . '.map',    // Absolute path where the .map file will be written
-                'sourceMapURL'        => $this->get_build_url() . '.map',                                                        // Full or relative URL to archive .map
-                'sourceMapBasepath'   => rtrim(str_replace('\\', '/', ABSPATH), '/'),                                            // Configures the base path to replace (for instance C:/www/domain/wp-content/themes/theme-name/classes/../scss/ or C:/www/domain/wp-content/ in your cases (notice that we have a weird thing where this options must use / instead of \ on Windows) (https://github.com/scssphp/scssphp/issues/35) // ? - Partial path (server root) to create the relative URL
-                'sourceMapFilename'   => $this->get_build_url(),                                                                // (Optional) Full or relative URL to compiled .css file
-                'sourceMapRootpath'   => trailingslashit(site_url()),                                    
-                //'sourceRoot'        => $this->src,                                                                            // (Optional) Prepend the 'source' field entries to relocate source files
-            ], $this->src, $this->handle, $this);
-
-        }
-
-        return $this->src_map_options;
+        return $this->target;
 
     }
 
     public function get_src_url () {
 
-        return isset($this->get_src_map_options()['sourceMapURL']) ? $this->get_src_map_options()['sourceMapURL'] : null;
+        return $this->get_target()->get_map_url();
 
     }
 
     public function get_build_directory () {
 
-        if (is_null($this->build_dir)) {
+        return $this->get_target()->get_directory();
 
-            $suffix = is_multisite() ? get_current_blog_id() . '/' : '';
-            $this->build_dir = apply_filters('sassy-build-directory', '/scss/' . $suffix, $this->src, $this->handle, $this);
-
-        }
-
-        return $this->build_dir;
-        
     }
-    
+
     public function get_build_path () {
-        
-        if (is_null($this->build_path)) $this->build_path = apply_filters('sassy-build-path', WP_CONTENT_DIR, $this->src, $this->handle, $this) . $this->get_build_directory();
 
-        return $this->build_path;
-        
+        return $this->get_target()->get_path();
+
     }
-    
+
     public function get_build_url () {
-        
-        if (is_null($this->build_url)) $this->build_url = apply_filters('sassy-build-url', WP_CONTENT_URL, $this->src, $this->handle, $this) . $this->get_build_directory() . $this->get_build_name();
 
-        return $this->build_url;
-        
+        return $this->get_target()->get_url();
+
     }
-    
+
     public function get_build_name () {
-        
-        if (is_null($this->build_name)) {
 
-            $parts         = explode('?', $this->src);
-            $name         = basename($parts[0], '.scss');
-            $build_name = "{$name}.css";
+        return $this->get_target()->get_name();
 
-            $this->build_name = apply_filters('sassy-build-name', $build_name, $this->src, $this->handle, $this);
-
-        }
-
-        return $this->build_name;
-        
     }
 
     public function get_build_file () {
 
-        if (is_null($this->build_file)) $this->build_file = $this->get_build_path() . $this->get_build_name();
+        return $this->get_target()->get_file();
 
-        return $this->build_file;
+    }
+
+    public function get_src_map_options () {
+
+        return $this->get_target()->get_map_options();
 
     }
 
