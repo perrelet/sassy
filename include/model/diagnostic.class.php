@@ -66,8 +66,13 @@ class Diagnostic {
      */
     public function render () {
 
+        // Both engines wrap longer messages. The header takes the first line; the rest follows
+        // rather than being dropped.
+        $lines = preg_split('/\R/', $this->message, 2);
         $where = $this->file ? $this->file . $this->position() . '  ' : '';
-        $out   = strtoupper($this->severity) . '  ' . $where . $this->message;
+        $out   = strtoupper($this->severity) . '  ' . $where . $lines[0];
+
+        if (isset($lines[1]) && trim($lines[1]) !== '') $out .= "\n" . rtrim($lines[1], "\n");
 
         if ($this->frame) $out .= "\n" . rtrim($this->frame, "\n");
         if ($this->trace) $out .= "\n" . rtrim($this->trace, "\n");

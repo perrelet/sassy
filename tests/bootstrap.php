@@ -91,6 +91,7 @@ foreach ([
     'include/model/import-resolver.class.php',
     'include/model/import-scanner.class.php',
     'include/engines/compiler-engine.interface.php',
+    'include/engines/scssphp-logger.class.php',
     'include/engines/scssphp-engine.compiler-engine.php',
     'include/engines/dart-sass-engine.compiler-engine.php',
     'include/model/scss-compiler.class.php',

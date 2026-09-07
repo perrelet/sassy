@@ -5,6 +5,7 @@ namespace Sassy;
 use ScssPhp\ScssPhp\Compiler;
 use ScssPhp\ScssPhp\OutputStyle;
 use ScssPhp\ScssPhp\ValueConverter;
+use ScssPhp\ScssPhp\Exception\SassException;
 use Exception;
 
 /**
@@ -30,6 +31,8 @@ class Scssphp_Engine implements Compiler_Engine {
      * @return Compile_Result
      */
     public function compile (array $args) : Compile_Result {
+
+        $logger = new Scssphp_Logger();
 
         try {
 
@@ -58,19 +61,41 @@ class Scssphp_Engine implements Compiler_Engine {
                 $this->compiler->addImportPath($path);
             }
 
+            $this->compiler->setLogger($logger);
+
             do_action('sassy-compiler', $this->compiler, $args);
 
             $result = $this->compiler->compileString($args['scss'], $args['src_path'] ?? null);
-            $css = $result->getCss();
-            $map = $result->getSourceMap();
 
-            return new Compile_Result($css, $map, null, null);
+            return new Compile_Result($result->getCss(), $result->getSourceMap(), null, null, $logger->get_diagnostics());
+
+        } catch (SassException $e) {
+
+            $diagnostics = array_merge($logger->get_diagnostics(), [static::diagnose($e)]);
+
+            return new Compile_Result(null, null, $e->getOriginalMessage(), null, $diagnostics);
 
         } catch (Exception $e) {
 
-            return new Compile_Result(null, null, $e->getMessage(), null);
+            $diagnostics = array_merge($logger->get_diagnostics(), [new Diagnostic(Diagnostic::ERROR, $e->getMessage())]);
+
+            return new Compile_Result(null, null, $e->getMessage(), null, $diagnostics);
 
         }
+
+    }
+
+    protected static function diagnose (SassException $e) {
+
+        $span  = $e->getSpan();
+        $trace = trim($e->getSassTrace()->getFormattedTrace());
+
+        return new Diagnostic(Diagnostic::ERROR, $e->getOriginalMessage(), [
+            'file'   => preg_replace('#^file://#', '', rawurldecode((string) $span->getSourceUrl())) ?: null,
+            'line'   => $span->getStart()->getLine() + 1,
+            'column' => $span->getStart()->getColumn() + 1,
+            'trace'  => $trace !== '' ? preg_replace('/^/m', '  ', $trace) : null,
+        ]);
 
     }
 

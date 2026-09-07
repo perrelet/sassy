@@ -60,6 +60,13 @@ check('line without column',
 check('the engine drawing is not redrawn',
     str_contains((new Diagnostic(Diagnostic::ERROR, 'e', ['frame' => "  ,\n1 | .a{}\n  '"]))->render(), "  ,\n1 | .a{}\n  '"));
 
+section('Multi-line messages');
+
+$wrapped = new Diagnostic(Diagnostic::DEPRECATION, "Global built-in functions are deprecated.\nUse math.percentage instead.", ['file' => 'a.scss', 'line' => 2, 'column' => 13]);
+
+check('the header keeps one line',  str_contains($wrapped->render(), "DEPRECATION  a.scss:2:13  Global built-in functions are deprecated.\n"));
+check('the remainder is not dropped', str_contains($wrapped->render(), 'Use math.percentage instead.'));
+
 section('render_all');
 
 $two = Diagnostic::render_all([
@@ -88,5 +95,44 @@ check('an error makes it not ok', !$result->ok());
 $clean = new Sassy\Compile_Result('.a{}', null, null, null, [new Diagnostic(Diagnostic::WARNING, 'careful')]);
 check('warnings alone stay ok', $clean->ok());
 check('the legacy error field still fails it', !(new Sassy\Compile_Result(null, null, 'broke'))->ok());
+
+section('scssphp produces them');
+
+$engine = new Sassy\Scssphp_Engine();
+$src    = '/var/www/site/scss/frontend.scss';
+
+$warned = $engine->compile(['scss' => "@warn \"careful\";\n.a { color: red; }\n", 'src_path' => $src]);
+$w      = $warned->warnings()[0] ?? null;
+
+check('a @warn becomes a warning',  $w && $w->severity === 'warning');
+check('with the message',           $w && $w->message === 'careful');
+check('located from the trace',     $w && $w->file === $src && $w->line === 1, $w ? "{$w->file}:{$w->line}" : 'none');
+check('carrying the trace',         $w && str_contains((string) $w->trace, 'root stylesheet'));
+check('and no frame',               $w && $w->frame === null);
+check('the compile still succeeded', $warned->ok());
+
+$deprecated = (new Sassy\Scssphp_Engine())->compile(['scss' => "@if false {} @elseif true {}\n", 'src_path' => $src]);
+$d          = $deprecated->deprecations()[0] ?? null;
+
+check('a deprecation is not a warning', $d && $d->severity === 'deprecation');
+check('carrying the engine code',       $d && $d->code === 'elseif', $d ? (string) $d->code : 'none');
+check('located from the span',          $d && $d->file === $src && $d->column === 14);
+
+$failed = (new Sassy\Scssphp_Engine())->compile(['scss' => ".a { color: \$nope; }\n", 'src_path' => $src]);
+$e      = $failed->errors()[0] ?? null;
+
+check('a SassException becomes an error', $e && $e->severity === 'error');
+check('with the original message',        $e && $e->message === 'Undefined variable.');
+check('located',                          $e && $e->file === $src && $e->line === 1 && $e->column === 13);
+check('and the result is not ok',         !$failed->ok());
+
+section('Modules are still unsupported, and say so with a location');
+
+$modules = (new Sassy\Scssphp_Engine())->compile(['scss' => "@use 'x';\n", 'src_path' => $src]);
+$m       = $modules->errors()[0] ?? null;
+
+check('refused',            $m && $m->is_error());
+check('naming the file',    $m && $m->file === $src);
+check('not a vendor trace', $m && !str_contains($m->message, 'vendor'));
 
 finish();
