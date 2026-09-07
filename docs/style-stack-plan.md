@@ -226,7 +226,11 @@ adds it through the filter.
 
 ### Phase 2 — One service, thin surfaces
 
-`SCSS_Compiler` (≈600 lines, five responsibilities) splits into:
+`SCSS_Compiler` (619 lines, five responsibilities) splits into the four classes below — and the
+work does not end at that file. The cache keys alone are read from three: the CLI reads
+`sassy-filemtimes-` in `watch`, `list` and `deps` and deletes both keys in `clear`, and `UI`
+deletes them with a raw `$wpdb` `LIKE` query. `Compile_Cache`'s public surface has to be wide
+enough to retire those call sites, or the first acceptance item below cannot pass.
 
 - **`Printer`** — takes an `Asset`, consults `Compile_Cache`, assembles the engine arguments,
   invokes the engine, post-processes, writes, records. Returns `Compile_Result`. The argument bag
@@ -254,7 +258,12 @@ remove.
 
 **Acceptance:**
 - No transient key or staleness rule exists outside `Compile_Cache`.
-- The same failure produces identical message text on all surfaces.
+- The same failure produces **identical diagnostic text** on every surface — the CLI, the footer
+  panel and the AJAX payload carry the engine's message verbatim and unwrapped. Surface chrome
+  may still differ (2.1 prefixes it `SASSY -> {basename} -> ` in the footer and
+  `{handle} -> ` in the CLI); unifying the chrome waits for phase 3's canonical formatter, which
+  is what makes a single rendering possible. Phase 2's job is that no surface *rewords* the
+  failure.
 - The 2.1 suite passes unchanged except for renames.
 
 ---
@@ -312,9 +321,14 @@ re-derive:
   newline-separated prelude parses and shifts every source-map line by the number of injected
   variables — five on the reference install.
 
-So `sass` is a **capability**, not an extension: `Scssphp_Engine` supports it outright, and
-`Dart_Sass_Engine` supports it only where no variables are injected. That is exactly what
-`capabilities()` exists to express, and why this waited for this phase.
+So `sass` is a **capability**, not an extension. `Scssphp_Engine` declares it; `Dart_Sass_Engine`
+**does not**. Not "only when no variables are injected" — `get_variables()` seeds three defaults
+before any filter runs, so a prelude is always present and that condition never holds on any real
+install. A capability that is true on paper and false everywhere is worse than an absent one: it
+makes `is_compilable()` promise a build the primary engine refuses every time. If the shift ever
+becomes worth trading for, it is a separate decision with its own row in §6, not an implication
+buried in a capability string. That is exactly what `capabilities()` exists to express, and why
+this waited for this phase.
 
 `Asset::is_compilable()` does **not** consult the engine. It stays a property of the asset —
 local, and an extension Sassy builds — because engine selection runs through `sassy-engine`,
@@ -389,7 +403,11 @@ trace exists (Sassy-source notices have neither frame nor trace). This example i
 spec; keep it self-consistent.
 
 Everything below the header is the engine's own drawing, reproduced verbatim — `frame` keeps the
-`╷`/`╵` gutter rules and Dart's line-number padding, `trace` keeps its column alignment. The
+gutter rules and the engine's line-number padding, `trace` keeps its column alignment. **The two
+engines draw differently**: Dart rules its frames with `╷ │ ╵`, scssphp with `, | '`. The parser
+must find file, line and column under either, and the rendering therefore looks engine-dependent
+by design. That is not in tension with the acceptance above about surfaces: the same failure from
+the same engine renders identically everywhere, which is the claim being made. The
 formatter composes; it does not redraw. `message` is likewise verbatim, which is why the header
 above reads `Undefined variable.` and not `Undefined variable: $gap`: Dart names the offending
 token only in the frame, and synthesizing a richer one-liner would mean guessing at output the
@@ -719,10 +737,14 @@ Updating staging is part of the work, not a follow-up — which means every row 
 that owns it. An unpinned row is a follow-up by another name, and the `$digitalis_styles`
 deletion sat unscheduled through phase 1 proving it.
 
+Anything here that a *third-party* site would also hit belongs in
+[upgrading-to-3.0.md](upgrading-to-3.0.md), which each phase appends to as it lands. This table
+is what breaks on this machine; that document is what breaks on someone else's.
+
 | Phase | Change | Action |
 |---|---|---|
 | 1 ✅ | `Sassy::get_scss_styles()` removed | Verified: no usage in d-pace *or* lattice. Nothing to do |
-| **1, due** | `$digitalis_styles` no longer read | **Delete the dead code**: `Theme::enqueue_style_last` and the `WP_Styles` construction in `lattice/include/objects/theme.abstract.php`. Verified zero callers anywhere under `wp-content/`. Actionable since phase 1 landed |
+| 1 ✅ | `$digitalis_styles` no longer read | Dead code **deleted** from Lattice: `Theme::enqueue_style_last` and its `WP_Styles` construction, 25 lines, zero callers anywhere under `wp-content/`. Uncommitted in the `digitalis-framework` submodule pending its own review |
 | 2 | Fourth filter argument becomes `Asset` | All four d-pace callbacks ignore it — `engine($engine, $compiler)` declares it unused, the rest do not declare it. **No change needed**; verified, not assumed |
 | 3 | `sassy-src-map-options` removed | No d-pace or lattice binding. Nothing to do |
 | 4 | `Digitalis` integration removed | Confirmed unused (measured: 0 live occurrences — the only hits are two commented-out `@import`s in `scss-template/front.scss`). Note `lattice/load.php` injects the *same two variables* through `sassy-variables`, so removal changes nothing at runtime. That duplicate is dead too, but it is outside this table: **punch-list, not an edit** |
