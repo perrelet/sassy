@@ -241,9 +241,9 @@ enough to retire those call sites, or the first acceptance item below cannot pas
   stays the untyped array until phase 3 replaces it with `Compile_Request`; pulling that forward
   is how a phase boundary stops being a review gate.
 - **`Build_Target`** — pure path math. Every `get_build_*` and `sassy-build-*`.
-- **`Compile_Cache`** — `is_current(Asset)`, `record(Asset, Import_Graph)`, `forget(Asset)`.
+- **`Compile_Cache`** — takes the `Asset`, `Build_Target` and `Variable_Resolver` on construction, and answers `needs_compile()`, `is_current()`, `record(Import_Graph, $time)` and `forget()`. It also carries handle-addressed statics (`get_graph`, `get_last_compile_time`, `forget_handle`, `forget_all`), because `wp sassy deps` and `wp sassy clear` have a handle and nothing else. Design that static surface from those call sites: without it the acceptance below cannot pass.
 - **`Variable_Resolver`** — defaults, `sassy-variables`, map conversion, URL scheme
-  normalization, signature hashing.
+  normalization, signature hashing, and `prepend()` for engines that inject variables through the source.
 
 All surfaces call `Printer` and render its result. They may format; they may not decide.
 
@@ -259,6 +259,10 @@ built, available before a `Compile_Request` exists, and a value object rather th
 the executor. Arity is unchanged, so a callback ignoring the argument (all four of d-pace's do)
 is unaffected. Passing `Printer` instead would rebuild the god-object access the split exists to
 remove.
+
+**Breaks:** `SCSS_Compiler` renamed `Printer`; `SASSY()->get_compilers()` renamed `get_printers()`, keyed by a 1-based index; `get_index()` removed from the compiler; the fourth argument of every per-compile filter becomes the `Asset`; `SCSS_Compiler::prepend_variables()` and `::temp_file()` gone.
+
+`Printer` carries no instance counter. `Sassy` assigns the index as it collects printers, because `assets/js/sassy.js` keys admin bar DOM nodes on `meta.index`; phase 6 rewrites that JS and rekeys by handle, and until it does the index has to keep being emitted.
 
 **Acceptance:**
 - No transient key or staleness rule exists outside `Compile_Cache`.
@@ -304,9 +308,7 @@ capabilities(): array        e.g. ['modules', 'source_maps', 'compressed']
 supports(string $c): bool
 ```
 
-`Scssphp_Engine` declares no `modules` support and refuses `@use`/`@forward` with a message
-naming the file and suggesting the Dart engine, rather than letting `Sass modules are not
-implemented yet` surface from four frames inside the vendor.
+`Scssphp_Engine` declares no `modules` support. What it already produces is better than it looks: scssphp throws a `SimpleSassFormatException` whose message names the real source file, line and column and draws its own frame, and the engine already catches it and returns that message. The gap is the **remedy**, so the work is to add "compile this with `Dart_Sass_Engine`" and to declare the capability, not to rescue a message from inside the vendor.
 
 #### Indented syntax (`.sass`) entry files
 
@@ -373,10 +375,9 @@ source     'engine' | 'sassy'
 | `deprecation` | Compiled, will break in a future Sass or CSS version | Yes | `--strict=all` |
 | `notice` | Informational, Sassy's own (e.g. Lightning CSS stripped the source-map link) | Yes | never |
 
-`deprecation` is separated from `warning` because it is time-bound and high-volume — 48 per
-compile on the reference install — and lumping them makes `--strict` useless. Hence the two
-gates: `--strict` promotes warnings only; `--strict=all` adds deprecations, for the day those 48
-matter (they become hard errors at Dart Sass 3.0).
+`deprecation` is separated from `warning` because it is time-bound and high-volume, and lumping them makes `--strict` useless. Hence the two gates: `--strict` promotes warnings only; `--strict=all` adds deprecations, for the day they matter (they become hard errors at Dart Sass 3.0).
+
+At least 48 per compile on the reference install. "At least" because Dart withholds repeats by default (`WARNING: N repetitive deprecation warnings omitted`), so 48 was counted through the cap; phase 3 passes `--verbose` and the real figure will be higher. A larger number only strengthens the case for the split.
 
 † Truncation keeps `warning` severity but fails `wp sassy check` unconditionally — see phase 5
 for the principle.
@@ -418,6 +419,8 @@ token only in the frame, and synthesizing a richer one-liner would mean guessing
 over-inclusion rule says to carry intact. Verified against sass 1.92.0 — the example is a real
 trace, not a sketch.
 
+**Breaks:** `sassy-src-map-options` removed; `Compile_Result::info` replaced by `Diagnostic[]`, so `get_warnings()` returns objects rather than strings; `Compiler_Engine::compile()` takes a `Compile_Request`. `Asset::COMPILABLE` gains `sass`.
+
 **Acceptance:**
 - `wp sassy status` reports the active engine's capabilities.
 - A `@use` under scssphp names the source file and the remedy.
@@ -451,6 +454,8 @@ Lightning CSS survives, ported to this API as the reference post-processor — t
 post-processor extension point works, as the retired integrations are for variables. Its
 source-map stripping is the canonical `notice`.
 
+**Breaks:** `Bricks`, `Oxygen` and `Digitalis` integrations removed, and with them every variable they injected; `include/integrations/` is gone.
+
 **Acceptance:**
 - Each retired integration exists in `tests/fixtures/` expressed purely through documented
   extension points, with tests against stubbed builder APIs.
@@ -483,6 +488,8 @@ Truncation fails `check` by default even though its severity is `warning`. The p
 **`check` fails on anything that makes its own answer untrustworthy.** Its promise is "everything
 current", and with a truncated graph that answer is unknowable — epistemic, not stylistic, so it
 does not wait for `--strict`.
+
+**Breaks:** none. `wp sassy check` and `wp sassy deps --file` are additions.
 
 **Acceptance:**
 - Editing a shared partial and running `deps --file` names exactly the handles that recompile.
@@ -598,6 +605,8 @@ release; the paintbrush spike page is kept as a fixture. **Phase 6 creates that 
 not inherit one — covering every browser behaviour this phase ships. Untested surface is named, never
 implied covered — the `watch` precedent.
 
+**Breaks:** the `wp_ajax_nopriv_sassy_compile` registration is dropped; `?sassy-vars=1`, `Sassy::get_all_variables()` and `meta.variables` are gone; Force Recompile and Clear Cache leave the admin bar, as do the per-file submenus; errors and DOM nodes are keyed by handle, so `meta.index` goes with the JS rewrite.
+
 **Acceptance:**
 - With `sassy-dev` returning false, no dev-surface assets reach the page: no JS, no panel
   markup, no localized params, no admin bar node. (The compiled CSS itself always ships — that
@@ -673,6 +682,8 @@ expanded output is irrelevant: the diff is CSSOM-shaped, not text-shaped.
 Not crazy. It is the import-graph shape again: observe, map through data already produced, act
 only where the mapping is exact.
 
+**Breaks:** none. Everything here is additive and gated.
+
 **Acceptance:**
 - Spike result recorded either way.
 - Tier 1: an inspector edit to a compiled declaration appears in the panel with the correct
@@ -709,6 +720,8 @@ Reference baseline — `d-pace/`, 28 files, excluding `node_modules` and `*.min.
 `data-theme` **1**, CSSOM injection **0**. Note `dataset` and `data-theme` are separate markers
 with separate counts; an earlier draft fused them at 8, which is the `dataset` figure.
 
+**Breaks:** none. `Asset` gains `type: 'script'`; existing style assets are unaffected.
+
 **Acceptance:**
 - `wp sassy list --type=script --format=json` reports each script's surface categories.
 - Every file touching `data-theme` on the reference install is identified (one at time of
@@ -743,13 +756,16 @@ deletion sat unscheduled through phase 1 proving it.
 
 Anything here that a *third-party* site would also hit belongs in
 [upgrading-to-3.0.md](upgrading-to-3.0.md), which each phase appends to as it lands. This table
-is what breaks on this machine; that document is what breaks on someone else's.
+is what breaks on this machine; that document is what breaks on someone else's. Each phase's
+`**Breaks:**` line is the source for both.
+
+Status is ✅ done, **open** for something still to decide or do, and unmarked for not yet reached.
 
 | Phase | Change | Action |
 |---|---|---|
 | 1 ✅ | `Sassy::get_scss_styles()` removed | Verified: no usage in d-pace *or* lattice. Nothing to do |
 | **1, open** | `$digitalis_styles` no longer read | `Theme::enqueue_style_last()` **stays** — it is live Lattice API on other sites. Earlier revisions of this table called it dead code on the strength of zero callers under this `wp-content/`, which measures one consumer of a shared submodule and proves nothing about the rest. The fix belongs in Lattice, not per-site: register `sassy-style-queues` there so every site calling `enqueue_style_last()` keeps working under 3.0. **Decision pending** |
-| 2 | Fourth filter argument becomes `Asset` | All four d-pace callbacks ignore it — `engine($engine, $compiler)` declares it unused, the rest do not declare it. **No change needed**; verified, not assumed |
+| 2 ✅ | Fourth filter argument becomes `Asset` | All four d-pace callbacks ignore it: `engine($engine, $compiler)` declares it unused, the rest do not declare it. **No change needed**; verified against the shipped code, not assumed |
 | 3 | `sassy-src-map-options` removed | No d-pace or lattice binding. Nothing to do |
 | 4 | `Digitalis` integration removed | Confirmed unused (measured: 0 live occurrences — the only hits are two commented-out `@import`s in `scss-template/front.scss`). Note `lattice/load.php` injects the *same two variables* through `sassy-variables`, so removal changes nothing at runtime. That duplicate is dead too, but it is outside this table: **punch-list, not an edit** |
 | 4 | `Sassy\Dart_Sass_Engine` may move namespace/directory | Update `sassy.integration.php` |
