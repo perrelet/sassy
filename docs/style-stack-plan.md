@@ -377,7 +377,7 @@ source     'engine' | 'sassy'
 
 `deprecation` is separated from `warning` because it is time-bound and high-volume, and lumping them makes `--strict` useless. Hence the two gates: `--strict` promotes warnings only; `--strict=all` adds deprecations, for the day they matter (they become hard errors at Dart Sass 3.0).
 
-At least 48 per compile on the reference install. "At least" because Dart withholds repeats by default (`WARNING: N repetitive deprecation warnings omitted`), so 48 was counted through the cap; phase 3 passes `--verbose` and the real figure will be higher. A larger number only strengthens the case for the split.
+Measured on the reference install with `--verbose`, so nothing withheld: **10 deprecations for `frontend`, 10 for `editor`, 0 for `admin`**. An earlier draft said 48 per compile; that figure does not reproduce and is withdrawn. Twenty across the install is still enough to drown `--strict`, which is all the argument needs, and every one of them becomes a hard error at Dart Sass 3.0.
 
 † Truncation keeps `warning` severity but fails `wp sassy check` unconditionally — see phase 5
 for the principle.

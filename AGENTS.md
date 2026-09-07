@@ -550,8 +550,9 @@ Two things it does that 2.x's `get_src_path()` did not:
 place an asset Sassy cannot resolve itself. It receives `($path, $src, $handle, $asset)`.
 
 `Printer::get_src_path()` delegates here and keeps returning the URL when resolution comes
-back `null`, because its callers `file_exists()` that value and print it. Phase 2 turns both
-outcomes into `Diagnostic`s.
+back `null`, because its callers `file_exists()` that value and print it, so both outcomes are
+still plain strings. Converting them to `Diagnostic`s is described in the plan's phase 1 section
+but is not scheduled by any phase; see the open item there.
 
 ### `Style_Stack`
 
