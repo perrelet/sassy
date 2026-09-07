@@ -26,6 +26,7 @@ class SCSS_Compiler {
     protected $asset;
     protected $target;
     protected $resolver;
+    protected $cache;
     protected $import_paths;
 
     protected $compiled;
@@ -49,6 +50,7 @@ class SCSS_Compiler {
         $this->asset            = null;
         $this->target           = null;
         $this->resolver         = null;
+        $this->cache            = null;
         $this->import_paths     = null;
 
         $this->compiled = false;
@@ -122,7 +124,7 @@ class SCSS_Compiler {
         $build_file = $this->get_build_file();
         $variables  = $this->get_variables();
 
-        $run = $this->should_compile($build_file, $src_path, $variables);
+        $run = $this->get_cache()->needs_compile();
 
         if ($run && !$this->ensure_build_directory($build_path)) {
             return $this->get_build_url();
@@ -173,12 +175,7 @@ class SCSS_Compiler {
                 );
             }
 
-            set_transient('sassy-filemtimes-' . $this->handle, array_merge([
-                $build_file        => filemtime($build_file),
-                '__compile_time__' => $this->compile_time,
-            ], $graph->to_array()));
-
-            set_transient('sassy-vars-sig-' . $this->handle, sha1(serialize($variables)));
+            $this->get_cache()->record($graph, $this->compile_time);
 
             $this->compiled = true;
         } else {
@@ -193,67 +190,6 @@ class SCSS_Compiler {
     }
 
     /**
-     * Whether the built file is up to date, without compiling.
-     *
-     * Asks should_compile() rather than re-deriving the answer, so a caller reporting state
-     * cannot drift from the caller acting on it.
-     */
-    public function is_current () {
-
-        $src_path = $this->get_src_path();
-
-        if (!file_exists($src_path)) return false;
-
-        return !$this->should_compile($this->get_build_file(), $src_path, $this->get_variables());
-
-    }
-
-    /**
-     * Whether we need to run compilation (cache invalid or missing).
-     *
-     * @param string $build_file Path to built CSS file.
-     * @param string $src_path   Path to source SCSS file.
-     * @param array  $variables  Current variables (signature used for cache).
-     * @return bool
-     */
-    protected function should_compile ($build_file, $src_path, array $variables) {
-
-        $run = apply_filters('sassy-force-compile', false, $this->src, $this->handle, $this);
-
-        if (!$run) {
-            $filemtimes = get_transient('sassy-filemtimes-' . $this->handle);
-            if ($filemtimes === false) {
-                $filemtimes = [];
-            }
-            if (!isset($filemtimes[$build_file])) {
-
-                $run = true;
-
-            } else if (apply_filters('sassy-check-dependencies', true, $this->src, $this->handle, $this)) {
-
-                $graph = Import_Graph::from_array($filemtimes);
-                if (!$graph || $graph->has_changed($src_path)) $run = true;
-
-            }
-
-        }
-
-        if (!$run) {
-            // Written on success, not here: recording it up front meant a failed compile was
-            // remembered as current, so the error vanished on the next request.
-            if (sha1(serialize($variables)) !== get_transient('sassy-vars-sig-' . $this->handle)) {
-                $run = true;
-            }
-        }
-
-        if (!$run && !file_exists($build_file)) {
-            $run = true;
-        }
-
-        return $run;
-    }
-
-    /**
      * Ensure build directory exists and is writable. Sets error state on failure.
      *
      * @param string $build_path Directory path.
@@ -264,14 +200,14 @@ class SCSS_Compiler {
         if (!is_dir($build_path)) {
             if (!wp_mkdir_p($build_path)) {
                 $this->error('File Permissions Error, unable to create cache directory: ' . $build_path);
-                delete_transient('sassy-filemtimes-' . $this->handle);
+                $this->get_cache()->forget();
                 return false;
             }
         }
 
         if (!is_writable($build_path)) {
             $this->error('File Permissions Error, permission denied. Please make the directory writable: ' . $build_path);
-            delete_transient('sassy-filemtimes-' . $this->handle);
+            $this->get_cache()->forget();
             return false;
         }
 
@@ -336,15 +272,6 @@ class SCSS_Compiler {
     public function get_compile_time () {
 
         return $this->compile_time;
-
-    }
-
-    public function get_last_compile_time () {
-
-        if ($this->compile_time > 0) return $this->compile_time;
-
-        $filemtimes = get_transient('sassy-filemtimes-' . $this->handle);
-        return $filemtimes['__compile_time__'] ?? null;
 
     }
 
@@ -422,6 +349,26 @@ class SCSS_Compiler {
         }
 
         return $this->import_paths;
+
+    }
+
+    public function get_cache () {
+
+        if (is_null($this->cache)) $this->cache = new Compile_Cache($this->get_asset(), $this->get_target(), $this->get_resolver());
+
+        return $this->cache;
+
+    }
+
+    public function is_current () {
+
+        return $this->get_cache()->is_current();
+
+    }
+
+    public function get_last_compile_time () {
+
+        return Compile_Cache::get_last_compile_time($this->handle);
 
     }
 

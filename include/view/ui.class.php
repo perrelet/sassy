@@ -204,9 +204,7 @@ class UI {
 
 		if (!current_user_can('edit_theme_options')) return;
 
-		global $wpdb;
-
-		$wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_sassy-filemtimes-%' OR option_name LIKE '_transient_sassy-vars-sig-%'");
+		Compile_Cache::forget_all();
 
 		wp_safe_redirect(remove_query_arg('sassy-clear-cache'));
 		exit;

@@ -137,7 +137,7 @@ class Sassy_CLI_Command extends WP_CLI_Command {
 
         foreach ($styles as $style) {
             $compiler = $this->watch_once($style);
-            $graph    = Import_Graph::from_array(get_transient('sassy-filemtimes-' . $style->handle));
+            $graph    = Compile_Cache::get_graph($style->handle);
             $files   += $graph ? count($graph->deps) : 0;
         }
 
@@ -262,7 +262,7 @@ class Sassy_CLI_Command extends WP_CLI_Command {
             if ($asset->is_compilable()) {
 
                 $compiler = (new SCSS_Compiler())->prepare($asset->src, $asset->handle);
-                $graph    = Import_Graph::from_array(get_transient('sassy-filemtimes-' . $asset->handle));
+                $graph    = Compile_Cache::get_graph($asset->handle);
                 $built    = $compiler->get_build_file();
 
                 if      (!file_exists($compiler->get_src_path())) $item['state'] = 'no source';
@@ -361,7 +361,7 @@ class Sassy_CLI_Command extends WP_CLI_Command {
      */
     public function deps ($args, $assoc_args) {
 
-        $graph = Import_Graph::from_array(get_transient('sassy-filemtimes-' . $args[0]));
+        $graph = Compile_Cache::get_graph($args[0]);
 
         if (!$graph) WP_CLI::error(sprintf("No import graph recorded for '%s'. Compile it first.", $args[0]));
 
@@ -417,10 +417,7 @@ class Sassy_CLI_Command extends WP_CLI_Command {
 
         if ($args) {
 
-            foreach ($args as $handle) {
-                delete_transient('sassy-filemtimes-' . $handle);
-                delete_transient('sassy-vars-sig-' . $handle);
-            }
+            foreach ($args as $handle) Compile_Cache::forget_handle($handle);
 
             WP_CLI::success(sprintf('Cleared %d handle(s).', count($args)));
             return;
@@ -431,15 +428,7 @@ class Sassy_CLI_Command extends WP_CLI_Command {
             WP_CLI::error('An external object cache is in use, so transients are not in the options table. Pass handles explicitly.');
         }
 
-        global $wpdb;
-
-        $deleted = $wpdb->query(
-            "DELETE FROM {$wpdb->options}
-             WHERE option_name LIKE '\_transient\_sassy-%'
-                OR option_name LIKE '\_transient\_timeout\_sassy-%'"
-        );
-
-        WP_CLI::success(sprintf('Cleared %d cache entries.', (int) $deleted));
+        WP_CLI::success(sprintf('Cleared %d cache entries.', Compile_Cache::forget_all()));
 
     }
 
