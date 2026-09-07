@@ -38,11 +38,13 @@ add_filter('sassy-style-queues', function ($queues) {
 Queues are read in order and a later one wins on a duplicate handle, which is the behaviour the
 old hard-coded `array_merge` had.
 
-**On the reference install this was already dead.** The only producer was Lattice's
-`Theme::enqueue_style_last()`, which had no callers anywhere under `wp-content/` — an Oxygen-era
-workaround that outlived its reason. It has been deleted from Lattice rather than carried
-forward. If your site calls `enqueue_style_last()`, use `wp_enqueue_style()` and the filter
-above.
+**If your site uses Lattice's `Theme::enqueue_style_last()`, this is you.** That method populates
+`$digitalis_styles`, so any style registered through it stops being discovered by Sassy 3.0
+unless the queue is added back through the filter above. The method itself is unchanged and still
+enqueues your styles — WordPress still prints them; it is Sassy that no longer looks in there.
+
+The intended fix is for Lattice to register the filter once on behalf of every site that calls
+it, rather than each site adding the snippet. Until it does, the snippet is the workaround.
 
 ### `Sassy::get_scss_styles()` is removed
 

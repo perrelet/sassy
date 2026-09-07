@@ -566,9 +566,13 @@ the queues as they stand.
 
 Queues come from the **`sassy-style-queues`** filter, defaulting to `[wp_styles()]`; later
 queues win on a duplicate handle. This replaces the `$digitalis_styles` global, which
-`get_scss_styles()` used to merge by hand — it is dead code in Lattice
-(`Theme::enqueue_style_last`, zero callers) and is no longer special-cased. Anything still
-needing a second registry adds it through the filter.
+`get_scss_styles()` used to merge by hand and which is no longer special-cased. Anything needing
+a second registry adds it through the filter.
+
+Lattice's `Theme::enqueue_style_last()` still populates that global. It has no callers on *this*
+install, but Lattice is a shared submodule and other sites call it, so styles registered that way
+need the filter or they stop being discovered — see
+[docs/upgrading-to-3.0.md](docs/upgrading-to-3.0.md).
 
 ---
 

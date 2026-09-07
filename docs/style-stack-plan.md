@@ -207,9 +207,13 @@ what lets the surfaces render the failure without owning the policy. The method 
 and one name for two things is what the naming table exists to prevent.
 
 Queues come from a `sassy-style-queues` filter defaulting to `[wp_styles()]`. The
-`$digitalis_styles` global is **not** special-cased — it is dead code in Lattice
-(`Theme::enqueue_style_last`, an Oxygen-era workaround). Anything still needing a second queue
-adds it through the filter.
+`$digitalis_styles` global is **not** special-cased: a hard-coded second registry is exactly the
+thing a filter should express.
+
+`Theme::enqueue_style_last()` in Lattice still populates that global and **is live API on other
+sites** — it has no callers on this install, which is a fact about this install and not about the
+framework. Lattice is a shared submodule; its consumers are not enumerable from here. So the
+method stays, and anything registering into a second queue adds it through the filter.
 
 **Breaks:** `Sassy::get_scss_styles()` removed.
 
@@ -744,7 +748,7 @@ is what breaks on this machine; that document is what breaks on someone else's.
 | Phase | Change | Action |
 |---|---|---|
 | 1 ✅ | `Sassy::get_scss_styles()` removed | Verified: no usage in d-pace *or* lattice. Nothing to do |
-| 1 ✅ | `$digitalis_styles` no longer read | Dead code **deleted** from Lattice: `Theme::enqueue_style_last` and its `WP_Styles` construction, 25 lines, zero callers anywhere under `wp-content/`. Uncommitted in the `digitalis-framework` submodule pending its own review |
+| **1, open** | `$digitalis_styles` no longer read | `Theme::enqueue_style_last()` **stays** — it is live Lattice API on other sites. Earlier revisions of this table called it dead code on the strength of zero callers under this `wp-content/`, which measures one consumer of a shared submodule and proves nothing about the rest. The fix belongs in Lattice, not per-site: register `sassy-style-queues` there so every site calling `enqueue_style_last()` keeps working under 3.0. **Decision pending** |
 | 2 | Fourth filter argument becomes `Asset` | All four d-pace callbacks ignore it — `engine($engine, $compiler)` declares it unused, the rest do not declare it. **No change needed**; verified, not assumed |
 | 3 | `sassy-src-map-options` removed | No d-pace or lattice binding. Nothing to do |
 | 4 | `Digitalis` integration removed | Confirmed unused (measured: 0 live occurrences — the only hits are two commented-out `@import`s in `scss-template/front.scss`). Note `lattice/load.php` injects the *same two variables* through `sassy-variables`, so removal changes nothing at runtime. That duplicate is dead too, but it is outside this table: **punch-list, not an edit** |
