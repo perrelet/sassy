@@ -5,19 +5,13 @@ namespace Sassy;
 use ScssPhp\ScssPhp\OutputStyle;
 
 /**
- * Orchestrates SCSS compilation for a single source: resolves paths, manages cache,
- * delegates to a Compiler_Engine, and writes CSS (and optional source map).
- *
- * Engine is selected via the sassy-engine filter (default: Scssphp_Engine).
+ * Produces one asset's output: consults Compile_Cache, drives a Compiler_Engine, writes the CSS
+ * and its source map.
  */
-class SCSS_Compiler {
-
-    /** @var int Instance counter for admin/UI. */
-    static $count = 0;
+class Printer {
 
     protected $engine;
 
-    protected $index     = null;
     protected $src       = null;
     protected $handle    = null;
     protected $style     = OutputStyle::EXPANDED;
@@ -34,12 +28,6 @@ class SCSS_Compiler {
     protected $src_map;
     protected $warnings = [];
     protected $compile_time = null;
-
-    public function __construct () {
-
-        $this->index = ++static::$count;
-
-    }
 
     /**
      * Reset build state and cache for a new compile run.
@@ -282,12 +270,6 @@ class SCSS_Compiler {
         // On cache hits src_map is never set; check whether the map file exists.
         $options = $this->get_src_map_options();
         return isset($options['sourceMapWriteTo']) && file_exists($options['sourceMapWriteTo']);
-
-    }
-
-    public function get_index () {
-
-        return $this->index;
 
     }
 

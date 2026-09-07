@@ -7,8 +7,7 @@
 > the present, this file wins — so **each phase updates this file as part of landing**, or the
 > sentence you are reading becomes a trap.
 >
-> **Phase 1 has landed** (`Asset`, `Style_Stack`). Phases 2–9 are still as the plan describes
-> them; the 2.1 architecture below is accurate everywhere else.
+> **Phases 1 and 2 have landed**: `Asset`, `Style_Stack`, `Printer`, `Build_Target`, `Compile_Cache`, `Variable_Resolver`. Phases 3 to 9 are still as the plan describes them.
 
 ## Overview
 
@@ -31,7 +30,10 @@ sassy/
 ├── include/
 │   ├── sassy.class.php                # Main plugin class (Sassy\Sassy)
 │   ├── model/
-│   │   ├── scss-compiler.class.php    # Per-file compilation orchestrator
+│   │   ├── printer.class.php          # Produces one asset's output (was SCSS_Compiler)
+│   │   ├── build-target.class.php     # Where output goes: path, URL, filename, source map
+│   │   ├── compile-cache.class.php    # Is it current? Sole owner of the cache transients
+│   │   ├── variable-resolver.class.php # What values an asset compiles with
 │   │   ├── compile-result.class.php   # DTO returned by compiler engines
 │   │   ├── scss-map.class.php         # PHP array → SCSS map syntax converter
 │   │   ├── asset.class.php            # One enqueued thing; owns URL → filesystem resolution
@@ -70,7 +72,7 @@ sassy/
 1. **`sassy.php`** — Defines constants, creates `new Sassy\Sassy()` stored in `$Sassy` global, registers `SASSY()` helper. Registers WP-CLI command if `WP_CLI` is defined.
 2. **`plugins_loaded`** → `Sassy::boot()`:
    - Loads vendors (Composer autoload)
-   - Loads model classes (require_once in order: `Compile_Result`, `Lightning_CSS_Postprocessor`, `Scss_Map`, `Asset`, `Style_Stack`, `Import_Graph`, `Import_Resolver`, `Import_Scanner`, `Compiler_Engine` interface, engine implementations, `SCSS_Compiler`)
+   - Loads model classes (require_once in order: `Compile_Result`, `Lightning_CSS_Postprocessor`, `Scss_Map`, `Asset`, `Style_Stack`, `Build_Target`, `Variable_Resolver`, `Compile_Cache`, `Import_Graph`, `Import_Resolver`, `Import_Scanner`, `Compiler_Engine` interface, engine implementations, `Printer`)
    - Loads view (`UI` class, instantiated immediately)
    - Registers `Lightning_CSS_Postprocessor::filter` on `sassy-css` at priority 20
    - If `is_admin()`: loads and boots `Admin` → `Updater`
@@ -83,12 +85,12 @@ sassy/
 
 ### Trigger
 
-`style_loader_src` filter intercepts any enqueued style whose URL ends in `.scss`. A fresh `SCSS_Compiler` is created per file and tracked in `Sassy::$compilers`.
+`style_loader_src` filter intercepts any enqueued style whose URL ends in `.scss`. A fresh `Printer` is created per file and tracked in `Sassy::$printers`, keyed by a 1-based index the admin bar and its JS use for DOM ids.
 
-### `SCSS_Compiler::compile($src, $handle)`
+### `Printer::compile($src, $handle)`
 
 1. **Resolve source path** — delegates to `Asset`, which is the only implementation of URL → filesystem resolution. Handles multisite by normalizing the blog path. Filterable via `sassy-src-path`. See [The style stack](#the-style-stack) for what `null` means, and what it does not.
-2. **Cache check** (`should_compile`) — skips actual compilation if:
+2. **Cache check** (`Compile_Cache::needs_compile()`) — skips actual compilation if:
    - `sassy-force-compile` filter returns false, AND
    - No file in the recorded import graph has changed (see [Dependency tracking](#dependency-tracking)), AND
    - `sassy-vars-sig-{handle}` transient matches sha1 of current serialized variables, AND
@@ -103,13 +105,13 @@ sassy/
 
 ### Engine Selection
 
-The engine is resolved lazily in `SCSS_Compiler::get_engine()`:
+The engine is resolved lazily in `Printer::get_engine()`:
 - Applies `sassy-engine` filter — return a `Compiler_Engine` instance to override.
 - Default: `Scssphp_Engine` (no external binaries required).
 
 ### Variables
 
-`SCSS_Compiler::get_variables()` seeds three defaults, then applies `sassy-variables` filter:
+`Variable_Resolver::get_variables()` seeds three defaults, then applies the `sassy-variables` filter:
 
 ```php
 [
@@ -139,6 +141,8 @@ cannot help values other plugins baked into constants at load time, which is why
 normalization runs over the final variable set.
 
 ### Caching Transients
+
+Owned entirely by `Compile_Cache`. Nothing else reads or writes these keys.
 
 | Transient key | Content | Invalidated when |
 |---|---|---|
@@ -232,7 +236,7 @@ Binary resolution order:
 2. `sassy-dart-sass-binary` filter (with `SASSY_DART_SASS_BIN` constant as its default value)
 3. If nothing is configured, `get_sass_bin()` returns `null` and compilation fails with an error message.
 
-Variables are injected by **prepending** `$var: value;` declarations to the SCSS source (via `SCSS_Compiler::prepend_variables()`), not via the library API. The prelude is emitted as a *single line joined to the source's first line* — the CLI has no equivalent of scssphp's `addVariables()`, and any taller prelude shifts every source map line number by the number of variables injected.
+Variables are injected by **prepending** `$var: value;` declarations to the SCSS source (via `Variable_Resolver::prepend()`), not via the library API. The prelude is emitted as a *single line joined to the source's first line* — the CLI has no equivalent of scssphp's `addVariables()`, and any taller prelude shifts every source map line number by the number of variables injected.
 
 #### Source maps
 
@@ -244,7 +248,7 @@ The CLI can only compile a file, so variable injection means compiling a temp co
 
 Because the temp input is not co-located with the real source, explicitly relative imports (`@use "./x"`, `@use "../x"`) resolve against `.sassy-tmp/`. Bare and subdirectory forms are unaffected — `dirname($src_path)` is always a load path.
 
-> Post-compile CSS mutation invalidates the map: both the `url()` rewriting in `SCSS_Compiler::compile()` and any `sassy-css` filter (Lightning CSS included) run *after* the engine has produced it.
+> Post-compile CSS mutation invalidates the map: both the `url()` rewriting in `Printer::compile()` and any `sassy-css` filter (Lightning CSS included) run *after* the engine has produced it.
 >
 > With Lightning CSS enabled the map is not merely stale, it is **unreachable** — Lightning
 > strips the `sourceMappingURL` comment from the CSS it emits, so nothing links to the `.map`
@@ -423,7 +427,8 @@ binary is absent.
 | `test-multiple-handles.php` | Handles sharing a source directory do not invalidate each other |
 | `test-source-maps.php` | Every map source resolves from where the map is served, and line numbers are unshifted |
 | `test-output-style.php` | `sassy-style` accepts the enum and the string, on both engines |
-| `test-style-stack.php` | `Asset` field resolution (local, root-relative, remote, `src === false`), `sassy-src-path` over an unresolvable URL, discovery per context, a context that raises, the multi-queue filter, and `SCSS_Compiler` delegating rather than duplicating |
+| `test-printer.php` | `Build_Target` path math and its filters; `Variable_Resolver` defaults, Sass maps, scheme normalization and signatures; `Compile_Cache` currency across a partial edit, a variable change, a missing build file and both cache filters; `Printer` agreeing with all three |
+| `test-style-stack.php` | `Asset` field resolution (local, root-relative, remote, `src === false`), `sassy-src-path` over an unresolvable URL, discovery per context, a context that raises, the multi-queue filter, and `Printer` delegating rather than duplicating |
 
 The second argument is what makes these worth having: point the runner at a checkout from before
 a fix and the relevant tests should fail. A test that passes against both is not testing the fix.
@@ -458,7 +463,7 @@ a fix and the relevant tests should fail. A test that passes against both is not
 | `sassy-lightning-css-options` | `['minify'=>true, 'bundle'=>false, ...]` | Lightning CSS CLI flags |
 | `sassy-print-errors` | `true` | Whether to render compile errors to the page footer |
 
-All per-compile filters receive `($value, $src, $handle, $compiler)` as arguments (where applicable).
+All per-compile filters receive `($value, $src, $handle, $asset)`. The fourth argument was the `SCSS_Compiler` before 3.0; it is now the `Asset`, which is available before a compile starts and carries no build state.
 
 ### Actions consumed by Sassy
 
@@ -529,10 +534,10 @@ A value object over a `_WP_Dependency`. On the reference install 337 of these ex
 **`null` means the URL maps nowhere** — a remote host, a hostless src that is not root-relative,
 or `src === false`. It does **not** mean the file is missing: a local URL resolves whether or not
 anything is there, so callers can name the path they looked at. That is why
-`SCSS_Compiler::compile()` can still report `Source file not found: /var/www/…/style.scss`
+`Printer::compile()` can still report `Source file not found: /var/www/…/style.scss`
 rather than echoing the URL back.
 
-Two things it does that `SCSS_Compiler::get_src_path()` did not:
+Two things it does that 2.x's `get_src_path()` did not:
 
 - **Root-relative sources resolve.** 65 of this install's handles register as
   `/wp-admin/css/common.min.css` — every wp-admin stylesheet. Treating a missing host as remote
@@ -544,7 +549,7 @@ Two things it does that `SCSS_Compiler::get_src_path()` did not:
 `sassy-src-path` applies **unconditionally, including over a `null`** — it is the only way to
 place an asset Sassy cannot resolve itself. It receives `($path, $src, $handle, $asset)`.
 
-`SCSS_Compiler::get_src_path()` delegates here and keeps returning the URL when resolution comes
+`Printer::get_src_path()` delegates here and keeps returning the URL when resolution comes
 back `null`, because its callers `file_exists()` that value and print it. Phase 2 turns both
 outcomes into `Diagnostic`s.
 
@@ -579,9 +584,10 @@ need the filter or they stop being discovered — see
 ## Key Architectural Decisions
 
 - **`Style_Stack` owns discovery** — nothing else reads `wp_styles()->registered`, and nothing else resolves a URL to a path. Both were duplicated before phase 1, which is how the scheme bugs and the divergent staleness rules happened.
-- **One `SCSS_Compiler` per file** — stateful, tracks compile result, errors, warnings, and metadata for that file.
+- **One `Printer` per file**: stateful, tracks compile result, errors, warnings and metadata for that file. It orchestrates; it does not own paths, currency or values.
+- **`Compile_Cache` is the sole owner of "is it stale"**, including both transient keys. The CLI and admin bar used to read and delete them directly, which is how `wp sassy list` grew a staleness rule that disagreed with the one the compiler acted on.
 - **Transient-based caching** — avoids recompilation on every page load; invalidated by file changes or variable changes.
-- **Engine abstraction** — `Compiler_Engine` interface allows swapping scssphp for Dart Sass (or a custom engine) without changing the orchestration layer.
+- **Engine abstraction** — `Compiler_Engine` interface allows swapping scssphp for Dart Sass (or a custom engine) without changing the orchestration layer. Engines never call back into the domain: `Variable_Resolver::prepend()` is theirs to call, and each backend owns its own temp files.
 - **Filter-driven extensibility** — nearly every step is filterable; integrations work entirely through `sassy-variables`.
 - **Graceful degradation** — Lightning CSS and Dart Sass both fail silently (returning unprocessed CSS), so the site never breaks due to missing binaries.
 - **All three integrations are instantiated by Sassy** — Bricks, Oxygen, and Digitalis are all booted in `load_integrations()`; each self-disables via `condition()` if its builder/framework is absent.
@@ -593,5 +599,5 @@ need the filter or they stop being discovered — see
 - The plugin's own admin CSS is `assets/css/sassy.css`, edited directly — the SCSS source was dropped in `398e1c6`, so the VS Code Sass task in `.vscode/tasks.json` no longer has an input.
 - The `Scssphp_Engine` is the only engine that needs no external binaries — safe default for all environments.
 - When adding a new integration: extend `Integration`, implement `condition()` and `get_variables()`, then add `new YourIntegration()` in `Sassy::load_integrations()`.
-- When adding a new filter to `SCSS_Compiler`, keep the signature consistent: `($value, $src, $handle, $compiler)`.
+- When adding a new per-compile filter, keep the signature consistent: `($value, $src, $handle, $asset)`.
 - The `Compile_Result::info` field carries warnings (array of strings) from the engine. `Dart_Sass_Engine` populates it from stderr output; `Scssphp_Engine` currently returns `null` (reserved for future use).

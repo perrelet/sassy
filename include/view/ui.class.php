@@ -30,7 +30,7 @@ class UI {
 	public function admin_bar_menu ($admin_bar) {
 		
 		if (!current_user_can('edit_theme_options')) return;
-		if (!SASSY()->get_compilers()) return;
+		if (!SASSY()->get_printers()) return;
 		
 		$compiler_menus = [
 			'get_src' => 'Source SCSS',
@@ -84,9 +84,7 @@ class UI {
 			'href'		=> false,
 		]);
 
-		foreach (SASSY()->get_compilers() as $i => $compiler) {
-
-			$index = $compiler->get_index();
+		foreach (SASSY()->get_printers() as $index => $compiler) {
 
 			//$icon = $compiler->has_error() ? '❌' : ($compiler->has_compiled() ? '✔️' : '💾');
 			$has_warnings = !empty($compiler->get_warnings());

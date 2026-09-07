@@ -93,10 +93,14 @@ foreach ([
     'include/engines/scssphp-engine.compiler-engine.php',
     'include/engines/dart-sass-engine.compiler-engine.php',
     'include/model/scss-compiler.class.php',
+    'include/model/printer.class.php',
 ] as $file) {
     // Files absent from an older checkout are skipped so the suite still reports on it.
     if (file_exists($SASSY_PLUGIN . $file)) require $SASSY_PLUGIN . $file;
 }
+
+// Printer was SCSS_Compiler before 3.0. Aliased so the suite still runs against older checkouts.
+if (!class_exists('Sassy\\Printer') && class_exists('Sassy\\SCSS_Compiler')) class_alias('Sassy\\SCSS_Compiler', 'Sassy\\Printer');
 
 // --- Harness -----------------------------------------------------------------
 
@@ -151,7 +155,7 @@ function use_dart_engine () {
 
 /** A fresh compiler each time, as a new request would build. */
 function compile ($src_url, $handle) {
-    $compiler = new Sassy\SCSS_Compiler();
+    $compiler = new Sassy\Printer();
     $compiler->compile($src_url, $handle);
     return $compiler;
 }

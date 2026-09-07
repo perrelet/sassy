@@ -115,7 +115,7 @@ fixture("$SCSS/entry.scss", "@use 'mix';\n.a { padding: mix.\$pad; }\n", 250);
 fixture("$SCSS/_mix.scss", "\$pad: 4px;\n", 260);
 compile($URL, 'current');
 
-$state = fn() => (new Sassy\SCSS_Compiler())->prepare($URL, 'current')->is_current();
+$state = fn() => (new Sassy\Printer())->prepare($URL, 'current')->is_current();
 
 check('current right after compiling', $state());
 

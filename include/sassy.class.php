@@ -7,8 +7,9 @@ class Sassy {
 	protected $build_dir;
 	protected $build_url;
 	protected $ui;
-	protected $compilers = [];
+	protected $printers = [];
 	protected $errors;
+	protected $index = 0;
 	
 	public function __construct() {
 		
@@ -62,7 +63,7 @@ class Sassy {
 		require_once(SASSY_PATH . 'include/engines/compiler-engine.interface.php');
 		require_once(SASSY_PATH . 'include/engines/scssphp-engine.compiler-engine.php');
 		require_once(SASSY_PATH . 'include/engines/dart-sass-engine.compiler-engine.php');
-		require_once(SASSY_PATH . 'include/model/scss-compiler.class.php');
+		require_once(SASSY_PATH . 'include/model/printer.class.php');
 
 	}
 	
@@ -128,9 +129,7 @@ class Sassy {
 
 		if (!apply_filters('sassy-compile', true, $src, $handle)) return $src;
 
-		$compiler = new SCSS_Compiler();
-		$this->compilers[] = $compiler;
-		return $compiler->compile($src, $handle);
+		return $this->add_printer(new Printer())->compile($src, $handle);
 		
 	}
 
@@ -145,8 +144,7 @@ class Sassy {
 
 		foreach (Style_Stack::discover(['frontend'])->compilable() as $asset) {
 
-            $compiler = new SCSS_Compiler();
-            $this->compilers[] = $compiler;
+            $compiler = $this->add_printer(new Printer());
 
             $href     = $compiler->compile($asset->src, $asset->handle);
             $warnings = $compiler->get_warnings();
@@ -159,7 +157,7 @@ class Sassy {
                 'src_path'       => $compiler->get_src_path(),
                 'src_url'        => $compiler->get_src_url(),
                 'handle'         => $compiler->get_handle(),
-                'index'          => $compiler->get_index(),
+                'index'          => $this->index_of($compiler),
                 'style'          => $compiler->get_style(),
                 'variables'      => $compiler->get_variables(),
                 'has_source_map' => $compiler->has_src_map(),
@@ -217,15 +215,13 @@ class Sassy {
 
 			$this->errors = [];
 
-			if ($this->compilers) foreach ($this->compilers as $compiler) {
+			foreach ($this->printers as $index => $printer) {
 
-				if ($compiler->has_error()) {
-				
-					$basename = basename(explode('?', $compiler->get_src())[0]);
-					$this->errors[$compiler->get_index()] = "SASSY -> {$basename} -> " . $compiler->get_error();
+				if (!$printer->has_error()) continue;
 
-				}
-	
+				$basename = basename(explode('?', $printer->get_src())[0]);
+				$this->errors[$index] = "SASSY -> {$basename} -> " . $printer->get_error();
+
 			}
 
 		}
@@ -240,19 +236,31 @@ class Sassy {
 
 	}
 	
-	public function get_compilers () {
+	public function get_printers () {
 
-		return $this->compilers;
+		return $this->printers;
+
+	}
+
+	protected function add_printer (Printer $printer) {
+
+		$this->printers[++$this->index] = $printer;
+
+		return $printer;
+
+	}
+
+	protected function index_of (Printer $printer) {
+
+		return array_search($printer, $this->printers, true);
 
 	}
 
 	public function get_all_variables () {
 
-		if (!$this->get_compilers()) return [];
-
 		$variables = [];
 
-		foreach ($this->get_compilers() as $compiler) {
+		foreach ($this->get_printers() as $compiler) {
 
 			$variables = array_merge($variables, $compiler->get_variables());
 

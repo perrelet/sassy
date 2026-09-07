@@ -65,7 +65,7 @@ class Sassy_CLI_Command extends WP_CLI_Command {
 
         foreach ($styles as $style) {
 
-            $compiler = new SCSS_Compiler();
+            $compiler = new Printer();
             $href     = $compiler->compile($style->src, $style->handle);
 
             if ($compiler->has_error()) {
@@ -175,7 +175,7 @@ class Sassy_CLI_Command extends WP_CLI_Command {
      */
     protected function watch_once ($style) {
 
-        $compiler = new SCSS_Compiler();
+        $compiler = new Printer();
         $compiler->compile($style->src, $style->handle);
 
         $stamp = wp_date('H:i:s');
@@ -261,7 +261,7 @@ class Sassy_CLI_Command extends WP_CLI_Command {
 
             if ($asset->is_compilable()) {
 
-                $compiler = (new SCSS_Compiler())->prepare($asset->src, $asset->handle);
+                $compiler = (new Printer())->prepare($asset->src, $asset->handle);
                 $graph    = Compile_Cache::get_graph($asset->handle);
                 $built    = $compiler->get_build_file();
 
@@ -316,7 +316,7 @@ class Sassy_CLI_Command extends WP_CLI_Command {
      */
     public function vars ($args, $assoc_args) {
 
-        $compiler = new SCSS_Compiler();
+        $compiler = new Printer();
 
         if ($args) {
             $style = $this->find_style($assoc_args, $args[0]);
@@ -452,7 +452,7 @@ class Sassy_CLI_Command extends WP_CLI_Command {
      */
     public function status ($args, $assoc_args) {
 
-        $compiler = new SCSS_Compiler();
+        $compiler = new Printer();
         $items    = [];
 
         $row = function ($key, $value) use (&$items) {

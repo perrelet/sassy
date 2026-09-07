@@ -149,15 +149,15 @@ check('later queues win',          $merged->handle('theme')->src === $BASE . 'ov
 
 unset($GLOBALS['filter_overrides']['sassy-style-queues']);
 
-section('SCSS_Compiler delegates rather than duplicating');
+section('Printer delegates rather than duplicating');
 
 $SCSS = WP_CONTENT_DIR . '/themes/t/scss';
 @mkdir($SCSS, 0777, true);
 fixture("$SCSS/entry.scss", ".a { color: red; }\n");
 
-$compiler = (new Sassy\SCSS_Compiler())->prepare($BASE . 'entry.scss', 'entry');
+$compiler = (new Sassy\Printer())->prepare($BASE . 'entry.scss', 'entry');
 
-check('the compiler and the Asset agree',
+check('the printer and the Asset agree',
     $compiler->get_src_path() === (new Asset('entry', $BASE . 'entry.scss'))->get_source_path(),
     $compiler->get_src_path());
 
@@ -165,10 +165,10 @@ check('and it is the real file', file_exists($compiler->get_src_path()));
 
 // The one place the two deliberately differ: callers file_exists() this value and print it.
 $unmappable = 'https://cdn.example.com/x.scss';
-$remote_compiler = (new Sassy\SCSS_Compiler())->prepare($unmappable, 'cdn');
+$remote_compiler = (new Sassy\Printer())->prepare($unmappable, 'cdn');
 
 check('an unmappable URL is null on the Asset',   (new Asset('cdn', $unmappable))->get_source_path() === null);
-check('and comes back as the URL on the compiler', $remote_compiler->get_src_path() === $unmappable);
+check('and comes back as the URL on the printer', $remote_compiler->get_src_path() === $unmappable);
 
 section('sassy-src-path reaches both call sites');
 
@@ -176,8 +176,8 @@ $GLOBALS['filter_overrides']['sassy-src-path'] = function ($path, $src) use ($SC
     return "$SCSS/entry.scss";
 };
 
-check('the compiler honours it',
-    (new Sassy\SCSS_Compiler())->prepare($unmappable, 'cdn')->get_src_path() === "$SCSS/entry.scss");
+check('the printer honours it',
+    (new Sassy\Printer())->prepare($unmappable, 'cdn')->get_src_path() === "$SCSS/entry.scss");
 
 check('the Asset honours it',
     (new Asset('cdn', $unmappable))->get_source_path() === "$SCSS/entry.scss");
