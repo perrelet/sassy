@@ -109,6 +109,14 @@ divergent error handling, `wp sassy list` inventing its own staleness rule, `com
 building metadata `watch` re-derived — was a surface that grew policy because there was nothing
 to delegate to.
 
+**A vocabulary is policy.** Moving the staleness rule into `Compile_Cache` in phase 2 left three
+surfaces still naming its answers for themselves: the admin bar says `error` / `warning` /
+`compiled` / `cache`, `wp sassy list` says `no source` / `not built` / `current` / `stale`, and
+`wp sassy deps` says `MISSING` / `current` / `changed`, where `current` means something different
+from the one in `list`. One owner for the rule and four for the words is the same defect wearing
+a smaller hat. `Diagnostic` gets this right and is the model: one schema, four renderings, one
+formatter. Phase 6 does the same for state.
+
 ### Naming
 
 | Name | Is | Notes |
@@ -427,7 +435,7 @@ token only in the frame, and synthesizing a richer one-liner would mean guessing
 over-inclusion rule says to carry intact. Verified against sass 1.92.0 — the example is a real
 trace, not a sketch.
 
-**Breaks:** `sassy-src-map-options` removed; `Compile_Result::info` replaced by `Diagnostic[]`, so `get_warnings()` returns objects rather than strings; `Compiler_Engine::compile()` takes a `Compile_Request`; `Printer::get_error()` returns a `Diagnostic`. `Asset::COMPILABLE` gains `sass`.
+**Breaks:** `sassy-src-map-options` removed; `Compile_Result::info` replaced by `Diagnostic[]`, so `get_warnings()` returns objects rather than strings; `Compiler_Engine::compile()` takes a `Compile_Request`; `Printer::get_error()` returns a `Diagnostic`, which fatals the two callers that interpolate it today (`Sassy::get_errors()` and the CLI's `compile`), so both move to the formatter. `Asset::COMPILABLE` gains `sass`.
 
 **Acceptance:**
 - `wp sassy status` reports the active engine's capabilities.
@@ -540,6 +548,22 @@ logged in, and 2.x's nopriv-plus-nonce-only model is not something 3.0 inherits.
 write endpoint additionally checks `sassy-write-source`. A nonce is a CSRF token, not an
 authorization model; nothing in Sassy treats it as one.
 
+#### State
+
+Two questions, two owners, one vocabulary each. Every surface renders these and none of them
+derives its own.
+
+- **Asset state**, from `Compile_Cache`: `no source` (the source is absent or maps nowhere),
+  `not built`, `stale`, `current`. Plus `error` and `warning`, which come from the last compile's
+  `Diagnostic[]` rather than the cache, and outrank the rest when present: an erroring handle is
+  not interesting as "stale".
+- **File state**, from `Import_Graph`, for one dependency inside a graph: `missing`, `changed`,
+  `current`. This is a different question from asset state and keeps its own words; `wp sassy
+  deps` is the surface that asks it.
+
+The admin bar's root glyph collapses asset state to a traffic light (`error` / `warning` /
+otherwise ok). That is a rendering of the vocabulary, not a fifth vocabulary.
+
 #### JS event contract
 
 Replaces the Oxygen/Angular reach-in (`parent.angular`, the last Oxygen artifact). The capability
@@ -577,8 +601,8 @@ v3 gets her admin page. A **dashboard, not a settings form** — config remains 
 
 - **Status** — engine + capabilities, binaries + versions, build dir + writability, constants,
   resolved policy (who currently sees the dev surface).
-- **Stack** — every handle (329 here), filterable: sassy-managed / compilable / third-party;
-  WP deps; state via `Compile_Cache`.
+- **Stack** — every handle (337 here under all hook sets), filterable: sassy-managed /
+  compilable / third-party; WP deps; asset state.
 - **Per-handle** — import graph (deps + watched dirs), build target, last diagnostics,
   source / css / map links (relocated from the bar).
 - **Actions** — Compile all, Clear cache.
@@ -614,13 +638,18 @@ release; the paintbrush spike page is kept as a fixture. **Phase 6 creates that 
 not inherit one — covering every browser behaviour this phase ships. Untested surface is named, never
 implied covered — the `watch` precedent.
 
-**Breaks:** the `wp_ajax_nopriv_sassy_compile` registration is dropped; `?sassy-vars=1`, `Sassy::get_all_variables()` and `meta.variables` are gone; Force Recompile and Clear Cache leave the admin bar, as do the per-file submenus; errors and DOM nodes are keyed by handle, so `meta.index` goes with the JS rewrite.
+**Breaks:** `wp sassy list`'s `state` column takes the canonical asset-state vocabulary, changing
+`no source`/`not built`/`current`/`stale` into that set plus `error` and `warning`; the
+`wp_ajax_nopriv_sassy_compile` registration is dropped; `?sassy-vars=1`, `Sassy::get_all_variables()` and `meta.variables` are gone; Force Recompile and Clear Cache leave the admin bar, as do the per-file submenus; errors and DOM nodes are keyed by handle, so `meta.index` goes with the JS rewrite.
 
 **Acceptance:**
 - With `sassy-dev` returning false, no dev-surface assets reach the page: no JS, no panel
   markup, no localized params, no admin bar node. (The compiled CSS itself always ships — that
   is the product, not the dev surface.)
 - A compile error renders identically (same text) in CLI, console and panel; copy reproduces it.
+- One vocabulary for asset state and one for file state, owned by `Compile_Cache` and
+  `Import_Graph`. No surface computes a state label: `grep -rn "'stale'\|'not built'" include/`
+  returns hits in one file each.
 - With the reference binding in place (`sassy-dev` → `current_user_can('dev')`), a user holding
   the d-pace `dev` capability sees the UI on production and an administrator without it does not.
   Stated against the binding, not the default: the default policy *is* `edit_theme_options`, which
