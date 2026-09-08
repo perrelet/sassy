@@ -338,12 +338,21 @@ class Sassy_CLI_Command extends WP_CLI_Command {
     }
 
     /**
-     * Show the recorded import graph for a handle.
+     * Show the recorded import graph for a handle, or which handles import a file.
      *
      * ## OPTIONS
      *
-     * <handle>
-     * : The style handle.
+     * [<handle>]
+     * : The style handle. Omit when using --file.
+     *
+     * [--file=<path>]
+     * : Report every handle whose import graph contains this file, the reverse direction.
+     *
+     * [--hooks=<hooks>]
+     * : Which enqueue hooks to fire when discovering handles. Only used with --file.
+     * ---
+     * default: all
+     * ---
      *
      * [--format=<format>]
      * : Render output in a particular format.
@@ -360,6 +369,13 @@ class Sassy_CLI_Command extends WP_CLI_Command {
      * @when after_wp_load
      */
     public function deps ($args, $assoc_args) {
+
+        if (!empty($assoc_args['file'])) {
+            $this->dependents($assoc_args);
+            return;
+        }
+
+        if (!$args) WP_CLI::error('Pass a handle, or --file=<path> for the reverse direction.');
 
         $graph = Compile_Cache::get_graph($args[0]);
 
@@ -505,6 +521,35 @@ class Sassy_CLI_Command extends WP_CLI_Command {
     /**
      * Every discovered style, with any context that raised already reported.
      */
+    /**
+     * The reverse direction: which handles recompile when this file changes.
+     */
+    protected function dependents ($assoc_args) {
+
+        $file = $assoc_args['file'];
+
+        if (!file_exists($file)) WP_CLI::warning(sprintf('%s does not exist; reporting what the recorded graphs still reference.', $file));
+
+        $stack = $this->stack($assoc_args + ['hooks' => 'all']);
+        $items = [];
+
+        foreach ($stack->dependents_of($file) as $handle => $asset) {
+            $items[] = [
+                'handle' => $handle,
+                'source' => $asset->get_source_path(),
+                'built'  => (new Build_Target($asset))->get_file(),
+            ];
+        }
+
+        if (!$items) {
+            WP_CLI::warning(sprintf('No compiled handle imports %s. It may be unused, or nothing has compiled since it was added.', $file));
+            return;
+        }
+
+        Utils\format_items($assoc_args['format'] ?? 'table', $items, ['handle', 'source', 'built']);
+
+    }
+
     protected function stack ($assoc_args) {
 
         $hooks    = $assoc_args['hooks'] ?? 'frontend';

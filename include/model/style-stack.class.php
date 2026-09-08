@@ -61,12 +61,40 @@ class Style_Stack {
     }
 
     /**
-     * Handles whose import graph contains the given file. Phase 5 inverts the graph; until
-     * then this is honestly empty rather than approximately right.
+     * Assets whose recorded import graph contains the given file.
+     *
+     * There is no reverse index: this reads each compilable handle's graph. A second copy of the
+     * same edges would need its own invalidation, which is the bug class phase 2 removed.
+     *
+     * @return Asset[] Keyed by handle.
      */
     public function dependents_of ($file) {
 
-        return [];
+        $canonical = realpath($file) ?: $file;
+        $found     = [];
+
+        foreach ($this->compilable() as $handle => $asset) {
+
+            $graph = Compile_Cache::get_graph($handle);
+            if (!$graph) continue;
+
+            if (isset($graph->deps[$file]) || isset($graph->deps[$canonical])) {
+                $found[$handle] = $asset;
+                continue;
+            }
+
+            // Only when the cheap comparison misses: recorded paths are usually canonical
+            // already, and this is 124 stats per handle on the reference install.
+            foreach (array_keys($graph->deps) as $path) {
+                if ((realpath($path) ?: $path) === $canonical) {
+                    $found[$handle] = $asset;
+                    break;
+                }
+            }
+
+        }
+
+        return $found;
 
     }
 
