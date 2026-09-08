@@ -93,7 +93,7 @@ class Sassy {
 
 		if (!current_user_can('edit_theme_options')) return;
 
-		wp_enqueue_style('sassy', SASSY_URI . 'assets/css/sassy.css', [], SASSY_VERSION);
+		wp_enqueue_style('sassy', SASSY_URI . 'assets/css/sassy.css', [], static::asset_version('assets/css/sassy.css'));
 
 		$builder = false;
 		if (defined('CT_VERSION')) $builder = 'oxygen';
@@ -103,7 +103,7 @@ class Sassy {
 
 		if (!$backend || ($backend && defined("OXYGEN_IFRAME"))) {
 
-			wp_enqueue_script('sassy', SASSY_URI . 'assets/js/sassy.js', [], SASSY_VERSION, true);
+			wp_enqueue_script('sassy', SASSY_URI . 'assets/js/sassy.js', [], static::asset_version('assets/js/sassy.js'), true);
 			wp_localize_script('sassy', 'sass_params', [
 				'ajax_url'				=> admin_url('admin-ajax.php'),
 				'sassy_compile_nonce'	=> wp_create_nonce('sassy_compile'),
@@ -115,6 +115,20 @@ class Sassy {
 
 	}
 	
+	/**
+	 * Sassy's own assets version by mtime, not SASSY_VERSION.
+	 *
+	 * The constant changes once a release; these files change while you are working on them, and
+	 * a browser that has cached one will not fetch it again until the URL does.
+	 */
+	protected static function asset_version ($relative) {
+
+		$mtime = @filemtime(SASSY_PATH . $relative);
+
+		return $mtime ? (string) $mtime : SASSY_VERSION;
+
+	}
+
 	public function style_loader_src ($src, $handle) {
 
 		$asset = new Asset($handle, $src);
