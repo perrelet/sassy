@@ -23,7 +23,7 @@ It also settles four debts earlier phases deliberately deferred here. Read those
 | `meta.index` | `Printer` carries no counter; `Sassy` assigns one so the JS keeps working. `Sassy::$printers`, `add_printer()` and `index_of()` exist *only* for this | Rekey errors and admin-bar nodes by **handle**. The JS queries `#wp-admin-bar-sassy-${meta.index}` in three places, so both sides move together or neither does |
 | State vocabulary | Three exist: `UI` says error/warning/compiled/cache, `wp sassy list` says no source/not built/current/stale, `wp sassy deps` says MISSING/current/changed | Two owners, per plan §3 phase 6: **asset state** on `Compile_Cache`, **file state** on `Import_Graph`. This is the first change to `wp sassy list`'s `state` column: phase 1 changed `deps`'s meaning and added `type` and `imports` but left `state` alone |
 | Diagnostic persistence | Phase 5 stores a severity **tally** under `__diagnostics__` in the filemtimes record | The per-handle panel needs the text. That needs **its own transient key**: the filemtimes record is read on every request and one compile's frames run to 5.5 KB. `Compile_Cache` owns it, like every other key |
-| Version bump | `SASSY_VERSION` and the plugin header are still `2.1.0`, pinned here by plan §1 | Move both to `3.0.0` together, **last**. The updater compares the constant |
+| Version bump | `SASSY_VERSION` and the plugin header are still `2.1.0`, pinned here by plan §1 | Move both to `3.0.0` together, **last**. The updater compares the constant. Two strings in `sassy.php` (lines 7 and 18) plus the prose in `AGENTS.md:14`; leave `2.1.0` alone everywhere it means scssphp's version rather than Sassy's |
 
 ## Judgement calls, pre-made
 
@@ -65,10 +65,10 @@ Server first, browser last, because the server half is the half you can test:
 
 Every acceptance item in plan §3 phase 6, plus:
 
-- `tests/test-policy.php`: `Policy::active()` defaulting to `edit_theme_options`, the `sassy-dev` filter overriding it both ways, and the endpoint refusing when it returns false even with a valid nonce.
+- `tests/test-policy.php`: `Policy::active()` defaulting to `edit_theme_options` and the `sassy-dev` filter overriding it both ways. **The endpoint half needs harness work first**: `wp_send_json_error`, `wp_send_json_success`, `wp_verify_nonce` and `wp_die` are not stubbed in `tests/bootstrap.php`, so `compile_all()` cannot be called from a test today. Stub them, or say in the handoff that the endpoint is covered only by the manual checklist.
 - State vocabulary tested where it is owned, and `grep -rn "'stale'\|'not built'" include/` returning hits in one file each, which is the plan's own acceptance.
 - `grep -rn 'current_user_can' include/` returns only `Policy`.
-- `grep -rn 'angular\|sassy-vars\|sassy-recompile\|get_all_variables' include/ assets/` returns nothing.
+- `grep -rnE "angular|sassy-recompile|get_all_variables|_GET\['sassy-vars'\]" include/ assets/` returns nothing. Note the precision: a bare `sassy-vars` also matches `Compile_Cache::VARS_KEY`, which is `sassy-vars-sig-` and stays, so the loose version of this grep can never pass and would look like unfinished work forever.
 - `tests/manual.md` exists, covers every browser behaviour this phase ships, and **has been walked once before you hand off**. Say in the handoff that you walked it and what you saw.
 - Live, in an actual browser, logged in: hard reload, confirm no console errors, trigger Live Compile, confirm the panel and console render diagnostics through the canonical formatter, confirm the admin bar node ids the JS queries still resolve, and confirm CTRL+SPACE works and does nothing inside a text field.
 - With `sassy-dev` returning false: no JS, no panel markup, no localized params, no admin bar node, and the compiled CSS still served.
