@@ -107,6 +107,8 @@ wp sassy compile my-theme        # just one handle
 wp sassy vars                    # resolved SCSS variables
 wp sassy vars --format=scss      # ...as $name: value; declarations
 wp sassy deps my-theme           # the recorded import graph
+wp sassy deps --file=_mixins.scss # which handles import this file
+wp sassy check                   # is everything current? one exit code
 wp sassy clear                   # drop compile caches
 wp sassy watch                   # recompile as you edit, until Ctrl-C
 ```
@@ -205,6 +207,22 @@ add_filter('sassy-lightning-css-options', function ($options, $src, $handle, $co
 ## Source Maps
 
 Source maps can be selectively generated via the `sassy-src-map` filter. Where the map is written follows the build target, so `sassy-build-path` and `sassy-build-directory` relocate it.
+
+## Checking
+
+`wp sassy check` answers one question about the whole install and exits accordingly: is every style current, unbroken and accounted for?
+
+```bash
+wp sassy check              # fails on a missing source, an unbuilt or stale handle, a truncated graph
+wp sassy check --strict     # ...and on warnings, which includes orphaned build files
+wp sassy check --strict=all # ...and on deprecations from the last compile
+```
+
+It never compiles anything. A handle that fails to compile is never recorded as current, so it turns up as stale and the remedy is always `wp sassy compile`.
+
+Two deliberate asymmetries. A **truncated import graph** is reported as a warning but fails anyway, because it makes the answer unknowable rather than untidy. An **orphaned output**, a built file no registered handle claims, is a warning that fails only under `--strict`, because a style enqueued on one template is indistinguishable from one that was deleted.
+
+`wp sassy deps --file=<path>` answers the reverse of `deps <handle>`: given a partial, which handles recompile when it changes. Useful before editing something shared, and the reason the import graph is recorded at all.
 
 ## Extending Sassy
 

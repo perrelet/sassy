@@ -38,6 +38,9 @@ class Diagnostic {
     /** @var string 'engine' or 'sassy'. */
     public $source;
 
+    /** @var bool Fails a check regardless of severity. Set by Style_Stack::audit(). */
+    public $fatal = false;
+
     public function __construct ($severity, $message, array $fields = []) {
 
         $this->severity = $severity;

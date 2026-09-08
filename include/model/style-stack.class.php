@@ -99,6 +99,109 @@ class Style_Stack {
     }
 
     /**
+     * Everything wrong with the stack, as diagnostics. The caller decides which severities are
+     * failures; this decides what is true.
+     *
+     * A handle that fails to compile is never recorded as current, so erroring handles surface
+     * here as stale without anything needing to compile them.
+     *
+     * @return Diagnostic[]
+     */
+    public function audit () {
+
+        $found = [];
+
+        foreach ($this->compilable() as $handle => $asset) {
+
+            $target = new Build_Target($asset);
+            $cache  = new Compile_Cache($asset, $target, new Variable_Resolver($asset));
+            $source = $asset->get_source_path();
+
+            if (!file_exists($source)) {
+                $found[] = static::finding(Diagnostic::ERROR, $handle, 'Source file not found.', $source);
+                continue;
+            }
+
+            if (!file_exists($target->get_file())) {
+                $found[] = static::finding(Diagnostic::ERROR, $handle, 'Never built. Run wp sassy compile.', $target->get_file());
+            } else if (!$cache->is_current()) {
+                $found[] = static::finding(Diagnostic::ERROR, $handle, 'Stale. Run wp sassy compile.', $target->get_file());
+            }
+
+            $graph = Compile_Cache::get_graph($handle);
+
+            if ($graph && $graph->truncated) {
+                $found[] = static::finding(Diagnostic::WARNING, $handle, sprintf('Import graph truncated at %d files, so staleness cannot be trusted.', Import_Scanner::MAX_FILES), $source, true);
+            }
+
+            foreach (Compile_Cache::get_tally($handle) as $severity => $count) {
+                if (in_array($severity, [Diagnostic::WARNING, Diagnostic::DEPRECATION], true)) {
+                    $found[] = static::finding($severity, $handle, sprintf('%d %s%s at last compile.', $count, $severity, $count === 1 ? '' : 's'), $source);
+                }
+            }
+
+        }
+
+        foreach ($this->orphaned_outputs() as $path) {
+            $found[] = static::finding(Diagnostic::WARNING, basename($path), 'Orphaned output: no registered handle builds this.', $path);
+        }
+
+        return $found;
+
+    }
+
+    /**
+     * Build-directory files no discovered asset claims.
+     *
+     * Dotfiles and directories are skipped: the Dart engine's own .sassy-tmp lives here, and a
+     * check that reports Sassy's own working directory on its first run teaches people to
+     * ignore it. An orphan stays a warning however well this is scoped, because a handle
+     * enqueued only on some template is discovered by no hook set at all.
+     *
+     * @return string[]
+     */
+    public function orphaned_outputs () {
+
+        $claimed = [];
+        $roots   = [];
+
+        foreach ($this->compilable() as $asset) {
+
+            $target = new Build_Target($asset);
+
+            $claimed[$target->get_file()]     = true;
+            $claimed[$target->get_map_path()] = true;
+            $roots[$target->get_path()]       = true;
+
+        }
+
+        $found = [];
+
+        foreach (array_keys($roots) as $root) {
+            foreach ((glob(rtrim($root, '/') . '/*.css') ?: []) as $path) {
+                if (!isset($claimed[$path]) && is_file($path))                  $found[] = $path;
+                if (!isset($claimed[$path . '.map']) && is_file($path . '.map')) $found[] = $path . '.map';
+            }
+        }
+
+        return $found;
+
+    }
+
+    /**
+     * $fatal marks a diagnostic that fails regardless of severity: truncation is a warning, but
+     * it makes "everything is current" unknowable rather than merely untidy.
+     */
+    protected static function finding ($severity, $subject, $message, $file = null, $fatal = false) {
+
+        $diagnostic = new Diagnostic($severity, $message, ['code' => $subject, 'file' => $file, 'source' => 'sassy']);
+        $diagnostic->fatal = $fatal || ($severity === Diagnostic::ERROR);
+
+        return $diagnostic;
+
+    }
+
+    /**
      * @return array<string, string> context => message, for contexts that raised.
      */
     public function context_errors () {

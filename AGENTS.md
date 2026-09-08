@@ -7,7 +7,7 @@
 > the present, this file wins — so **each phase updates this file as part of landing**, or the
 > sentence you are reading becomes a trap.
 >
-> **Phases 1 to 4 have landed**: `Asset`, `Style_Stack`, `Printer`, `Build_Target`, `Compile_Cache`, `Variable_Resolver`, `Diagnostic`, `Compile_Request`, `Extensions`. Phases 5 to 9 are still as the plan describes them.
+> **Phases 1 to 5 have landed**: `Asset`, `Style_Stack`, `Printer`, `Build_Target`, `Compile_Cache`, `Variable_Resolver`, `Diagnostic`, `Compile_Request`, `Extensions`, plus `wp sassy check`. Phases 6 to 9 are still as the plan describes them.
 
 ## Overview
 
@@ -274,6 +274,33 @@ Default CLI options: `--minify`. Customizable via `sassy-lightning-css-options` 
 
 ---
 
+## `wp sassy check`
+
+One call, one exit code, over every discovered style. It is the phase 5 deliverable and the thing the model was built to answer.
+
+`Style_Stack::audit()` decides what is true and returns `Diagnostic[]`; the command decides which severities are failures and renders them. That split is deliberate: what counts as broken is domain, what a flag promotes is surface.
+
+| Condition | Severity | Fails |
+|---|---|---|
+| Source file missing | `error` | always |
+| Never built | `error` | always |
+| Stale | `error` | always |
+| Import graph truncated | `warning` | **always**, via the diagnostic's `fatal` flag |
+| Warnings or deprecations at last compile | as recorded | `--strict` / `--strict=all` |
+| Orphaned output | `warning` | `--strict` |
+
+**`check` never compiles.** It does not need to: a failed compile is never recorded as current (phase 2's rule), so an erroring handle arrives as stale. The remedy printed is always `wp sassy compile`.
+
+**Truncation is a warning that fails anyway**, which is what `Diagnostic::$fatal` exists for. A truncated graph makes "everything is current" *unknowable*, so it cannot be demoted to a stylistic preference. An orphan only makes the answer *noisy*.
+
+**Orphan detection is scoped.** Dotfiles and directories are skipped, because the Dart engine's own `.sassy-tmp` lives in the build directory and reporting Sassy's own working directory on a first run is how a tool teaches people to ignore it. It stays a warning however well it is scoped: a handle enqueued only on some template is discovered by no hook set at all, and its output is indistinguishable from an abandoned one.
+
+**`check` defaults to `--hooks=all`**, alone among the commands, for the same reason.
+
+Severity counts from each compile are stored in the existing `sassy-filemtimes-{handle}` record as `__diagnostics__`, so `--strict` has something to gate on without compiling. Counts, not the diagnostics themselves: that record is read on every request and one compile's frames run to kilobytes.
+
+---
+
 ## Extension API
 
 Four things are extensible: **load paths**, **variables**, **post-processors** and **engines**. Each keeps its filter, and each gains a registration that carries a name.
@@ -331,6 +358,8 @@ Registered only when `WP_CLI` is defined. Command group: `sassy`.
 | `wp sassy compile [<handle>...]` | Compile; `--force` ignores the cache |
 | `wp sassy vars [<handle>]` | Resolved SCSS variables, after integrations and filters |
 | `wp sassy deps <handle>` | The recorded import graph, with each file's state |
+| `wp sassy deps --file=<path>` | The reverse: every handle that imports this file |
+| `wp sassy check` | Is everything current, unbroken and accounted for? One exit code |
 | `wp sassy clear [<handle>...]` | Drop compile caches |
 | `wp sassy watch [<handle>...]` | Recompile on change until interrupted; `--interval` sets the poll |
 
@@ -410,6 +439,7 @@ binary is absent.
 | `test-source-maps.php` | Every map source resolves from where the map is served, and line numbers are unshifted |
 | `test-output-style.php` | `sassy-style` accepts the enum and the string, on both engines |
 | `test-printer.php` | `Build_Target` path math and its filters; `Variable_Resolver` defaults, Sass maps, scheme normalization and signatures; `Compile_Cache` currency across a partial edit, a variable change, a missing build file and both cache filters; `Printer` agreeing with all three |
+| `test-check.php` | `dependents_of()` including non-canonical paths; the audit's three hard failures; orphan scoping against a dotfile, a directory and a real orphan; truncation as a fatal warning; the severity tally |
 | `test-extensions.php` | The registry: four kinds, named providers, re-registration replacing by slug, per-asset timing, and a post-processor's report reaching the `Printer` |
 | `test-fixtures.php` | The retired Bricks, Oxygen and Digitalis integrations rebuilt on the extension API, against stubbed builder APIs |
 | `test-diagnostics.php` | The `Diagnostic` schema and its rendering; Dart stderr parsing for all three shapes plus unrecognised output; the scssphp logger and its structured exceptions; engine capabilities |

@@ -449,6 +449,85 @@ class Sassy_CLI_Command extends WP_CLI_Command {
     }
 
     /**
+     * One call, one exit code: is every style current, unbroken and accounted for?
+     *
+     * ## OPTIONS
+     *
+     * [--strict]
+     * : Fail on warnings too, which includes orphaned outputs. Pass --strict=all to fail on
+     * deprecations as well.
+     *
+     * [--hooks=<hooks>]
+     * : Which enqueue hooks to fire. Defaults to all, alone among the commands: under a narrower
+     * set every admin and editor output looks orphaned.
+     * ---
+     * default: all
+     * ---
+     *
+     * [--format=<format>]
+     * : Render output in a particular format.
+     * ---
+     * default: table
+     * options:
+     *   - table
+     *   - csv
+     *   - json
+     *   - yaml
+     * ---
+     *
+     * ## EXAMPLES
+     *
+     *     wp sassy check
+     *     wp sassy check --strict
+     *
+     * @when after_wp_load
+     */
+    public function check ($args, $assoc_args) {
+
+        $strict      = $assoc_args['strict'] ?? false;
+        $stack       = $this->stack($assoc_args + ['hooks' => 'all']);
+        $diagnostics = $stack->audit();
+
+        if (!$diagnostics) {
+            WP_CLI::success(sprintf('%d handle(s) current, nothing erroring, no orphans.', count($stack->compilable())));
+            return;
+        }
+
+        Utils\format_items($assoc_args['format'] ?? 'table', array_map(function ($diagnostic) {
+            return [
+                'severity' => $diagnostic->severity,
+                'subject'  => $diagnostic->code,
+                'message'  => $diagnostic->message,
+                'file'     => $diagnostic->file,
+            ];
+        }, $diagnostics), ['severity', 'subject', 'message', 'file']);
+
+        if (static::fails($diagnostics, $strict)) WP_CLI::halt(1);
+
+        WP_CLI::success('No failures. Pass --strict to fail on the warnings above.');
+
+    }
+
+    /**
+     * Which severities count as failure is the flag's business; what is true is the stack's.
+     */
+    protected static function fails (array $diagnostics, $strict) {
+
+        foreach ($diagnostics as $diagnostic) {
+
+            if ($diagnostic->fatal) return true;
+            if (!$strict) continue;
+
+            if ($diagnostic->severity === Diagnostic::WARNING) return true;
+            if (($strict === 'all') && ($diagnostic->severity === Diagnostic::DEPRECATION)) return true;
+
+        }
+
+        return false;
+
+    }
+
+    /**
      * Report how Sassy is configured and what it can reach.
      *
      * ## OPTIONS

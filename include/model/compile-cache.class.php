@@ -54,13 +54,16 @@ class Compile_Cache {
      * Written on success only: recording up front remembered a failed compile as current, so the
      * error vanished on the next request.
      */
-    public function record (Import_Graph $graph, $compile_time) {
+    public function record (Import_Graph $graph, $compile_time, array $diagnostics = []) {
 
         $build_file = $this->target->get_file();
 
+        // Counts, not the diagnostics themselves: this record is read on every request, and one
+        // compile's frames and traces run to kilobytes. Enough for `check --strict` to gate on.
         set_transient(static::GRAPH_KEY . $this->asset->handle, array_merge([
             $build_file        => filemtime($build_file),
             '__compile_time__' => $compile_time,
+            '__diagnostics__'  => static::tally($diagnostics),
         ], $graph->to_array()));
 
         set_transient(static::VARS_KEY . $this->asset->handle, $this->resolver->get_signature());
@@ -76,6 +79,31 @@ class Compile_Cache {
     public static function get_graph ($handle) {
 
         return Import_Graph::from_array(get_transient(static::GRAPH_KEY . $handle));
+
+    }
+
+    /**
+     * How many diagnostics of each severity the last successful compile produced.
+     *
+     * @return array<string, int>
+     */
+    public static function get_tally ($handle) {
+
+        $recorded = get_transient(static::GRAPH_KEY . $handle);
+
+        return is_array($recorded) ? ($recorded['__diagnostics__'] ?? []) : [];
+
+    }
+
+    protected static function tally (array $diagnostics) {
+
+        $counts = [];
+
+        foreach ($diagnostics as $diagnostic) {
+            $counts[$diagnostic->severity] = ($counts[$diagnostic->severity] ?? 0) + 1;
+        }
+
+        return $counts;
 
     }
 

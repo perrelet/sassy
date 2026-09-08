@@ -165,7 +165,7 @@ class Printer {
                 ), ['file' => $src_path, 'source' => 'sassy']);
             }
 
-            $this->get_cache()->record($graph, $this->compile_time);
+            $this->get_cache()->record($graph, $this->compile_time, $this->diagnostics);
 
             $this->compiled = true;
         } else {

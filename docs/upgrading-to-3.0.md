@@ -2,7 +2,7 @@
 
 What changes for a site running Sassy, and what to do about it.
 
-**In progress.** 3.0 ships phases 1-6 of [style-stack-plan.md](style-stack-plan.md), and each phase adds its breaks here as it lands. Anything not listed below has not changed yet. Landed so far: **phases 1 to 4**.
+**In progress.** 3.0 ships phases 1-6 of [style-stack-plan.md](style-stack-plan.md), and each phase adds its breaks here as it lands. Anything not listed below has not changed yet. Landed so far: **phases 1 to 5**.
 
 Nothing on 1.x is auto-updated to 3.0. The digitalis.ca update JSON is version-fenced before 3.0 publishes, so a wild 1.x install is never offered a breaking upgrade.
 
@@ -218,3 +218,27 @@ Sassy\Extensions::register_post_processor('my-minifier', function ($css, $contex
 ### A new notice when the source map link disappears
 
 If source maps are on and a map is written but the CSS coming out of post-processing has no `sourceMappingURL`, Sassy reports a notice naming the map. Any post-processor can cause this; Lightning CSS is the common one.
+
+---
+
+## Phase 5: reverse dependencies and `check`
+
+Almost entirely additive. Two new commands, `wp sassy check` and `wp sassy deps --file=<path>`, and one changed signature.
+
+### `Compile_Cache::record()` takes a third argument
+
+**Who this affects:** anything calling it directly, which is `Printer` and nothing else in the plugin.
+
+```php
+record(Import_Graph $graph, $compile_time, array $diagnostics = [])
+```
+
+The diagnostics are stored as a severity tally under `__diagnostics__` in the existing `sassy-filemtimes-{handle}` record, so `check --strict` can gate on them without compiling. Counts only: that record is read on every request and a compile's frames run to kilobytes. `Compile_Cache::get_tally($handle)` reads them back. Existing records without the key simply report nothing until the next compile.
+
+### `wp sassy deps` no longer requires a handle
+
+`deps <handle>` is unchanged. `deps --file=<path>` reports the reverse direction, and the handle argument is now optional so one or the other can be given.
+
+### `Diagnostic` gains a `fatal` flag
+
+Set by `Style_Stack::audit()` for findings that fail a check regardless of severity, which today means a truncated import graph. Defaults to false, so nothing that constructs a `Diagnostic` needs changing.
