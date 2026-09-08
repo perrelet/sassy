@@ -146,14 +146,20 @@ class Printer {
             $this->diagnostics = array_merge($this->diagnostics, $context->get_diagnostics());
 
             // Any post-processor can drop the link; the map is then written and unreachable.
-            if ($request->wants_map() && !str_contains($css, 'sourceMappingURL')) {
+            if ($result->map !== null && $request->map_path && !str_contains($css, 'sourceMappingURL')) {
                 $this->diagnostics[] = new Diagnostic(Diagnostic::NOTICE, 'Source map written but nothing links to it: a post-processor removed the sourceMappingURL comment.', [
                     'file'   => $request->map_path,
                     'source' => 'sassy',
                 ]);
             }
 
-            file_put_contents($build_file, $css);
+            if (file_put_contents($build_file, $css) === false) {
+                // Recording here would remember a build that was never written: filemtime()
+                // reports the old file's stamp, so the cache would call stale CSS current.
+                $this->fail(new Diagnostic(Diagnostic::ERROR, 'Could not write the compiled CSS.', ['file' => $build_file, 'source' => 'sassy']));
+                return $this->get_build_url();
+            }
+
             if ($result->map !== null && $request->map_path) file_put_contents($request->map_path, $result->map);
 
             $graph = Import_Scanner::scan($src_path, $this->get_import_paths($src_path));

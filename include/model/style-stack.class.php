@@ -212,17 +212,19 @@ class Style_Stack {
 
     protected function fire ($context) {
 
+        // Unwind to the level we started at, not one buffer: a callback that throws while
+        // holding its own buffer would otherwise leave ours open and swallow later output.
+        $level = ob_get_level();
+
         ob_start();
 
         try {
             $this->fire_context($context);
         } catch (\Throwable $e) {
-            ob_end_clean();
             $this->context_errors[$context] = $e->getMessage();
-            return;
         }
 
-        ob_end_clean();
+        while (ob_get_level() > $level) ob_end_clean();
 
     }
 

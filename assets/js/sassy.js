@@ -1,3 +1,23 @@
+/**
+ * Mirrors Sassy\Diagnostic::render(): the header is ours, everything below it is the engine's
+ * own drawing and is reproduced verbatim.
+ */
+function renderDiagnostic (d) {
+
+    if (typeof d === 'string') return d;
+
+    const where = d.file ? d.file + (d.line ? ':' + d.line + (d.column ? ':' + d.column : '') : '') + '  ' : '';
+    const lines = String(d.message || '').split(/\r?\n/);
+    const parts = [d.severity.toUpperCase() + '  ' + where + lines[0]];
+
+    if (lines.length > 1 && lines.slice(1).join('\n').trim()) parts.push(lines.slice(1).join('\n'));
+    if (d.frame) parts.push(d.frame);
+    if (d.trace) parts.push(d.trace);
+
+    return parts.join('\n');
+
+}
+
 (() => {
 
     'use strict';
@@ -192,7 +212,7 @@
 
                         if (warnings.length) {
                             hadWarnings = true;
-                            const block = warnings.map(w => String(w)).join('\n');
+                            const block = warnings.map(renderDiagnostic).join('\n\n');
                             console.log(`Successfully Recompiled: ${href}`);
                             console.warn(`Sassy warnings for ${property}:\n${block}`);
                             const menuItem = document.querySelector(`#wp-admin-bar-sassy-${meta && meta.index ? meta.index : ''} [data-state]`);

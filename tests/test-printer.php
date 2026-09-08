@@ -156,4 +156,52 @@ check('map url agrees with the target',      $printer->get_map_url() === $target
 check('variables agree with the resolver',   $printer->get_variables() === (new Variable_Resolver($asset))->get_variables());
 check('currency agrees with the cache',      $printer->is_current() === (new Compile_Cache($asset, $target, new Variable_Resolver($asset)))->is_current());
 
+section('A build that cannot be written is not recorded as current');
+
+// A distinct source, because the build name comes from the filename rather than the handle.
+fixture("$SCSS/blocked.scss", ".a { color: red; }\n");
+
+$blocked = new Asset('blocked', $BASE . 'blocked.scss');
+$target2 = new Build_Target($blocked);
+
+@mkdir($target2->get_path(), 0777, true);
+
+// file_put_contents fails on a path that is a directory, which is the portable way to force
+// the write failure a full disk or a permissions change would cause.
+@mkdir($target2->get_file(), 0777, true);
+
+$printer2 = new Sassy\Printer();
+$printer2->compile($BASE . 'blocked.scss', 'blocked');
+
+check('the failure is reported',        $printer2->has_error());
+check('naming the build file',          str_contains((string) $printer2->get_error()->file, 'blocked.css'));
+check('and nothing is recorded',        Compile_Cache::get_graph('blocked') === null, 'a recorded graph would make the missing build read as current');
+
+$cache2 = new Compile_Cache($blocked, $target2, new Variable_Resolver($blocked));
+check('so it still needs compiling',    $cache2->needs_compile());
+
+@rmdir($target2->get_file());
+
+section('No map, no missing-link notice');
+
+$engine = new class implements Sassy\Compiler_Engine {
+    public function compile (Sassy\Compile_Request $request) : Sassy\Compile_Result {
+        return new Sassy\Compile_Result('.a{color:red}', null, null, []);
+    }
+    public function capabilities () : array { return []; }
+    public function supports (string $capability) : bool { return false; }
+};
+
+$GLOBALS['filter_overrides']['sassy-engine'] = $engine;
+$GLOBALS['filter_overrides']['sassy-force-compile'] = true;
+
+$mapless = new Sassy\Printer();
+$mapless->compile($BASE . 'entry.scss', 'mapless');
+
+unset($GLOBALS['filter_overrides']['sassy-engine'], $GLOBALS['filter_overrides']['sassy-force-compile']);
+
+$linknotice = array_filter($mapless->get_warnings(), function ($d) { return str_contains($d->message, 'nothing links to it'); });
+
+check('an engine that wrote no map is not accused of losing one', $linknotice === [], (string) count($linknotice));
+
 finish();

@@ -101,7 +101,7 @@ check('compilable narrows',      array_keys($stack->compilable()) === ['theme'])
 check('handle() finds one',      $stack->handle('base') instanceof Asset);
 check('handle() misses cleanly', $stack->handle('nope') === null);
 check('WP deps survive discovery', $stack->handle('theme')->deps === ['base']);
-check('dependents_of is empty until phase 5', $stack->dependents_of('/any.scss') === []);
+check('dependents_of names nobody for an unknown file', $stack->dependents_of('/any.scss') === []);
 
 section('Discovery fires the contexts it is asked for');
 
@@ -203,5 +203,22 @@ $r = $remote->get_error();
 check('one that maps nowhere is an error', $r && $r->severity === 'error');
 check('has no file to name',               $r && $r->file === null);
 check('so it names the URL',               $r && str_contains($r->message, 'cdn.example.com'));
+
+section('A throwing callback cannot leak an output buffer');
+
+// Not the editor hook: an earlier section already throws on it, which would short-circuit this
+// callback and let the test pass without exercising anything.
+on_action('admin_enqueue_scripts', function () {
+    ob_start();                       // a callback that buffers and then dies
+    echo 'partial output';
+    throw new \RuntimeException('died mid-buffer');
+});
+
+$before = ob_get_level();
+$leaky  = Style_Stack::discover(['admin']);
+$after  = ob_get_level();
+
+check('the raise is still recorded',   isset($leaky->context_errors()['admin']));
+check('and the buffer level is restored', $after === $before, "before $before, after $after");
 
 finish();

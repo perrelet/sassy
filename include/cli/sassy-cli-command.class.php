@@ -558,8 +558,12 @@ class Sassy_CLI_Command extends WP_CLI_Command {
         $row('engine',      $compiler->get_engine_class());
         $row('capabilities', implode(', ', $compiler->get_engine()->capabilities()));
         $row('output style', $compiler->get_style());
-        $row('source maps', apply_filters('sassy-src-map', true, null, null, $compiler) ? 'on' : 'off');
-        $row('dependency checking', apply_filters('sassy-check-dependencies', true, null, null, $compiler) ? 'on' : 'off (compile explicitly)');
+        // Every per-compile filter takes the Asset as its fourth argument, so status has to hand
+        // one over too: a callback typed against it would fatal here otherwise.
+        $probe = new Asset('sassy-status-probe', false);
+
+        $row('source maps', apply_filters('sassy-src-map', true, false, $probe->handle, $probe) ? 'on' : 'off');
+        $row('dependency checking', apply_filters('sassy-check-dependencies', true, false, $probe->handle, $probe) ? 'on' : 'off (compile explicitly)');
 
         foreach (Extensions::providers() as $kind => $slugs) {
             $row(str_replace('_', ' ', $kind), $slugs ? implode(', ', $slugs) : '(none registered)');
@@ -569,7 +573,7 @@ class Sassy_CLI_Command extends WP_CLI_Command {
         $row('dart sass binary', $sass_bin ?: '(not configured)');
         if ($sass_bin) $row('dart sass version', $this->probe($sass_bin . ' --version'));
 
-        if (!apply_filters('sassy-lightning-css', true, null, null, $compiler)) {
+        if (!apply_filters('sassy-lightning-css', true, false, $probe->handle, $probe)) {
             $row('lightning css', 'disabled by filter');
         } else if ($bin = Lightning_CSS_Postprocessor::resolve_bin()) {
             $row('lightning css', 'enabled');
