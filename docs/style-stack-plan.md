@@ -576,8 +576,10 @@ Pruned to actions. Detail lives on the admin page.
 
 v3 gets her admin page. A **dashboard, not a settings form** — config remains code.
 
-- **Status** — engine + capabilities, binaries + versions, build dir + writability, constants,
-  resolved policy (who currently sees the dev surface).
+- **Status** — engine + capabilities, registered extension providers, binaries + versions, build
+  dir + writability, constants, resolved policy (who currently sees the dev surface). Providers
+  arrived with phase 4 and `wp sassy status` already lists them; two status surfaces that
+  disagree on their first day is not worth the saving.
 - **Stack** — every handle (337 here under all hook sets), filterable: sassy-managed /
   compilable / third-party; WP deps; asset state.
 - **Per-handle** — import graph (deps + watched dirs), build target, last diagnostics,
