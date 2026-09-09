@@ -146,6 +146,8 @@ class Sassy {
 			wp_die(); 
 		}
 
+		if (!empty($_REQUEST['force'])) add_filter('sassy-force-compile', '__return_true', 10, 4);
+
 		$response = [];
 
 		foreach (Style_Stack::discover(['frontend'])->compilable() as $asset) {
@@ -225,7 +227,7 @@ class Sassy {
 
 				if (!$printer->has_error()) continue;
 
-				$this->errors[$handle] = Diagnostic::render_all($printer->get_errors());
+				$this->errors[UI::node_id($handle)] = Diagnostic::render_all($printer->get_errors());
 
 			}
 

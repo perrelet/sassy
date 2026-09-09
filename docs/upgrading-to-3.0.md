@@ -273,10 +273,10 @@ It gates the assets, the admin bar, the error panel and the endpoint together. G
 
 ### Admin bar
 
-- **Force Recompile is gone.** Live Compile already skips the cache.
+- **Force Recompile is renamed Force Compile** and now runs through the endpoint rather than a query string. Live Compile checks the cache rather than skipping it, which is what makes the keypress cheap, so the forced route is a separate control. `window.sassy.compile(true)` does the same thing.
 - **Log Variables and `?sassy-vars=1` are gone**, with `Sassy::get_all_variables()` and `UI::print_variables()`. Use `wp sassy vars` or the new Logging submenu.
-- **`?sassy-recompile=1` is gone**, with the `sassy-force-compile` filter callback behind it. The filter itself is untouched.
-- **Logging is new**: console toggles for diagnostics and compile meta, persisted per-browser in `localStorage`.
+- **`?sassy-recompile=1` is gone**, with the `UI::run_compiler()` callback behind it. The `sassy-force-compile` filter is untouched, and the endpoint applies it when passed `force=1`.
+- **Logging is new**: console toggles for diagnostics and compile meta, persisted per-browser in `localStorage` under `sassy:log:*`. Console output that used to be unconditional is now behind them.
 - Clear Cache and the per-handle entries **stay**. They were slated to move to the admin page, which is now phase 6b, and dropping them before their replacement exists would leave no route to them at all.
 - Node ids are `sassy-<handle>` rather than `sassy-<n>`.
 

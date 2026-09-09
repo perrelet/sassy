@@ -7,11 +7,11 @@ namespace Sassy;
  */
 class Import_Graph {
 
-    /** @var array<string, array{0: int, 1: int}> path => [mtime, size] */
     const MISSING = 'missing';
     const CHANGED = 'changed';
     const CURRENT = 'current';
 
+    /** @var array<string, array{0: int, 1: int}> path => [mtime, size] */
     public $deps;
 
     /** @var array<string, int> dir => mtime (0 when absent) for directories searched during resolution */

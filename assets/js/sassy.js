@@ -53,8 +53,8 @@ function renderDiagnostic (d) {
 
             // The declared surface, replacing the Angular reach-in a builder used to need.
             window.sassy = {
-                compile: () => this.liveCompile(),
-                reload:  () => this.emit('sassy:reload'),
+                compile: (force) => this.liveCompile(force === true),
+                reload:  () => this.reloadSheets(),
                 logging: (key) => this.logging(key),
             };
 
@@ -75,8 +75,10 @@ function renderDiagnostic (d) {
 
             document.querySelectorAll('#wp-admin-bar-sassy-logging .sassy-log-toggle').forEach(item => {
 
-                const key  = item.getAttribute('rel');
                 const link = item.querySelector('a') || item;
+                const key  = link.getAttribute('rel');
+
+                if (!key) return;
 
                 const reflect = () => link.setAttribute('data-on', this.logging(key) ? '1' : '0');
                 reflect();
@@ -88,6 +90,27 @@ function renderDiagnostic (d) {
                 });
 
             });
+
+        },
+
+        /**
+         * Re-request every same-origin stylesheet. What window.sassy.reload() is for: swapping
+         * the CSS without recompiling and without a page load.
+         */
+        reloadSheets () {
+
+            document.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
+
+                let href;
+                try { href = new URL(link.href, location.href); } catch (e) { return; }
+                if (href.origin !== location.origin) return;
+
+                href.searchParams.set('sassy', Date.now().toString());
+                link.href = href.toString();
+
+            });
+
+            this.emit('sassy:reload');
 
         },
 
@@ -104,15 +127,16 @@ function renderDiagnostic (d) {
                 liveCompileButton.addEventListener('click', () => this.liveCompile());
             }
 
-            const keydownCallback = this.debounce(this.onKeyDown.bind(this), 250);
+            const forceButton = document.getElementById('wp-admin-bar-sassy-force-compile');
+            if (forceButton) {
+                forceButton.addEventListener('click', () => this.liveCompile(true));
+            }
 
-            document.addEventListener('keydown', keydownCallback);
+            document.addEventListener('keydown', this.onKeyDown.bind(this));
 
         },
 
         onKeyDown (event) {
-
-            if (event.repeat) return;
 
             // Not while typing. The collision with IME and autocomplete has bitten in practice,
             // which is also why the binding is filterable at all.
@@ -120,10 +144,15 @@ function renderDiagnostic (d) {
 
             if (!this.matchesBinding(event)) return;
 
-            this.liveCompile();
-
+            // Claim the combination before the repeat guard: a held ctrl+shift+k should not open
+            // the browser's console on the second keydown just because we only compile on the
+            // first.
             event.stopImmediatePropagation();
             event.preventDefault();
+
+            if (event.repeat) return;
+
+            this.liveCompile();
 
         },
 
@@ -146,20 +175,23 @@ function renderDiagnostic (d) {
 
                 if (wants !== key) return false;
 
-                return parts.every(modifier => ({
+                const held = {
                     ctrl:  event.ctrlKey,
                     meta:  event.metaKey,
                     alt:   event.altKey,
                     shift: event.shiftKey,
-                }[modifier] === true));
+                };
+
+                // Exact: a modifier the binding did not ask for disqualifies it.
+                return Object.keys(held).every(modifier => held[modifier] === parts.includes(modifier));
 
             });
 
         },
 
-        liveCompile () {
+        liveCompile (force = false) {
 
-            const url = `${this.params.ajax_url}?action=sassy_compile&nonce=${this.params.sassy_compile_nonce}`;
+            const url = `${this.params.ajax_url}?action=sassy_compile&nonce=${this.params.sassy_compile_nonce}${force ? '&force=1' : ''}`;
 
             this.clearErrors();
             this.showNotice('⚡ Compiling\u2026', 'pending');
@@ -280,7 +312,6 @@ function renderDiagnostic (d) {
                             const menuItem = meta && meta.node ? document.querySelector(`#wp-admin-bar-${meta.node} [data-state]`) : null;
                             if (menuItem) menuItem.setAttribute('data-state', 'warning');
                         } else {
-                            console.log(`Successfully Recompiled: ${href}`);
                         }
 
                     }
@@ -319,7 +350,7 @@ function renderDiagnostic (d) {
 
                     this.els.errors.appendChild(errorNode);
 
-                    const menuItem = document.querySelector(`#wp-admin-bar-sassy-${instance} [data-state]`);
+                    const menuItem = document.querySelector(`#wp-admin-bar-${instance} [data-state]`);
                     if (menuItem) menuItem.setAttribute('data-state', 'error');
 
                 }
@@ -348,7 +379,7 @@ function renderDiagnostic (d) {
             const menuItems = document.querySelectorAll('#wpadminbar .sassy-file [data-state]');
 
             menuItems.forEach(menuItem => {
-                menuItem.setAttribute('data-state', 'compiled');
+                menuItem.setAttribute('data-state', 'current');
             });
 
         },

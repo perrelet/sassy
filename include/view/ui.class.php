@@ -35,8 +35,14 @@ class UI {
 			'href'		=> '#',
 		]);
 		
-		// Force Recompile is gone: Live Compile already skips the cache, which makes it a genuine
-		// redundancy rather than something waiting for a replacement.
+		// Live Compile checks the cache rather than skipping it, which is the point of it being a
+		// cheap keypress. So a forced route still has to exist.
+		$admin_bar->add_menu([
+			'id'     => 'sassy-force-compile',
+			'parent' => 'sassy',
+			'title'  => __('🤖 Force Compile', 'sassy'),
+			'href'   => '#',
+		]);
 
 		$admin_bar->add_menu([
 			'id'     => 'sassy-logging',
@@ -52,7 +58,8 @@ class UI {
 				'parent' => 'sassy-logging',
 				'title'  => $label,
 				'href'   => '#',
-				'meta'   => ['class' => 'sassy-log-toggle', 'html' => '', 'rel' => $key],
+				// class lands on the li, rel on the anchor: the JS reads the key off the anchor.
+				'meta'   => ['class' => 'sassy-log-toggle', 'rel' => $key],
 			]);
 
 		}
@@ -189,10 +196,6 @@ class UI {
 	}
 	
 	/**
-	 * Console logging toggles. State lives in the browser, so these are rendered inert and the
-	 * JS reflects and persists them.
-	 */
-	/**
 	 * WordPress handles are slug-like in practice but not guaranteed to be; the JS is handed the
 	 * id the server computed rather than reimplementing this.
 	 */
@@ -202,12 +205,15 @@ class UI {
 
 	}
 
+	/**
+	 * Console logging toggles. State lives in the browser, so these render inert and the JS
+	 * reflects and persists them.
+	 */
 	protected function log_toggles () {
 
 		return [
 			'diagnostics' => __('Diagnostics', 'sassy'),
 			'meta'        => __('Compile meta', 'sassy'),
-			'stack'       => __('Stack summary', 'sassy'),
 		];
 
 	}

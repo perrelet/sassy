@@ -39,6 +39,7 @@ Untested surface is named rather than implied covered. If you add browser behavi
 | Turn **Logging → Diagnostics** off, reload, Live Compile | No warning output in the console |
 | Turn **Logging → Compile meta** on | `console.info` per handle with the compile metadata |
 | Toggle a Logging item, then reload | The tick survives. It is per-browser, in `localStorage`, and never shared |
+| Toggle **Diagnostics** on and **Compile meta** off | They are independent. A bug in phase 6 had all toggles sharing one key, so check both, not one |
 
 ## Keybinding
 
@@ -56,7 +57,8 @@ Untested surface is named rather than implied covered. If you add browser behavi
 | Check | Expected |
 |---|---|
 | Open the **SCSS** menu | Live Compile, Logging, Clear Cache, then one entry per compiled handle |
-| Confirm what is absent | No **Force Recompile** (Live Compile already skips the cache) and no **Log Variables** (`wp sassy vars`, and the Logging menu) |
+| Click **🤖 Force Compile** with nothing changed | Handles recompile anyway. Live Compile in the same state should report cached instead: that difference is the reason both exist |
+| Confirm what is absent | No **Log Variables**: `wp sassy vars` and the Logging menu replace it |
 | Inspect a per-handle node's id | `sassy-<handle>`, e.g. `sassy-d-pace-frontend`. Not a number: a handle keeps its node across requests even when another handle stops compiling |
 | Check the glyph against `wp sassy list` | Same word for the same handle: `current`, `stale`, `warning`, `not built`, `no source` |
 | Click **Clear Cache** | Page reloads, handles recompile, glyphs return to current |
@@ -74,7 +76,8 @@ document.addEventListener('sassy:compiled', e => console.log('→ compiled', e.d
 |---|---|
 | Both fire, in order | `before` then `compiled` |
 | `e.detail.diagnostics` | Keyed by handle, each an array of diagnostic objects |
-| `window.sassy.compile()` in the console | Compiles, exactly as the button does |
+| `window.sassy.compile()` in the console | Compiles, exactly as the button does. `window.sassy.compile(true)` forces |
+| `window.sassy.reload()` in the console | Same-origin stylesheets re-request with a fresh query value, no recompile, no page load |
 
 The iframe bridge a builder integration needs, which replaced the Angular reach-in. Confirm it is genuinely this small:
 

@@ -568,7 +568,7 @@ Pruned to actions. Detail lives on the admin page.
 |---|---|
 | State glyph on root | Keep — error / warning / ok |
 | ⚡ Live Compile | **Keep.** No reload, skips cache, instant, it just works |
-| Force Recompile | **Drop** — Live Compile already skips cache |
+| Force Recompile | **Keep**, renamed 🤖 Force Compile. An earlier draft dropped it as redundant because "Live Compile already skips cache", which contradicts the live-compile section below and is false: `compile_all()` goes through `Compile_Cache::needs_compile()` like everything else. Being a *check* and not a rebuild is the whole reason the keypress is cheap, so a forced route has to exist separately. Caught by code review in phase 6, after the claim had survived six passes |
 | Log Variables | **Replaced by 📜 Logging** — a submenu of console-logging toggles (diagnostics, compile meta, stack summary, capture diffs), persisted client-side, rendered via the canonical formatter |
 | 🖌️ Capture | New, phase 7, present only when enabled |
 | Clear Cache | **Stays for 3.0.0.** It was dropped because the admin page would carry it, and that reason expires while the page waits in 6b. Removed from the bar when its replacement ships |
@@ -903,7 +903,7 @@ change to what hot-wiring feels like, so it is named rather than implied.
 | Admin page look | **WordPress with a side of Sassy spice**: wp-admin furniture carries it, Sassy's character lives in the accents and the diagnostic block |
 | Diagnostic rendering | Header becomes UI, frame and trace stay verbatim monospace. `file:line:col` is **click-to-copy**, not an editor link. Groups **collapse** by `code`. Copy always yields the canonical text, never the DOM |
 | Sassy's own admin CSS | **She compiles it.** Authored to work on scssphp so the team eats the limitation its default engine imposes. Unstyled-on-failure is an acceptable bootstrapping risk |
-| Admin bar | Glyph + Live Compile + Logging (+ Capture); Force Recompile dropped; variables surface removed everywhere (`meta.variables`, `?sassy-vars=1`, `get_all_variables()`) — superseded by `wp sassy vars` and the Logging menu |
+| Admin bar | Glyph + Live Compile + Force Compile + Logging + Clear Cache (+ Capture in 7). The variables surface is removed everywhere (`meta.variables`, `?sassy-vars=1`, `get_all_variables()`), superseded by `wp sassy vars` and the Logging menu. Force Compile and Clear Cache stay: the first was dropped on a false premise, the second because 6b's page was to receive it |
 | Oxygen/builder JS | Angular reach-in deleted; replaced by the `sassy:*` event contract |
 | Paintbrush | In, as phase 7 — tier 0 documented, tier 1 after spike, tier 2 behind `sassy-write-source` |
 | Clear Cache | **Stays in the bar for 3.0.0**, leaving when 6b's page replaces it. Dropping it was justified by the page carrying it, and that justification expires while the page is unbuilt |
