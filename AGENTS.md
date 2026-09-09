@@ -7,13 +7,13 @@
 > the present, this file wins — so **each phase updates this file as part of landing**, or the
 > sentence you are reading becomes a trap.
 >
-> **Phases 1 to 6b have landed**: phases 1 to 6 are 3.0.0 and 6b, the admin page, is 3.1.0. Phases 7, 8 and 9 are still as the plan describes them.
+> **Phases 1 to 6b and phase 7's tier 1 have landed**: phases 1 to 6 are 3.0.0, 6b (the admin page) is 3.1.0 and 7's capture-and-copy is 3.2.0. Phase 7's tier 2, 8 and 9 are still as the plan describes them.
 >
 > **Starting fresh?** Plan §8 opens with what to read and the four commands to run before touching anything. Run them: this file has been wrong about the present three times, and each time the code was right.
 
 ## Overview
 
-**Sassy** is a WordPress plugin (v3.1.0, by Digitalis Web Build Co.) that compiles SCSS files on-demand. The core premise: enqueue `.scss` files exactly as you would `.css` files via `wp_enqueue_style`, and Sassy intercepts the URL, compiles the SCSS to CSS, writes the result to disk, and returns the compiled CSS URL to WordPress instead.
+**Sassy** is a WordPress plugin (v3.2.0, by Digitalis Web Build Co.) that compiles SCSS files on-demand. The core premise: enqueue `.scss` files exactly as you would `.css` files via `wp_enqueue_style`, and Sassy intercepts the URL, compiles the SCSS to CSS, writes the result to disk, and returns the compiled CSS URL to WordPress instead.
 
 ```php
 wp_enqueue_style('my-theme', get_template_directory_uri() . '/style.scss');
@@ -348,11 +348,13 @@ If the extension API ever cannot express one of them, the API is wrong. That is 
 
 **State has one vocabulary per question.** `Compile_Cache::get_state()` answers for an asset: `no source`, `not built`, `stale`, `warning`, `current`. `Import_Graph::state_of()` answers for one file inside a graph: `missing`, `changed`, `current`. `error` belongs to neither, because a failed compile is never recorded; only `Printer::get_state()`, which just ran, can report it. Before this, the admin bar, `wp sassy list` and `wp sassy deps` each named the same answers differently and `current` meant two things.
 
-**The JS surface is declared, not reached into.** `window.sassy.compile()` and `.reload()`, plus `sassy:before-compile`, `sassy:compiled` and `sassy:reload` on `document`. The Oxygen Angular reach-in is gone, and a builder integration is now a listener that forwards the event into an iframe. `assets/js/sassy.js` renders diagnostics through `renderDiagnostic()`, which mirrors `Diagnostic::render()`.
+**The JS surface is declared, not reached into.** `window.sassy.compile()`, `.reload()`, `.poll()` and `.capture()`, plus `sassy:before-compile`, `sassy:compiled`, `sassy:reload` and `sassy:captured` on `document`. The Oxygen Angular reach-in is gone, and a builder integration is now a listener that forwards the event into an iframe. `assets/js/sassy.js` renders diagnostics through `renderDiagnostic()`, which mirrors `Diagnostic::render()`.
 
 **Admin bar node ids come from the server.** `UI::node_id($handle)` produces `sassy-<handle>` and the payload carries it as `meta.node`, so the JS never reconstructs the id and the two cannot drift. Errors and printers are keyed by handle rather than a request counter.
 
-**Cache-busting uses the build's content hash**, `meta.hash`, which is exact where `Math.random()` was merely different and is the primitive an opt-in change poll would compare. **Logging → Auto-reload** polls the compile endpoint every two seconds with the page's context and swaps only the sheets whose hash moved; off by default, per browser, paused while the tab is hidden, and it stops itself when the endpoint stops answering cleanly. The stack summary and capture diff toggles wait for phases 8 and 7.
+**Cache-busting uses the build's content hash**, `meta.hash`, which is exact where `Math.random()` was merely different and is the primitive an opt-in change poll would compare. **Logging → Auto-reload** polls the compile endpoint every two seconds with the page's context and swaps only the sheets whose hash moved; off by default, per browser, paused while the tab is hidden, and it stops itself when the endpoint stops answering cleanly. The stack summary toggle waits for phase 8.
+
+**The paintbrush, tier 1.** Inspector edits mutate the CSSOM; Sassy snapshots its own sheets when they load (and again after every reload, since Live Compile and the poll swap a link's `href`), diffs on 🖌️ Capture, maps each change through the source map and shows the patch in the panel. The JS learns which sheets are Sassy's from `data-sassy-sheets` on the panel element, written by `print_errors()` at `wp_footer` 30, because the printers exist only after the head has printed. Declarations are diffed as the rule serialises them (`style.cssText`), which keeps a shorthand whole; the sheet's text is fetched as bytes so Dart's byte-order mark keeps its column; blocks in the text are aligned to flattened CSSOM rules by order, and when the counts differ lines are withheld for that sheet rather than guessed. A rule created in the inspector and an `element.style` edit are listed copy-only. Copy yields the patch as text, `sassy:captured` carries it, and Logging → Capture diffs logs it. The panel is one `panel(title, blocks, kind)` for errors and captures alike, with `data-kind` for the stylesheet and a Copy beside Dismiss. The spike that gated this is `tests/fixtures/paintbrush-spike.html`. Tier 2, pushing a patch to source behind `sassy-write-source`, is not built.
 
 **The keybinding is filterable.** `sassy-keybinding` defaults to `['ctrl+space', 'meta+space']`; `false` disables it and leaves the button. The handler ignores repeats and bails unless focus is on `body`, which is what stops it fighting IME and autocomplete.
 
@@ -371,7 +373,8 @@ Two surfaces: the admin bar, pruned to actions, and the page under Tools that ca
 - **SCSS** (root) — shows ❌ SCSS on compile errors
   - ⚡ **Live Compile** — the endpoint with the cache check, then an in-place stylesheet reload
   - 🤖 **Force Compile** — the same endpoint with `force=1`, which applies `sassy-force-compile`
-  - 📜 **Logging** — console toggles for Diagnostics and Compile meta, plus Auto-reload, kept per browser in `localStorage`
+  - 🖌️ **Capture** — diff the live CSSOM against the snapshot and show the patch
+  - 📜 **Logging** — console toggles for Diagnostics, Compile meta and Capture diffs, plus Auto-reload, kept per browser in `localStorage`
   - 🧭 **Dashboard** — the page
   - `sassy-admin-bar` action, for third parties adding to the menu
 
@@ -481,13 +484,13 @@ binary is absent.
 |---|---|
 | `test-frontend-safety.php` | Nothing in the compile path calls an admin-only function; Lightning CSS stays off unless configured, and its cli.js route runs through node |
 | `test-clear-cache.php` | `Compile_Cache` indexes the handles it records, and `forget_all()` walks that index under an external object cache; the diagnostics record on both outcomes, and a `Diagnostic` round-tripping through it |
-| `test-error-panel.php` | `Sassy::get_errors()` reports a failure compiled after it was first asked, which is what a footer-enqueued style is |
+| `test-error-panel.php` | `Sassy::get_errors()` reports a failure compiled after it was first asked, which is what a footer-enqueued style is; `print_errors()` lists every printer's sheet on the panel and prints nothing with the gate closed |
 | `test-import-graph.php` | Import parsing and resolution; editing a partial invalidates; shadowing; a failed compile is not remembered as current |
 | `test-multiple-handles.php` | Handles sharing a source directory do not invalidate each other |
 | `test-source-maps.php` | Every map source resolves from where the map is served, line numbers are unshifted, the map moves with `url()` rewriting under compressed output, and `file` names the built sheet |
 | `test-output-style.php` | `sassy-style` accepts the enum and the string, on both engines |
 | `test-printer.php` | `Build_Target` path math and its filters; `Variable_Resolver` defaults, Sass maps, scheme normalization and signatures; `Compile_Cache` currency across a partial edit, a variable change, a missing build file and both cache filters; `Printer` agreeing with all three |
-| `test-js.php` | Boots the shipped `assets/js/sassy.js` under a minimal DOM in node and exercises it through `window.sassy`: the canonical rendering, the log toggles, the keybinding including exact modifier matching, `reload()`, the context and `hooks` on the endpoint URL, the page's copy, filter and Compile all attributes, and the poll across three answers. Skips when node is absent |
+| `test-js.php` | Boots the shipped `assets/js/sassy.js` under a minimal DOM in node and exercises it through `window.sassy`: the canonical rendering, the log toggles, the keybinding including exact modifier matching, `reload()`, the context and `hooks` on the endpoint URL, the page's copy, filter and Compile all attributes, the poll across three answers, errors through the panel with Copy, and the paintbrush against a fake CSSOM and a map encoded in the test. Skips when node is absent |
 | `test-policy.php` | The dev gate: the `edit_theme_options` default, `sassy-dev` overriding both ways, and `sassy-write-source` never implied by it |
 | `test-check.php` | `dependents_of()` including non-canonical paths; the audit's three hard failures; orphan scoping against a dotfile, a directory and a real orphan; truncation as a fatal warning; the severity tally |
 | `test-extensions.php` | The registry: four kinds, named providers, re-registration replacing by slug, per-asset timing, and a post-processor's report reaching the `Printer` |
@@ -531,7 +534,7 @@ there as needing both.
 | `sassy-style-queues` | `[wp_styles()]` | Registries discovery reads. Later queues win on a duplicate handle |
 | `sassy-engine` | `null` (→ Scssphp_Engine) | Return a `Compiler_Engine` instance to override |
 | `sassy-dart-sass-binary` | `SASSY_DART_SASS_BIN`, else `null` | Dart Sass binary. No implicit fallback: unset, the compile fails and the error names the constant and the filter |
-| `sassy-css` | N/A | Post-process compiled CSS string |
+| `sassy-css` | N/A | Post-process compiled CSS string. Runs after the map has been moved for `url()` rewriting, so anything it changes is on its own |
 | `sassy-lightning-css` | `true` | Enable/disable Lightning CSS post-processing |
 | `sassy-lightning-css-binary` | `null` | Lightning CSS binary path |
 | `sassy-lightning-css-options` | `['minify'=>true, 'bundle'=>false, ...]` | Lightning CSS CLI flags |
@@ -557,7 +560,7 @@ Per-compile filters receive `($value, $src, $handle, $asset)`, except `sassy-com
 | `after_setup_theme` | `Extensions::boot()`, which fires `sassy-register` |
 | `wp_ajax_sassy_compile` | `Sassy::compile_all()`. Checks `Policy::active()`, then the nonce; takes `hooks` and `force`. No `nopriv` registration |
 | `wp_enqueue_scripts` / `admin_enqueue_scripts` | `Sassy::enqueue_scripts()`, gated by `Policy::active()` |
-| `wp_footer` / `admin_footer` | `Sassy::print_errors()`, gated by `Policy::active()` and `sassy-print-errors` |
+| `wp_footer` (priority 30) / `admin_footer` | `Sassy::print_errors()`, gated by `Policy::active()` and `sassy-print-errors`; after `print_late_styles()` at 20, and carries `data-sassy-sheets` |
 | `admin_bar_menu` (priority 100) | `UI::admin_bar_menu()` |
 | `admin_menu` | `Admin_Page::register()`, only when `Policy::active()` |
 | `admin_post_sassy_clear` | `Admin_Page::clear()`: the gate, then `check_admin_referer()`, then `Compile_Cache::forget_all()` |
@@ -568,7 +571,7 @@ Per-compile filters receive `($value, $src, $handle, $asset)`, except `sassy-com
 
 | Constant | Set in | Value |
 |---|---|---|
-| `SASSY_VERSION` | `sassy.php` | `'3.1.0'` — kept identical to the plugin header |
+| `SASSY_VERSION` | `sassy.php` | `'3.2.0'` — kept identical to the plugin header |
 | `SASSY_PATH` | `sassy.php` | Absolute path to plugin directory (trailing slash) |
 | `SASSY_URI` | `sassy.php` | URL to plugin directory (trailing slash) |
 | `SASSY_ROOT_FILE` | `sassy.php` | `__FILE__` of sassy.php |

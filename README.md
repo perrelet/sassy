@@ -100,7 +100,7 @@ Who sees the dev surface at all is one filter. It defaults to `edit_theme_option
 add_filter('sassy-dev', fn () => current_user_can('dev'));
 ```
 
-Sassy exposes `window.sassy.compile(force, hooks)`, `window.sassy.reload()` and `window.sassy.poll()`, and fires `sassy:before-compile`, `sassy:compiled` and `sassy:reload` on `document`, so driving it from a builder iframe is a listener rather than a reach-in. Live Compile sends the context it was served in, so on a wp-admin screen it rebuilds the sheet on that screen.
+Sassy exposes `window.sassy.compile(force, hooks)`, `window.sassy.reload()`, `window.sassy.poll()` and `window.sassy.capture()`, and fires `sassy:before-compile`, `sassy:compiled`, `sassy:reload` and `sassy:captured` on `document`, so driving it from a builder iframe is a listener rather than a reach-in. Live Compile sends the context it was served in, so on a wp-admin screen it rebuilds the sheet on that screen.
 
 When live compile runs, Sassy also:
 
@@ -108,6 +108,22 @@ When live compile runs, Sassy also:
 - With **Logging → Compile meta** on, logs each stylesheet's compile metadata to the console (engine, compiled file, source, handle, content hash, source-map status, compile time).
 - With **Logging → Diagnostics** on, logs each stylesheet's warnings and deprecations, rendered exactly as the CLI renders them.
 - With **Logging → Auto-reload** on, polls every two seconds and swaps only the stylesheets whose content changed, so a save in your editor or a `wp sassy watch` compile appears without a keypress. Off by default, per browser, paused while the tab is hidden.
+- With **Logging → Capture diffs** on, a capture's patch also goes to the console.
+
+## Painting in the inspector
+
+Two ways to work from DevTools, both on the dev surface.
+
+**Edit the source in the browser.** The compiled CSS ships a source map that is exact, `url()` rewriting included, so the styles pane links straight into the `.scss` that produced each rule. Add the project folder as a DevTools Workspace and edits saved from the Sources panel land on disk; with `wp sassy watch` running and **Logging → Auto-reload** on, the page repaints without a keypress.
+
+**Paint, then capture.** Edit declarations in the styles pane as usual, then press 🖌️ **Capture** in the admin bar, or call `window.sassy.capture()`. Sassy diffs the page's live CSSOM against the snapshot it took when the sheets loaded, maps each change through the source map, and shows the patch in the panel:
+
+```
+plugins/d-pace/scss/components/_site-header.scss:33  .site-header
+  background: var(--material-bg, var(--surface-dark)) → red
+```
+
+**Copy** yields exactly that text, which is the handoff: paste it to an agent or a colleague with "integrate this properly". A rule created in the inspector and an `element.style` edit have no source location and are listed as copy-only, the first with a suggested file. Where a sheet has no reachable map (Lightning CSS strips the link, for instance) the patch names the sheet instead of a line and says why. Nothing is written anywhere: capture observes. `sassy:captured` fires on `document` with the patch and the structured changes.
 
 ## The dashboard
 

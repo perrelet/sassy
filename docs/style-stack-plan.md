@@ -573,7 +573,7 @@ Pruned to actions. Detail lives on the admin page.
 | ⚡ Live Compile | **Keep.** No reload, skips cache, instant, it just works |
 | Force Recompile | **Keep**, renamed 🤖 Force Compile. An earlier draft dropped it as redundant because "Live Compile already skips cache", which contradicts the live-compile section below and is false: `compile_all()` goes through `Compile_Cache::needs_compile()` like everything else. Being a *check* and not a rebuild is the whole reason the keypress is cheap, so a forced route has to exist separately. Caught by code review in phase 6, after the claim had survived six passes |
 | Log Variables | **Replaced by 📜 Logging** — a submenu of console-logging toggles, persisted client-side, rendered via the canonical formatter. Diagnostics and compile meta ship here; stack summary and capture diffs arrive with phases 8 and 7, which produce what they log |
-| 🖌️ Capture | New, phase 7, present only when enabled |
+| 🖌️ Capture | New, phase 7. **Always present** on the dev surface (Jamie, 2026-09-09): pure observation needs no gate |
 | Clear Cache | **Stays for 3.0.0.** It was dropped because the admin page would carry it, and that reason expires while the page waits in 6b. Removed from the bar when its replacement ships |
 | Per-file submenus | **Stay for 3.0.0**, with Clear Cache and for the same reason. Per-handle detail moves to the admin page when it ships |
 
@@ -948,7 +948,7 @@ anything**:
 git status                       # clean, on style-stack
 php tests/run.php                # 15 files
 wp sassy check                   # exit 0
-wp sassy status                  # version 3.1.0
+wp sassy status                  # version 3.2.0
 ```
 
 That is not ceremony. Documentation in this repo has drifted from the code three times: filters
@@ -962,7 +962,7 @@ Two things about this machine that no document upstream of you will mention:
   yours**, and has had throughout. Two of the modified lines in `sassy.integration.php` are the §4
   dev-gate and `wp_tempnam` changes; everything else in that tree belongs to someone else. Do not
   commit there.
-- 3.1.0 is tagged in the plugin header and neither it nor 3.0.0 is **released**. The digitalis.ca update JSON is not
+- 3.2.0 is tagged in the plugin header and none of 3.0.0, 3.1.0 or 3.2.0 is **released**. The digitalis.ca update JSON is not
   yet version-fenced, so publishing would offer a breaking upgrade to every 1.x install polling
   it. That fence is Jamie's and it is not done.
 

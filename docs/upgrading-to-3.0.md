@@ -350,3 +350,25 @@ Discovery with contexts now runs against copies of `wp_styles()` and `wp_scripts
 
 It reported the map URL. `Printer::get_map_url()` has since phase 2.
 
+## Phase 7, tier 1: the paintbrush
+
+Ships as 3.2.0.
+
+### Source maps are exact under compressed output
+
+**Who this affects:** anyone reading Sassy's maps, DevTools included.
+
+`Printer` rewrites relative `url()` references after the engine has produced the map, and under compressed output every insertion used to shift every later column, so DevTools landed on the wrong source line for every rule after the first `url()`. The map now moves with the rewrite, and its `file` field names the built sheet rather than Dart's temp output. A `sassy-css` filter still runs after that and can invalidate what it likes.
+
+### The panel changed
+
+**Who this affects:** anything styling or scripting against `#sassy-errors`.
+
+The element keeps its id and gains `data-kind` (`error` or `capture`), a Copy button beside Dismiss, and `data-sassy-sheets`, a JSON object of handle to build URL, map URL and source path for every sheet Sassy printed. It prints at `wp_footer` priority 30 now, after late styles, so footer-enqueued sheets are in the list and their errors in the panel. Server-rendered errors are escaped.
+
+### New surface
+
+- 🖌️ **Capture** in the admin bar, `window.sassy.capture()`, and `sassy:captured` on `document` with `{ patch, changes, extras }`.
+- **Logging → Capture diffs**, off by default like the other toggles.
+- `tests/fixtures/paintbrush-spike.html`, the page that gated the tier, kept as a fixture.
+
