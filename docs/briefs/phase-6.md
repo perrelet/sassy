@@ -45,7 +45,7 @@ It also settles four debts earlier phases deliberately deferred here. Read those
 
 **The admin page is not in this phase.** It was carved out into phase 6b (plan §3) because it is the only part of the dev surface needing visual design, and that conversation deserves its own room rather than being squeezed in beside a keybinding rewrite. Do not build it, and do not half-build it: no menu registration, no page callback.
 
-One consequence to carry knowingly. Clear Cache leaves the admin bar in this phase and the admin page is where it was going, so **3.0.0 ships with no way to clear the cache from the UI**, `wp sassy clear` only. That is recorded in the plan as a decision rather than an accident, but say it in the handoff too.
+**Clear Cache stays in the admin bar**, against what an older draft of the plan said. It was dropped because the admin page would carry it, and that justification expires while the page waits in 6b. Removing it now would ship 3.0.0 with no UI route to clearing the cache at all. Force Recompile still goes: Live Compile already skips the cache, which is a real redundancy rather than a deferred replacement.
 
 **Removals are a set, not a list.** `?sassy-vars=1`, `?sassy-recompile=1`, `UI::print_variables()`, `Sassy::get_all_variables()` and `meta.variables` all go together, along with Force Recompile and Clear Cache leaving the bar. Live Compile already skips the cache, which is what makes Force Recompile redundant rather than merely unfashionable.
 

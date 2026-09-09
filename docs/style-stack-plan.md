@@ -571,7 +571,7 @@ Pruned to actions. Detail lives on the admin page.
 | Force Recompile | **Drop** — Live Compile already skips cache |
 | Log Variables | **Replaced by 📜 Logging** — a submenu of console-logging toggles (diagnostics, compile meta, stack summary, capture diffs), persisted client-side, rendered via the canonical formatter |
 | 🖌️ Capture | New, phase 7, present only when enabled |
-| Clear Cache | **Drops from the bar.** Admin page action + `wp sassy clear` only |
+| Clear Cache | **Stays for 3.0.0.** It was dropped because the admin page would carry it, and that reason expires while the page waits in 6b. Removed from the bar when its replacement ships |
 | Per-file submenus | Drop from bar; per-handle detail moves to the admin page |
 
 #### Live compile
@@ -656,25 +656,58 @@ Server-rendered. Behaviour declared in attributes (`data-sassy-copy`, `data-sass
 Design intent, verified once phase 8 exists: the profiler run over Sassy's own UI reports only
 intended categories.
 
-#### What the design conversation has to settle
+#### Design, settled
 
-Not decided here, because these are Jamie's and they are the reason this phase is separate:
+**It looks like WordPress with a side of Sassy spice.** wp-admin's structural furniture (`.wrap`,
+the `.notice-*` palette, list-table conventions, the admin colour scheme) carries the page;
+Sassy's own character lives in the accents and in the parts wp-admin has no vocabulary for, which
+is mostly the diagnostic block below.
 
-- **Whether it looks like WordPress or like Sassy.** A dashboard that adopts wp-admin's furniture
-  is cheaper and disappears into the host; one with its own voice is legible at a glance and
-  fights the surrounding chrome. The stack view of 337 rows is where this actually bites.
-- **How a diagnostic renders visually**, given the canonical text rendering already exists and
-  carries engine-drawn frames in a monospace gutter. The panel and the page should not disagree.
-- **Whether Sassy compiles its own admin CSS.** `assets/css/sassy.css` is 138 hand-edited lines
-  today; the SCSS source was dropped in `398e1c6` and `.vscode/tasks.json` still names an input
-  that no longer exists. An admin page is real CSS, so this is the moment to decide whether the
-  tool eats its own cooking. It is a good demonstration and a real bootstrapping risk in the same
-  decision: a broken stylesheet would take its own diagnostics UI down with it.
+**A diagnostic renders as UI header plus verbatim body.** The split follows from phase 3: Sassy
+composes the header and never redraws what the engine drew.
 
-**Breaks:** none beyond phase 6's. Clear Cache is the exception worth naming: phase 6 removes it
-from the admin bar and this page is where it was going, so **3.0.0 ships with no way to clear the
-cache from the UI**, `wp sassy clear` only. Acceptable for a dev tool, but a decision rather than
-a side effect.
+- The **header** becomes interface. `severity` gets a colour and label from the notice palette,
+  with `deprecation` distinct from `warning` rather than borrowed from it, or the `--strict` /
+  `--strict=all` split is invisible in the surface people actually look at. `message` is prose and
+  may wrap. `code` and `url` become a link to the Sass documentation where present.
+- The **frame and trace** are engine-drawn art: monospace, unwrapped, `overflow-x` rather than
+  reflow. Their columns are aligned by the engine and rewrapping them destroys the caret.
+
+**`file:line:column` is click-to-copy.** Not an editor link: `vscode://` works on one machine and
+is dead on the next, while a copied `path:line` always works and feeds the paste-into-an-agent
+loop directly.
+
+This raises something phase 3 left standing: **Dart cites bare basenames**, so half the real
+diagnostics on the reference install say `_harness.scss` rather than a path, and copying that is
+copying nothing useful. 6b resolves cited names against the recorded `Import_Graph`, which is
+unambiguous wherever exactly one recorded dependency matches the basename, and falls back to what
+the engine said. That is the phase where §1's "every string names something a machine can open"
+finally holds for diagnostics.
+
+**Diagnostics collapse, grouped by `code`.** Thirty across the reference install, four frame lines
+each, and ten of them are the same `global-builtin`. Folding a group into one expandable row is
+presentation rather than a second structure, so it does not breach "no surface invents its own",
+but it is the first place a surface deliberately differs from the CLI and is recorded as a
+decision rather than left to drift.
+
+**Copy yields the canonical text, never the DOM.** Whatever the page looks like, the copy
+affordance produces exactly what the CLI prints, because that is what gets pasted into an agent.
+The raw rendering therefore stays in the markup even when a group is folded.
+
+**Sassy compiles her own admin CSS.** The argument is stronger than dogfooding: the default engine
+is scssphp, which cannot do `@use` or `@forward`, so Sassy's own stylesheet has to be authored to
+compile on a default install. The team then permanently eats the limitation its own default
+imposes on everyone who has not configured Dart.
+
+The bootstrapping risk is real but mild. A stylesheet that fails to compile leaves the admin page
+unstyled rather than broken, and the failure appears in the diagnostics panel it failed to style.
+`.vscode/tasks.json` still runs `sass assets/scss/sassy.scss assets/css/sassy.css` against an
+input deleted in `398e1c6`; this phase restores the source, which is also what makes that task
+mean something again.
+
+**Breaks:** Clear Cache leaves the admin bar here, not in phase 6. It was dropped from the bar
+*because this page would have it*, and that reason expires while the page is unbuilt, so the bar
+keeps it until its replacement exists.
 
 ---
 
@@ -867,10 +900,13 @@ change to what hot-wiring feels like, so it is named rather than implied.
 | Who is the dev surface for? | The digitalis team, production included. `sassy-dev` filter; d-pace binds it to the Lattice `dev` capability |
 | Frontend idiom | Hand-rolled minimal; server-rendered; attribute-driven; zero dependencies |
 | Admin page | **Yes** — dashboard, never a settings form. Carved out of phase 6 into **6b** (2026-09-09), because it is the only part of the dev surface needing visual design and that conversation should not be squeezed in beside a keybinding rewrite. Ships with the 3.x minors |
+| Admin page look | **WordPress with a side of Sassy spice**: wp-admin furniture carries it, Sassy's character lives in the accents and the diagnostic block |
+| Diagnostic rendering | Header becomes UI, frame and trace stay verbatim monospace. `file:line:col` is **click-to-copy**, not an editor link. Groups **collapse** by `code`. Copy always yields the canonical text, never the DOM |
+| Sassy's own admin CSS | **She compiles it.** Authored to work on scssphp so the team eats the limitation its default engine imposes. Unstyled-on-failure is an acceptable bootstrapping risk |
 | Admin bar | Glyph + Live Compile + Logging (+ Capture); Force Recompile dropped; variables surface removed everywhere (`meta.variables`, `?sassy-vars=1`, `get_all_variables()`) — superseded by `wp sassy vars` and the Logging menu |
 | Oxygen/builder JS | Angular reach-in deleted; replaced by the `sassy:*` event contract |
 | Paintbrush | In, as phase 7 — tier 0 documented, tier 1 after spike, tier 2 behind `sassy-write-source` |
-| Clear Cache | Admin page + CLI only; dropped from the bar. With the page in 6b, **3.0.0 has no UI route to it at all**: `wp sassy clear` only. Named as a consequence of the split rather than discovered |
+| Clear Cache | **Stays in the bar for 3.0.0**, leaving when 6b's page replaces it. Dropping it was justified by the page carrying it, and that justification expires while the page is unbuilt |
 | Auto-reload polling | Opt-in only, via the Logging menu; never a default |
 | Keybinding | Configurable via `sassy-keybinding` filter (default `['ctrl+space', 'meta+space']`, preserving 2.x; `false` disables). The collision has bitten in practice |
 | Unresolvable source paths | `source_path` is `?string` and never falls back to the URL. `sassy-src-path` applies unconditionally, including over a `null`, so the filter can rescue a URL Sassy cannot resolve |
