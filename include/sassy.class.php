@@ -9,7 +9,6 @@ class Sassy {
 	protected $ui;
 	protected $printers = [];
 	protected $errors;
-	protected $index = 0;
 	
 	public function __construct() {
 		
@@ -138,7 +137,7 @@ class Sassy {
 
 		if (!apply_filters('sassy-compile', true, $src, $handle)) return $src;
 
-		return $this->add_printer(new Printer())->compile($src, $handle);
+		return $this->add_printer(new Printer(), $handle)->compile($src, $handle);
 		
 	}
 
@@ -158,7 +157,7 @@ class Sassy {
 
 		foreach (Style_Stack::discover(['frontend'])->compilable() as $asset) {
 
-            $compiler = $this->add_printer(new Printer());
+            $compiler = $this->add_printer(new Printer(), $asset->handle);
 
             $href     = $compiler->compile($asset->src, $asset->handle);
             $warnings = array_map(function ($diagnostic) { return $diagnostic->to_array(); }, $compiler->get_warnings());
@@ -171,9 +170,9 @@ class Sassy {
                 'src_path'       => $compiler->get_src_path(),
                 'src_url'        => $compiler->get_src_url(),
                 'handle'         => $compiler->get_handle(),
-                'index'          => $this->index_of($compiler),
+                'node'           => UI::node_id($asset->handle),
                 'style'          => $compiler->get_style(),
-                'variables'      => $compiler->get_variables(),
+                'hash'           => $compiler->get_content_hash(),
                 'has_source_map' => $compiler->has_src_map(),
                 'compile_time'   => $compiler->get_compile_time(),
             ];
@@ -229,12 +228,11 @@ class Sassy {
 
 			$this->errors = [];
 
-			foreach ($this->printers as $index => $printer) {
+			foreach ($this->printers as $handle => $printer) {
 
 				if (!$printer->has_error()) continue;
 
-				$basename = basename(explode('?', $printer->get_src())[0]);
-				$this->errors[$index] = "SASSY -> {$basename}\n" . Diagnostic::render_all($printer->get_errors());
+				$this->errors[$handle] = Diagnostic::render_all($printer->get_errors());
 
 			}
 
@@ -256,32 +254,13 @@ class Sassy {
 
 	}
 
-	protected function add_printer (Printer $printer) {
+	protected function add_printer (Printer $printer, $handle) {
 
-		$this->printers[++$this->index] = $printer;
+		$this->printers[$handle] = $printer;
 
 		return $printer;
 
 	}
 
-	protected function index_of (Printer $printer) {
-
-		return array_search($printer, $this->printers, true);
-
-	}
-
-	public function get_all_variables () {
-
-		$variables = [];
-
-		foreach ($this->get_printers() as $compiler) {
-
-			$variables = array_merge($variables, $compiler->get_variables());
-
-		}
-
-		return $variables;
-
-	}
 	
 }

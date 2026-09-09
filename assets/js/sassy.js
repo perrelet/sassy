@@ -49,6 +49,51 @@ function renderDiagnostic (d) {
             this.noticeTimeout = null;
 
             this.addEventListeners();
+            this.bindLogToggles();
+
+            // The declared surface, replacing the Angular reach-in a builder used to need.
+            window.sassy = {
+                compile: () => this.liveCompile(),
+                reload:  () => this.emit('sassy:reload'),
+                logging: (key) => this.logging(key),
+            };
+
+        },
+
+        /**
+         * Console logging is opt-in and per-browser: a shared default would spam a colleague's
+         * console on a site they merely happen to be logged into.
+         */
+        logging (key) {
+
+            try { return localStorage.getItem('sassy:log:' + key) === '1'; }
+            catch (e) { return false; }
+
+        },
+
+        bindLogToggles () {
+
+            document.querySelectorAll('#wp-admin-bar-sassy-logging .sassy-log-toggle').forEach(item => {
+
+                const key  = item.getAttribute('rel');
+                const link = item.querySelector('a') || item;
+
+                const reflect = () => link.setAttribute('data-on', this.logging(key) ? '1' : '0');
+                reflect();
+
+                link.addEventListener('click', event => {
+                    event.preventDefault();
+                    try { localStorage.setItem('sassy:log:' + key, this.logging(key) ? '0' : '1'); } catch (e) {}
+                    reflect();
+                });
+
+            });
+
+        },
+
+        emit (name, detail) {
+
+            document.dispatchEvent(new CustomEvent(name, { detail, bubbles: true }));
 
         },
 
@@ -61,24 +106,13 @@ function renderDiagnostic (d) {
 
             const keydownCallback = this.debounce(this.onKeyDown.bind(this), 250);
 
-            if ((this.params.builder === 'oxygen') && this.params.backend) {
-
-                // Oxygen builder uses Angular in both iframe and builder window.
-                angular.element('body').on('keydown', keydownCallback);            // iframe
-                parent.angular.element('body').on('keydown', keydownCallback);     // builder
-
-            } else {
-
-                document.addEventListener('keydown', keydownCallback);
-
-            }
+            document.addEventListener('keydown', keydownCallback);
 
         },
 
         onKeyDown (event) {
 
-            if ((this.params.builder === 'oxygen') && this.params.backend && event.originalEvent && event.originalEvent.repeat) return;
-            if (!event.ctrlKey && !event.metaKey) return;
+            if (event.repeat) return;
             if (event.target && event.target.nodeName !== 'BODY') return;
 
             let processed = false;
@@ -106,6 +140,7 @@ function renderDiagnostic (d) {
 
             this.clearErrors();
             this.showNotice('⚡ Compiling\u2026', 'pending');
+            this.emit('sassy:before-compile');
 
             fetch(url, { credentials: 'same-origin' })
                 .then(response => {
@@ -134,6 +169,11 @@ function renderDiagnostic (d) {
                     if (payload.success) {
 
                         const hadWarnings = this.reloadStyles(payload.data);
+
+                        this.emit('sassy:compiled', {
+                            diagnostics: Object.fromEntries(Object.entries(payload.data).map(([h, e]) => [h, e.warnings || []])),
+                            styles: payload.data,
+                        });
                         this.showNotice(hadWarnings ? '⚠ Compiled with warnings' : '✔ Compiled', hadWarnings ? 'warning' : 'success');
 
                     } else {
@@ -196,13 +236,13 @@ function renderDiagnostic (d) {
                     if (link.href.includes(href)) {
 
                         const newHref = new URL(link.href);
-                        newHref.searchParams.set('sassy', Math.random().toString());
+                        newHref.searchParams.set('sassy', (meta && meta.hash) || Date.now().toString());
                         link.href = newHref.toString();
 
                         if (meta) {
-                            console.info(`Sassy compile info for ${property}:`, meta);
+                            if (this.logging('meta')) console.info(`Sassy compile info for ${property}:`, meta);
 
-                            const engineItem = document.querySelector(`#wp-admin-bar-sassy-${meta.index}-engine .ab-item`);
+                            const engineItem = document.querySelector(`#wp-admin-bar-${meta.node}-engine .ab-item`);
                             if (engineItem) {
                                 const engineLabel = (meta.engine || '').replace(/^Sassy\\/, '').replace(/_Engine$/, '').replace(/_/g, ' ');
                                 const compileMs   = meta.compile_time ? Math.round(meta.compile_time * 1000) + 'ms' : '\u2014';
@@ -213,9 +253,8 @@ function renderDiagnostic (d) {
                         if (warnings.length) {
                             hadWarnings = true;
                             const block = warnings.map(renderDiagnostic).join('\n\n');
-                            console.log(`Successfully Recompiled: ${href}`);
-                            console.warn(`Sassy warnings for ${property}:\n${block}`);
-                            const menuItem = document.querySelector(`#wp-admin-bar-sassy-${meta && meta.index ? meta.index : ''} [data-state]`);
+                            if (this.logging('diagnostics')) console.warn(`Sassy warnings for ${property}:\n${block}`);
+                            const menuItem = meta && meta.node ? document.querySelector(`#wp-admin-bar-${meta.node} [data-state]`) : null;
                             if (menuItem) menuItem.setAttribute('data-state', 'warning');
                         } else {
                             console.log(`Successfully Recompiled: ${href}`);

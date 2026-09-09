@@ -328,6 +328,18 @@ class Printer {
 
     }
 
+    /**
+     * Content hash of the built CSS: exact where Math.random() was merely different, and the
+     * primitive an opt-in change poll would compare.
+     */
+    public function get_content_hash () {
+
+        $build_file = $this->get_build_file();
+
+        return file_exists($build_file) ? substr(md5_file($build_file), 0, 12) : null;
+
+    }
+
     public function has_src_map () {
 
         if ($this->src_map) return true;

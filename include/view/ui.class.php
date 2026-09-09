@@ -7,25 +7,10 @@ class UI {
 	public function __construct () {
 
 		add_action('admin_bar_menu', [$this, 'admin_bar_menu'], 100);
-		add_filter('sassy-force-compile', [$this, 'run_compiler']);
-
-		if (isset($_GET['sassy-vars'])) add_action('wp_footer', [$this, 'print_variables']);
 
 		if (isset($_GET['sassy-clear-cache'])) add_action('init', [$this, 'clear_cache']);
 
 	}
-
-	public function print_variables () {
-
-		$variables = SASSY()->get_all_variables();
-		$sass_variables = [];
-
-		if ($variables) foreach ($variables as $key => $value) $sass_variables['$' . $key] = $value;
-		
-        echo "<script>console.log('SCSS Variables:');console.log(" . json_encode($sass_variables) . ");</script>";
-
-    }
-	
 
 	public function admin_bar_menu ($admin_bar) {
 		
@@ -50,19 +35,27 @@ class UI {
 			'href'		=> '#',
 		]);
 		
-		$admin_bar->add_menu([
-			'id'		=> 'sassy-force-recompile',
-			'parent'	=> 'sassy',
-			'title'		=> !isset($_GET['sassy-recompile']) ? __('🤖 Force Recompile', 'sassy') : __('🤖 Normal Compile', 'sassy'),
-			'href'		=> add_query_arg('sassy-recompile', !isset($_GET['sassy-recompile']))
-		]);
+		// Force Recompile is gone: Live Compile already skips the cache, which makes it a genuine
+		// redundancy rather than something waiting for a replacement.
 
 		$admin_bar->add_menu([
-            'id'     => 'sassy-vars',
-            'parent' => 'sassy',
-            'title'  => !isset($_GET['sassy-vars']) ? __('📝 Log Variables', 'sassy') : __('📝 Don\'t Log Variables', 'sassy'),
-            'href'   => add_query_arg('sassy-vars', !isset($_GET['sassy-vars'])),
-        ]);
+			'id'     => 'sassy-logging',
+			'parent' => 'sassy',
+			'title'  => __('📜 Logging', 'sassy'),
+			'href'   => false,
+		]);
+
+		foreach ($this->log_toggles() as $key => $label) {
+
+			$admin_bar->add_menu([
+				'id'     => "sassy-logging-{$key}",
+				'parent' => 'sassy-logging',
+				'title'  => $label,
+				'href'   => '#',
+				'meta'   => ['class' => 'sassy-log-toggle', 'html' => '', 'rel' => $key],
+			]);
+
+		}
 
 		$admin_bar->add_menu([
 			'id'     => 'sassy-clear-cache',
@@ -84,14 +77,16 @@ class UI {
 			'href'		=> false,
 		]);
 
-		foreach (SASSY()->get_printers() as $index => $compiler) {
+		foreach (SASSY()->get_printers() as $handle => $compiler) {
+
+			$node = static::node_id($handle);
 
 			//$icon = $compiler->has_error() ? '❌' : ($compiler->has_compiled() ? '✔️' : '💾');
 			$state = $compiler->get_state();
 			$title = "<span data-state='{$state}'>" . basename(explode('?', $compiler->get_src())[0]). "</span>";
 
 			$admin_bar->add_menu([
-				'id'		=> "sassy-{$index}",
+				'id'		=> "{$node}",
 				'parent'	=> 'sassy',
 				'title'		=> $title,
 				'href'		=> $compiler->get_build_url(),
@@ -104,8 +99,8 @@ class UI {
 			foreach ($compiler_menus as $method => $label) {
 
 				$admin_bar->add_menu([
-					'id'     => "sassy-{$index}-{$method}",
-					'parent' => "sassy-{$index}",
+					'id'     => "{$node}-{$method}",
+					'parent' => "{$node}",
 					'title'  => $label,
 					'href'		=> $compiler->$method(),
 					'meta'		=> ['target' => '_blank'],
@@ -119,8 +114,8 @@ class UI {
 			$compile_label = $last_compile_time ? round($last_compile_time * 1000) . 'ms' : '—';
 
 			$admin_bar->add_menu([
-				'id'     => "sassy-{$index}-engine",
-				'parent' => "sassy-{$index}",
+				'id'     => "{$node}-engine",
+				'parent' => "{$node}",
 				'title'  => $engine_label . ' &mdash; ' . $compile_label,
 				'href'   => false,
 			]);
@@ -130,8 +125,8 @@ class UI {
 				if ($map_url = $compiler->get_map_url()) {
 
 					$admin_bar->add_menu([
-						'id'		=> "sassy-{$index}-map-url",
-						'parent'	=> "sassy-{$index}",
+						'id'		=> "{$node}-map-url",
+						'parent'	=> "{$node}",
 						'title'		=> 'Source Map',
 						'href'		=> $map_url,
 						'meta'		=> ['target' => '_blank'],
@@ -148,8 +143,8 @@ class UI {
 						if (!empty($src_map->sources) && count($src_map->sources) > 1) {
 
 							$admin_bar->add_menu([
-								'id'		=> "sassy-{$index}-map-line-1",
-								'parent'	=> "sassy-{$index}",
+								'id'		=> "{$node}-map-line-1",
+								'parent'	=> "{$node}",
 								'title'		=> $horizontal_line,
 								'href'		=> false,
 							]);
@@ -170,8 +165,8 @@ class UI {
 								}
 
 								$admin_bar->add_menu([
-									'id'		=> "sassy-{$index}-map-source-{$j}",
-									'parent'	=> "sassy-{$index}",
+									'id'		=> "{$node}-map-source-{$j}",
+									'parent'	=> "{$node}",
 									'title'		=> basename($source),
 									'href'		=> $source_url ?: false,
 									'meta'		=> $source_url ? ['target' => '_blank'] : [],
@@ -193,6 +188,30 @@ class UI {
 		
 	}
 	
+	/**
+	 * Console logging toggles. State lives in the browser, so these are rendered inert and the
+	 * JS reflects and persists them.
+	 */
+	/**
+	 * WordPress handles are slug-like in practice but not guaranteed to be; the JS is handed the
+	 * id the server computed rather than reimplementing this.
+	 */
+	public static function node_id ($handle) {
+
+		return 'sassy-' . sanitize_key($handle);
+
+	}
+
+	protected function log_toggles () {
+
+		return [
+			'diagnostics' => __('Diagnostics', 'sassy'),
+			'meta'        => __('Compile meta', 'sassy'),
+			'stack'       => __('Stack summary', 'sassy'),
+		];
+
+	}
+
 	public function clear_cache () {
 
 		if (!Policy::active()) return;
@@ -204,12 +223,5 @@ class UI {
 
 	}
 
-	public function run_compiler ($run) {
-
-		if (isset($_GET['sassy-recompile']) && $_GET['sassy-recompile']) return true;
-		
-		return $run;
-		
-	}
 	
 }
