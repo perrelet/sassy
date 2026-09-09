@@ -1,4 +1,4 @@
-# Builder brief: Phase 6, frontend and admin surface
+# Builder brief: Phase 6, frontend and dev surface
 
 One builder, one phase, then stop for review. The spec is [../style-stack-plan.md](../style-stack-plan.md): read §3 phase 6 for the work, §2 for the state vocabulary rule, §8 for the rules of engagement. This brief adds only what the plan leaves to the builder.
 
@@ -13,7 +13,7 @@ It also settles four debts earlier phases deliberately deferred here. Read those
 1. `docs/style-stack-plan.md` §3 phase 6 in full, plus §2's "a vocabulary is policy"
 2. `assets/js/sassy.js`, all 346 lines. **This session shipped `[object Object]` to the console for an hour** because the AJAX payload was verified and the file consuming it was never opened. It is the least-read file in the repository and this phase rewrites it.
 3. `include/view/ui.class.php` and `Sassy::enqueue_scripts()`, `print_errors()`, `compile_all()`
-4. `include/model/diagnostic.class.php` and `Style_Stack::audit()`, which the panel and admin page render
+4. `include/model/diagnostic.class.php` and `Style_Stack::audit()`, which the panel renders
 5. `tests/manual.md`, which does not exist yet and is one of your deliverables
 
 ## The four debts
@@ -22,7 +22,7 @@ It also settles four debts earlier phases deliberately deferred here. Read those
 |---|---|---|
 | `meta.index` | `Printer` carries no counter; `Sassy` assigns one so the JS keeps working. `Sassy::$printers`, `add_printer()` and `index_of()` exist *only* for this | Rekey errors and admin-bar nodes by **handle**. The JS queries `#wp-admin-bar-sassy-${meta.index}` in three places, so both sides move together or neither does |
 | State vocabulary | Three exist: `UI` says error/warning/compiled/cache, `wp sassy list` says no source/not built/current/stale, `wp sassy deps` says MISSING/current/changed | Two owners, per plan §3 phase 6: **asset state** on `Compile_Cache`, **file state** on `Import_Graph`. This is the first change to `wp sassy list`'s `state` column: phase 1 changed `deps`'s meaning and added `type` and `imports` but left `state` alone |
-| Diagnostic persistence | Phase 5 stores a severity **tally** under `__diagnostics__` in the filemtimes record | The per-handle panel needs the text. That needs **its own transient key**: the filemtimes record is read on every request and one compile's frames run to 5.5 KB. `Compile_Cache` owns it, like every other key |
+| Diagnostic persistence | Phase 5 stores a severity **tally** under `__diagnostics__` in the filemtimes record | **Not yours.** It moved to phase 6b with the admin page, because only the per-handle view needs the diagnostic *text*; Live Compile's diagnostics are live in the response. Leave the tally alone |
 | Version bump | `SASSY_VERSION` and the plugin header are still `2.1.0`, pinned here by plan §1 | Move both to `3.0.0` together, **last**. The updater compares the constant. Two strings in `sassy.php` (lines 7 and 18) plus the prose in `AGENTS.md:14`; leave `2.1.0` alone everywhere it means scssphp's version rather than Sassy's |
 
 ## Judgement calls, pre-made
@@ -43,11 +43,11 @@ It also settles four debts earlier phases deliberately deferred here. Read those
 
 **Two documented extension points need a stated fate, because pruning the bar changes what they extend.** `do_action('sassy-admin-bar', $admin_bar)` at `ui.class.php:74` lets a third party add to the menu this phase prunes, and `sassy-print-errors` at `sassy.class.php:201` switches off the footer panel this phase replaces. Both are in AGENTS.md's reference. **Keep both**: the bar still exists and still takes additions, and a panel you can silence is worth having on a production-adjacent install. Say so in the docs rather than leaving them to be found still working, or found gone. Phase 3 nearly lost `sassy-src-map-options` to exactly this oversight.
 
-**The admin page cannot be gated the obvious way.** `add_menu_page()` takes a capability string and `Policy::active()` returns a bool, so there is no predicate to hand WordPress. **Register the page conditionally**: check `Policy::active()` at `admin_menu` time, add the page only when it passes, and check again in the render callback. Do not invent a capability and map it through `user_has_cap`, which would put a second copy of the gate beside the one this phase exists to centralise. Put it under **Tools**: it is a dev tool, and a top-level menu for a surface most users never see is presumptuous.
+**The admin page is not in this phase.** It was carved out into phase 6b (plan §3) because it is the only part of the dev surface needing visual design, and that conversation deserves its own room rather than being squeezed in beside a keybinding rewrite. Do not build it, and do not half-build it: no menu registration, no page callback.
+
+One consequence to carry knowingly. Clear Cache leaves the admin bar in this phase and the admin page is where it was going, so **3.0.0 ships with no way to clear the cache from the UI**, `wp sassy clear` only. That is recorded in the plan as a decision rather than an accident, but say it in the handoff too.
 
 **Removals are a set, not a list.** `?sassy-vars=1`, `?sassy-recompile=1`, `UI::print_variables()`, `Sassy::get_all_variables()` and `meta.variables` all go together, along with Force Recompile and Clear Cache leaving the bar. Live Compile already skips the cache, which is what makes Force Recompile redundant rather than merely unfashionable.
-
-**The admin page is a dashboard.** If you find yourself writing a form field, stop: config is code, and the only actions are Compile all and Clear cache.
 
 ## Strangler order
 
@@ -58,8 +58,7 @@ Server first, browser last, because the server half is the half you can test:
 3. **Diagnostic persistence** under its own key.
 4. **Admin bar prune and rekey by handle**, PHP and JS in one commit because they cannot land apart.
 5. **The JS**: event contract, keybinding filter, content-hash busting, Angular deleted.
-6. **The admin page.**
-7. **`tests/manual.md`, walked**, then the version bump.
+6. **`tests/manual.md`, walked**, then the version bump.
 
 ## Definition of done
 

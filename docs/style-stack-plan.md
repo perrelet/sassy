@@ -63,7 +63,8 @@ does not know a Sass import tree. Only the intersection does, and that intersect
 Breaking: renamed classes, changed engine contract, changed filter surface, integrations removed.
 **3.0.0.** Branch: `style-stack`.
 
-**3.0.0 ships phases 1–6.** Phases 7 and 8 land as 3.x minors; phase 9 is unversioned.
+**3.0.0 ships phases 1–6.** Phase 6b (the admin page), 7 and 8 land as 3.x minors; phase 9 is
+unversioned.
 
 Two release preconditions, named here because neither belongs to a phase's acceptance and both
 were drifting unowned:
@@ -143,7 +144,8 @@ House idiom unchanged: `Class_Name`, `*.class.php`, `snake_case()`, `require_onc
 ## 3. Phases
 
 1–4 sequential, each assuming the last. 5 needs 1–3 only and may run parallel with 4. 6 needs
-1–3 (`Style_Stack` for the stack view, `Compile_Cache` for state, `Diagnostic` for the panel).
+1–3 (`Compile_Cache` for state, `Diagnostic` for the panel). 6b is the admin page, carved out of
+6 because it is the only part needing visual design; it needs 6 and ships with the 3.x minors.
 7 follows 6 and a successful spike. 8 is independent of 5–7. 9 is recorded, not scheduled.
 
 ### Phase 1 — `Asset` and `Style_Stack`
@@ -493,7 +495,7 @@ does not wait for `--strict`.
 
 ---
 
-### Phase 6 — Frontend and admin surface
+### Phase 6 — Frontend and dev surface
 
 **Status: agreed.**
 
@@ -572,25 +574,6 @@ Pruned to actions. Detail lives on the admin page.
 | Clear Cache | **Drops from the bar.** Admin page action + `wp sassy clear` only |
 | Per-file submenus | Drop from bar; per-handle detail moves to the admin page |
 
-#### Admin page
-
-v3 gets her admin page. A **dashboard, not a settings form** — config remains code.
-
-- **Status** — engine + capabilities, registered extension providers, binaries + versions, build
-  dir + writability, constants, resolved policy (who currently sees the dev surface). Providers
-  arrived with phase 4 and `wp sassy status` already lists them; two status surfaces that
-  disagree on their first day is not worth the saving.
-- **Stack** — every handle (337 here under all hook sets), filterable: sassy-managed /
-  compilable / third-party; WP deps; asset state.
-- **Per-handle** — import graph (deps + watched dirs), build target, last diagnostics,
-  source / css / map links (relocated from the bar).
-- **Actions** — Compile all, Clear cache.
-
-Server-rendered. Behaviour declared in attributes (`data-sassy-copy`, `data-sassy-dismiss`,
-`data-sassy-poll`); one small hand-rolled JS file does event delegation + fetch. No dependencies.
-Design intent, verified once phase 8 exists: the profiler run over Sassy's own UI reports only
-intended categories.
-
 #### Live compile
 
 - Payload carries `Diagnostic[]` per handle; panel, console and clipboard render it through the
@@ -637,6 +620,61 @@ implied covered — the `watch` precedent.
   staging demonstrates that as well as production would.
 - `sassy:compiled` fires with diagnostics attached; a five-line listener can forward it into an
   iframe.
+
+---
+
+### Phase 6b — Admin page
+
+**Carved out of phase 6.** Everything else in that phase is mechanism: a gate, an event contract,
+a pruned bar, a keybinding. This is the first thing in the plan that needs **visual design**, and
+a design conversation inside a phase of plumbing gets neither the attention it needs nor the room
+to be argued about. It lands with the 3.x minors alongside phase 7.
+
+Not renumbered to 7, deliberately: commit messages across five phases already cite phase numbers,
+and rewriting what "phase 7" means would make the history ambiguous in a way no file edit fixes.
+
+Two debts move here with it: **full diagnostic persistence** (the per-handle view needs the
+diagnostic *text*, which needs its own transient key, because phase 5's severity tally lives in a
+record read on every request) and the **provider listing** in Status.
+
+#### The page
+
+v3 gets her admin page. A **dashboard, not a settings form** — config remains code.
+
+- **Status** — engine + capabilities, registered extension providers, binaries + versions, build
+  dir + writability, constants, resolved policy (who currently sees the dev surface). Providers
+  arrived with phase 4 and `wp sassy status` already lists them; two status surfaces that
+  disagree on their first day is not worth the saving.
+- **Stack** — every handle (337 here under all hook sets), filterable: sassy-managed /
+  compilable / third-party; WP deps; asset state, in the vocabulary phase 6 settled.
+- **Per-handle** — import graph (deps + watched dirs), build target, last diagnostics,
+  source / css / map links (relocated from the bar).
+- **Actions** — Compile all, Clear cache.
+
+Server-rendered. Behaviour declared in attributes (`data-sassy-copy`, `data-sassy-dismiss`,
+`data-sassy-poll`); one small hand-rolled JS file does event delegation + fetch. No dependencies.
+Design intent, verified once phase 8 exists: the profiler run over Sassy's own UI reports only
+intended categories.
+
+#### What the design conversation has to settle
+
+Not decided here, because these are Jamie's and they are the reason this phase is separate:
+
+- **Whether it looks like WordPress or like Sassy.** A dashboard that adopts wp-admin's furniture
+  is cheaper and disappears into the host; one with its own voice is legible at a glance and
+  fights the surrounding chrome. The stack view of 337 rows is where this actually bites.
+- **How a diagnostic renders visually**, given the canonical text rendering already exists and
+  carries engine-drawn frames in a monospace gutter. The panel and the page should not disagree.
+- **Whether Sassy compiles its own admin CSS.** `assets/css/sassy.css` is 138 hand-edited lines
+  today; the SCSS source was dropped in `398e1c6` and `.vscode/tasks.json` still names an input
+  that no longer exists. An admin page is real CSS, so this is the moment to decide whether the
+  tool eats its own cooking. It is a good demonstration and a real bootstrapping risk in the same
+  decision: a broken stylesheet would take its own diagnostics UI down with it.
+
+**Breaks:** none beyond phase 6's. Clear Cache is the exception worth naming: phase 6 removes it
+from the admin bar and this page is where it was going, so **3.0.0 ships with no way to clear the
+cache from the UI**, `wp sassy clear` only. Acceptable for a dev tool, but a decision rather than
+a side effect.
 
 ---
 
@@ -828,11 +866,11 @@ change to what hot-wiring feels like, so it is named rather than implied.
 | `Compile_Result` severity? | **Yes** — four levels: error / warning / deprecation / notice |
 | Who is the dev surface for? | The digitalis team, production included. `sassy-dev` filter; d-pace binds it to the Lattice `dev` capability |
 | Frontend idiom | Hand-rolled minimal; server-rendered; attribute-driven; zero dependencies |
-| Admin page | **Yes** — dashboard, never a settings form |
+| Admin page | **Yes** — dashboard, never a settings form. Carved out of phase 6 into **6b** (2026-09-09), because it is the only part of the dev surface needing visual design and that conversation should not be squeezed in beside a keybinding rewrite. Ships with the 3.x minors |
 | Admin bar | Glyph + Live Compile + Logging (+ Capture); Force Recompile dropped; variables surface removed everywhere (`meta.variables`, `?sassy-vars=1`, `get_all_variables()`) — superseded by `wp sassy vars` and the Logging menu |
 | Oxygen/builder JS | Angular reach-in deleted; replaced by the `sassy:*` event contract |
 | Paintbrush | In, as phase 7 — tier 0 documented, tier 1 after spike, tier 2 behind `sassy-write-source` |
-| Clear Cache | Admin page + CLI only; dropped from the bar |
+| Clear Cache | Admin page + CLI only; dropped from the bar. With the page in 6b, **3.0.0 has no UI route to it at all**: `wp sassy clear` only. Named as a consequence of the split rather than discovered |
 | Auto-reload polling | Opt-in only, via the Logging menu; never a default |
 | Keybinding | Configurable via `sassy-keybinding` filter (default `['ctrl+space', 'meta+space']`, preserving 2.x; `false` disables). The collision has bitten in practice |
 | Unresolvable source paths | `source_path` is `?string` and never falls back to the URL. `sassy-src-path` applies unconditionally, including over a `null`, so the filter can rescue a URL Sassy cannot resolve |
