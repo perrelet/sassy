@@ -14,8 +14,9 @@ class Compile_Cache {
     const CURRENT   = 'current';
     const ERROR     = 'error';
 
-    const GRAPH_KEY = 'sassy-filemtimes-';
-    const VARS_KEY  = 'sassy-vars-sig-';
+    const GRAPH_KEY   = 'sassy-filemtimes-';
+    const VARS_KEY    = 'sassy-vars-sig-';
+    const HANDLES_KEY = 'sassy-handles';
 
     protected $asset;
     protected $target;
@@ -97,6 +98,8 @@ class Compile_Cache {
 
         set_transient(static::VARS_KEY . $this->asset->handle, $this->resolver->get_signature());
 
+        static::index($this->asset->handle);
+
     }
 
     public function forget () {
@@ -152,10 +155,23 @@ class Compile_Cache {
     }
 
     /**
-     * Pattern-matches the options table, so it finds nothing under an external object cache.
-     * Callers that care must check wp_using_ext_object_cache() and clear by handle instead.
+     * Under an external object cache the transients are not in the options table, so there is
+     * nothing to pattern-match; the index record() keeps is walked instead.
+     *
+     * @return int Handles cleared under an external object cache, rows deleted otherwise.
      */
     public static function forget_all () {
+
+        if (function_exists('wp_using_ext_object_cache') && wp_using_ext_object_cache()) {
+
+            $handles = get_transient(static::HANDLES_KEY) ?: [];
+
+            foreach ($handles as $handle) static::forget_handle($handle);
+            delete_transient(static::HANDLES_KEY);
+
+            return count($handles);
+
+        }
 
         global $wpdb;
 
@@ -164,6 +180,17 @@ class Compile_Cache {
              WHERE option_name LIKE '\_transient\_sassy-%'
                 OR option_name LIKE '\_transient\_timeout\_sassy-%'"
         );
+
+    }
+
+    protected static function index ($handle) {
+
+        $handles = get_transient(static::HANDLES_KEY) ?: [];
+
+        if (in_array($handle, $handles, true)) return;
+
+        $handles[] = $handle;
+        set_transient(static::HANDLES_KEY, $handles);
 
     }
 

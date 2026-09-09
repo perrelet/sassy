@@ -935,7 +935,7 @@ anything**:
 
 ```
 git status                       # clean, on style-stack
-php tests/run.php                # 13 files
+php tests/run.php                # 15 files
 wp sassy check                   # exit 0
 wp sassy status                  # version 3.0.0
 ```

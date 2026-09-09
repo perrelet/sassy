@@ -157,6 +157,7 @@ Owned entirely by `Compile_Cache`. Nothing else reads or writes these keys.
 |---|---|---|
 | `sassy-filemtimes-{handle}` | `build_file => filemtime`, `__compile_time__`, `__diagnostics__` (severity tally), `deps`, `dirs`, `truncated` | Directory creation error; rewritten after each successful compile |
 | `sassy-vars-sig-{handle}` | sha1 of serialized variables | Written only after a **successful** compile, so a failed one is never remembered as current |
+| `sassy-handles` | Every handle `record()` has written, so `forget_all()` can clear by handle under an external object cache | Dropped by `forget_all()` |
 
 ### Dependency tracking
 
@@ -364,17 +365,14 @@ Admin bar structure:
   - ⚡ **Live Compile** — the endpoint with the cache check, then an in-place stylesheet reload
   - 🤖 **Force Compile** — the same endpoint with `force=1`, which applies `sassy-force-compile`
   - 📜 **Logging** — console toggles for Diagnostics and Compile meta, kept per browser in `localStorage`
-  - 🗑️ **Clear Cache** — `?sassy-clear-cache=1`, handled on `init` by `UI::clear_cache()`
+  - 🗑️ **Clear Cache** — a nonced `?sassy-clear-cache=1`, handled on `init` by `UI::clear_cache()`
   - `sassy-admin-bar` action, for third parties adding to the menu
   - _(separator)_
   - Per-handle entries, id `sassy-<handle>`, state word from `Printer::get_state()`
     - Source SCSS and Compiled CSS links, engine and last compile time
     - Source map link and its other sources, when a map exists
 
-Two things here describe the code rather than the intent, and both go when the admin page (6b) replaces this menu:
-
-- Clear Cache calls `Compile_Cache::forget_all()`, which deletes by pattern from the options table. Under an external object cache, which the reference install runs, it removes nothing. `wp sassy clear` detects that case; the bar does not.
-- The per-source links are built by prefix-matching absolute paths. The Dart engine writes map `sources` relative to the map, so under Dart every source renders without a link and the entry file is listed among them.
+One thing here describes the code rather than the intent, and it goes when the admin page (6b) replaces this menu: the per-source links are built by prefix-matching absolute paths, and the Dart engine writes map `sources` relative to the map, so under Dart every source renders without a link and the entry file is listed among them.
 
 ---
 
@@ -444,9 +442,7 @@ Three things it has to get right:
 Not a deploy mechanism: under an external object cache a long-running process holds a runtime
 cache and will not see a concurrent web request recompiling.
 
-> `wp sassy clear` with no handles deletes by pattern from the options table. Under an external
-> object cache transients are not there, so it falls back to clearing discovered handles and says
-> so — widen it with `--hooks=all`.
+> `wp sassy clear` with no handles deletes by pattern from the options table. Under an external object cache transients are not there, so `Compile_Cache` walks the handle index it keeps instead, which is also what makes the admin bar's Clear Cache work on the reference install.
 
 ---
 
@@ -464,7 +460,9 @@ binary is absent.
 
 | File | Covers |
 |---|---|
-| `test-frontend-safety.php` | Nothing in the compile path calls an admin-only function; Lightning CSS stays off unless configured |
+| `test-frontend-safety.php` | Nothing in the compile path calls an admin-only function; Lightning CSS stays off unless configured, and its cli.js route runs through node |
+| `test-clear-cache.php` | `Compile_Cache` indexes the handles it records, and `forget_all()` walks that index under an external object cache |
+| `test-error-panel.php` | `Sassy::get_errors()` reports a failure compiled after it was first asked, which is what a footer-enqueued style is |
 | `test-import-graph.php` | Import parsing and resolution; editing a partial invalidates; shadowing; a failed compile is not remembered as current |
 | `test-multiple-handles.php` | Handles sharing a source directory do not invalidate each other |
 | `test-source-maps.php` | Every map source resolves from where the map is served, and line numbers are unshifted |

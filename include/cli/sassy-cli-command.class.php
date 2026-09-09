@@ -406,27 +406,9 @@ class Sassy_CLI_Command extends WP_CLI_Command {
      * [<handle>...]
      * : Only clear these handles. Omit to clear every Sassy cache entry.
      *
-     * [--hooks=<hooks>]
-     * : Which enqueue hooks to fire when discovering handles. Comma-separated, or "all".
-     * ---
-     * default: frontend
-     * ---
-     *
      * @when after_wp_load
      */
     public function clear ($args, $assoc_args) {
-
-        // With an external object cache the transients are not in the options table, so there
-        // is nothing to pattern-match; fall back to whatever discovery can reach.
-        if (!$args && function_exists('wp_using_ext_object_cache') && wp_using_ext_object_cache()) {
-
-            $args = array_keys($this->discover($assoc_args));
-
-            if (!$args) WP_CLI::error('External object cache in use and no handles discovered. Pass handles explicitly.');
-
-            WP_CLI::warning('External object cache in use: clearing discovered handles only.');
-
-        }
 
         if ($args) {
 
@@ -435,10 +417,6 @@ class Sassy_CLI_Command extends WP_CLI_Command {
             WP_CLI::success(sprintf('Cleared %d handle(s).', count($args)));
             return;
 
-        }
-
-        if (function_exists('wp_using_ext_object_cache') && wp_using_ext_object_cache()) {
-            WP_CLI::error('An external object cache is in use, so transients are not in the options table. Pass handles explicitly.');
         }
 
         WP_CLI::success(sprintf('Cleared %d cache entries.', Compile_Cache::forget_all()));
