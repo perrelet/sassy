@@ -37,6 +37,14 @@ class UI {
 			'href'   => '#',
 		]);
 
+		// Pure observation: snapshot at load, diff on click, map through the source map.
+		$admin_bar->add_menu([
+			'id'     => 'sassy-capture',
+			'parent' => 'sassy',
+			'title'  => __('🖌️ Capture', 'sassy'),
+			'href'   => '#',
+		]);
+
 		$admin_bar->add_menu([
 			'id'     => 'sassy-logging',
 			'parent' => 'sassy',
@@ -90,6 +98,7 @@ class UI {
 			'meta'        => __('Compile meta', 'sassy'),
 			// Never a default: a page that reloads itself uninvited is how a tool loses trust.
 			'reload'      => __('Auto-reload', 'sassy'),
+			'capture'     => __('Capture diffs', 'sassy'),
 		];
 
 	}

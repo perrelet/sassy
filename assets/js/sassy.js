@@ -46,6 +46,7 @@
             this.bindLogToggles();
             this.bindPage();
             this.syncPoll();
+            this.armPaintbrush();
 
             // The declared surface, replacing the Angular reach-in a builder used to need.
             window.sassy = {
@@ -54,6 +55,7 @@
                 render:  (diagnostic) => renderDiagnostic(diagnostic),
                 logging: (key) => this.logging(key),
                 poll:    () => this.poll(),
+                capture: () => this.capture(),
             };
 
         },
@@ -319,6 +321,382 @@
 
         },
 
+        // --- Paintbrush, tier 1: capture and copy ------------------------------------------
+
+        /**
+         * Which sheets are Sassy's, from the panel: the printers exist only once the head has
+         * printed, after the localized params were written. Baselines live here per handle.
+         */
+        managed () {
+
+            if (this.sheets) return this.sheets;
+
+            let list = {};
+            try { list = JSON.parse((this.els.errors && this.els.errors.getAttribute('data-sassy-sheets')) || '{}') || {}; } catch (e) {}
+
+            this.sheets = {};
+
+            for (const handle in list) {
+                if (!Object.prototype.hasOwnProperty.call(list, handle) || !list[handle] || !list[handle].href) continue;
+                this.sheets[handle] = Object.assign({ handle, baseline: null, mapping: undefined }, list[handle]);
+            }
+
+            return this.sheets;
+
+        },
+
+        linkFor (sheet) {
+
+            return this.sheetFor(sheet.href);
+
+        },
+
+        /**
+         * Snapshot once the sheets have loaded, and again whenever one reloads: Live Compile and
+         * the poll swap a link's href, and the next capture would otherwise report the whole
+         * compile as a paint.
+         */
+        armPaintbrush () {
+
+            const sheets = this.managed();
+            const all    = () => { for (const handle in sheets) this.snapshot(handle); };
+
+            if (document.readyState === 'complete') all();
+            else if (typeof window.addEventListener === 'function') window.addEventListener('load', all);
+
+            for (const handle in sheets) {
+                const link = this.linkFor(sheets[handle]);
+                if (link && link.addEventListener) link.addEventListener('load', () => { this.snapshot(handle); sheets[handle].mapping = undefined; });
+            }
+
+            this.inlineBaseline = this.inlineStyles();
+
+        },
+
+        rulesOf (sheet) {
+
+            const link = this.linkFor(sheet);
+
+            try { return this.flatten(link && link.sheet ? link.sheet.cssRules : []); }
+            catch (e) { return []; }
+
+        },
+
+        snapshot (handle) {
+
+            const sheet = this.managed()[handle];
+            if (!sheet) return 0;
+
+            sheet.baseline = this.rulesOf(sheet).map(rule => this.declarations(rule));
+
+            return sheet.baseline.length;
+
+        },
+
+        /**
+         * Every rule in document order, nested ones included, so the list aligns with the blocks
+         * in the sheet's text. Statements without a block are skipped on both sides.
+         */
+        flatten (rules, out = []) {
+
+            for (const rule of rules || []) {
+                const kind = rule && rule.constructor ? rule.constructor.name : '';
+                if (kind === 'CSSImportRule' || kind === 'CSSNamespaceRule' || kind === 'CSSLayerStatementRule') continue;
+                out.push(rule);
+                if (rule.cssRules) this.flatten(rule.cssRules, out);
+            }
+
+            return out;
+
+        },
+
+        /**
+         * As the rule serialises them: the CSSOM expands background: red into nine longhands
+         * with empty baselines, and cssText gives the shorthand back.
+         */
+        declarations (rule) {
+
+            return this.parseDeclarations(rule && rule.style ? rule.style.cssText : '');
+
+        },
+
+        parseDeclarations (cssText) {
+
+            const out = {};
+            let depth = 0, quote = null, start = 0;
+
+            const push = end => {
+                const decl  = cssText.slice(start, end).trim();
+                const colon = decl.indexOf(':');
+                if (colon > 0) out[decl.slice(0, colon).trim()] = decl.slice(colon + 1).trim();
+            };
+
+            for (let i = 0; i < cssText.length; i++) {
+                const c = cssText[i];
+                if (quote) { if (c === '\\') i++; else if (c === quote) quote = null; continue; }
+                if (c === '"' || c === "'") quote = c;
+                else if (c === '(') depth++;
+                else if (c === ')') depth--;
+                else if (c === ';' && depth === 0) { push(i); start = i + 1; }
+            }
+
+            push(cssText.length);
+
+            return out;
+
+        },
+
+        diff (was, now) {
+
+            const changes = [];
+
+            for (const prop of new Set([...Object.keys(was), ...Object.keys(now)])) {
+                if (was[prop] === now[prop]) continue;
+                changes.push({ prop, from: prop in was ? was[prop] : null, to: prop in now ? now[prop] : null });
+            }
+
+            return changes;
+
+        },
+
+        /**
+         * The sheet's text and map, fetched on the first capture that needs them and kept. Bytes,
+         * not text: Dart writes a byte-order mark in compressed mode that the map counts as
+         * column 0 and Response.text() strips.
+         */
+        mapping (sheet) {
+
+            if (sheet.mapping !== undefined) return Promise.resolve(sheet.mapping);
+
+            sheet.mapping = null;
+
+            if (!sheet.map) return Promise.resolve(null);
+
+            const link = this.linkFor(sheet);
+            const href = link ? link.href : sheet.href;
+
+            return fetch(href, { credentials: 'same-origin' })
+                .then(response => response.arrayBuffer())
+                .then(bytes => {
+                    const text = new TextDecoder('utf-8', { ignoreBOM: true }).decode(bytes);
+                    return fetch(sheet.map, { credentials: 'same-origin' }).then(r => r.json()).then(map => {
+                        sheet.mapping = { text, blocks: this.blocks(text), lines: this.decodeMap(String(map.mappings || '')), sources: map.sources || [] };
+                        return sheet.mapping;
+                    });
+                })
+                .catch(() => { sheet.mapping = null; return null; });
+
+        },
+
+        /** Twenty lines. Segments carry absolute values by the time they are stored. */
+        decodeMap (mappings) {
+
+            const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+            const lines = [];
+            let src = 0, oline = 0, ocol = 0;
+
+            for (const encoded of mappings.split(';')) {
+                const segs = []; let col = 0;
+                for (const seg of encoded.split(',')) {
+                    if (!seg) continue;
+                    const vals = []; let shift = 0, value = 0;
+                    for (const ch of seg) {
+                        const d = B64.indexOf(ch); value += (d & 31) << shift; shift += 5;
+                        if (!(d & 32)) { vals.push(value & 1 ? -(value >> 1) : value >> 1); value = 0; shift = 0; }
+                    }
+                    col += vals[0];
+                    if (vals.length > 1) { src += vals[1]; oline += vals[2]; ocol += vals[3]; }
+                    segs.push({ col, src, oline, ocol });
+                }
+                lines.push(segs);
+            }
+
+            return lines;
+
+        },
+
+        /**
+         * Every block in the text in order: depth-aware over strings, comments and nested
+         * at-rules, so index n here is rule n in the flattened CSSOM.
+         */
+        blocks (css) {
+
+            const blocks = [];
+            let i = 0, preludeStart = 0, quote = null;
+
+            while (i < css.length) {
+                const c = css[i];
+                if (quote) { if (c === '\\') i++; else if (c === quote) quote = null; }
+                else if (c === '"' || c === "'") quote = c;
+                else if (c === '/' && css[i + 1] === '*') { const end = css.indexOf('*/', i + 2); i = end < 0 ? css.length : end + 1; preludeStart = i + 1; }
+                else if (c === '{') { const lead = css.slice(preludeStart, i); blocks.push({ start: preludeStart + Math.max(0, lead.search(/\S/)), prelude: lead.trim() }); preludeStart = i + 1; }
+                else if (c === '}' || c === ';') preludeStart = i + 1;
+                i++;
+            }
+
+            return blocks;
+
+        },
+
+        locate (mapping, offset) {
+
+            const before = mapping.text.slice(0, offset);
+            const line   = (before.match(/\n/g) || []).length;
+            const col    = offset - (before.lastIndexOf('\n') + 1);
+            let hit = null;
+
+            for (const s of mapping.lines[line] || []) { if (s.col <= col) hit = s; else break; }
+
+            return hit ? { file: String(mapping.sources[hit.src] || '').replace(/^(\.\.\/)+/, ''), line: hit.oline + 1 } : null;
+
+        },
+
+        /** The declaration's own position where the block's text has it, else the block's. */
+        declarationOffset (mapping, index, prop) {
+
+            const block = mapping.blocks[index];
+            const next  = mapping.blocks[index + 1];
+            const end   = next ? next.start : mapping.text.length;
+            const at    = mapping.text.indexOf(prop + ':', block.start);
+
+            return at > -1 && at < end ? at : block.start;
+
+        },
+
+        capture () {
+
+            const sheets  = this.managed();
+            const changes = [];
+            const reasons = {};
+            const counts  = {};
+
+            for (const handle in sheets) {
+                const sheet = sheets[handle];
+                if (!sheet.baseline) this.snapshot(handle);
+                const rules = this.rulesOf(sheet);
+                counts[handle] = rules.length;
+                rules.forEach((rule, index) => {
+                    const now = this.declarations(rule), was = sheet.baseline[index] || {};
+                    const selector = rule.selectorText || String(rule.cssText || '').split('{')[0].trim();
+                    for (const change of this.diff(was, now)) changes.push(Object.assign({ handle, index, selector, location: null }, change));
+                });
+            }
+
+            const located = Promise.all(Object.keys(sheets).filter(h => changes.some(c => c.handle === h)).map(handle => {
+                const sheet = sheets[handle];
+                return this.mapping(sheet).then(mapping => {
+                    if (!mapping) { reasons[handle] = 'no source map for this sheet, so no lines; a post-processor may have removed its link.'; return; }
+                    if (mapping.blocks.length !== counts[handle]) { reasons[handle] = `its text and its rules did not align (${mapping.blocks.length} blocks, ${counts[handle]} rules), so lines are withheld rather than wrong.`; return; }
+                    for (const change of changes) {
+                        if (change.handle !== handle) continue;
+                        change.location = this.locate(mapping, this.declarationOffset(mapping, change.index, change.prop));
+                    }
+                });
+            }));
+
+            return located.then(() => {
+
+                const extras = this.sharpEdges();
+                const patch  = this.patch(changes, extras, reasons);
+
+                this.panel('Captured styles', [patch], 'capture');
+                this.showNotice(changes.length || extras.length ? '🖌️ Captured' : '🖌️ Nothing changed', 'success');
+                if (this.logging('capture')) console.log(patch);
+                this.emit('sassy:captured', { patch, changes, extras });
+
+                return { patch, changes, extras };
+
+            });
+
+        },
+
+        /**
+         * Text first, markup second. One header per rule and source line, the plan's format:
+         *   file:line  selector
+         *     prop: old → new
+         */
+        patch (changes, extras, reasons) {
+
+            const groups = new Map();
+
+            for (const c of changes) {
+                const sheet = this.managed()[c.handle];
+                const where = c.location ? `${c.location.file}:${c.location.line}` : `${c.handle} (${String(sheet.href).split('/').pop().split('?')[0]})`;
+                const key   = `${c.handle}:${c.index}:${where}`;
+                if (!groups.has(key)) groups.set(key, [`${where}  ${c.selector}`]);
+                const rows = groups.get(key);
+                if (c.from === null)    rows.push(`  + ${c.prop}: ${c.to}`);
+                else if (c.to === null) rows.push(`  - ${c.prop}: ${c.from}`);
+                else                    rows.push(`  ${c.prop}: ${c.from} → ${c.to}`);
+            }
+
+            const lines = [];
+            for (const rows of groups.values()) lines.push(...rows);
+            for (const extra of extras) lines.push(extra.text, ...extra.rows);
+            for (const handle in reasons) lines.push(`${handle}: ${reasons[handle]}`);
+
+            return lines.length ? lines.join('\n') : 'Nothing changed since the last snapshot.';
+
+        },
+
+        /**
+         * The plan's sharp edges: a rule created in the inspector has no source location, and an
+         * element.style edit has no stylesheet. Both listed, both copy-only.
+         */
+        sharpEdges () {
+
+            const extras = [];
+
+            for (const sheet of document.styleSheets || []) {
+                if (sheet.href || sheet.ownerNode) continue;
+                let rules; try { rules = sheet.cssRules; } catch (e) { continue; }
+                for (const rule of rules || []) {
+                    const suggest = this.suggestFor(rule.selectorText);
+                    extras.push({
+                        kind: 'inspector',
+                        text: `inspector-stylesheet  ${rule.selectorText || rule.cssText}  (no source location${suggest ? '; try ' + suggest : ''})`,
+                        rows: Object.entries(this.declarations(rule)).map(([prop, value]) => `  + ${prop}: ${value}`),
+                    });
+                }
+            }
+
+            for (const [el, style] of this.inlineStyles()) {
+                if ((this.inlineBaseline && this.inlineBaseline.get(el)) === style) continue;
+                extras.push({ kind: 'inline', text: `element.style on <${this.describe(el)}>  (no stylesheet)`, rows: [`  ${style}`] });
+            }
+
+            return extras;
+
+        },
+
+        inlineStyles () {
+
+            return new Map(Array.from(document.querySelectorAll('[style]')).map(el => [el, el.getAttribute('style')]));
+
+        },
+
+        suggestFor (selector) {
+
+            const sheets = Object.values(this.managed());
+
+            if (selector) {
+                for (const sheet of sheets) {
+                    if (this.rulesOf(sheet).some(rule => rule.selectorText === selector)) return sheet.source;
+                }
+            }
+
+            return sheets.length ? sheets[0].source : null;
+
+        },
+
+        describe (el) {
+
+            const classes = el.classList && el.classList.length ? '.' + Array.from(el.classList).join('.') : '';
+
+            return String(el.tagName || '').toLowerCase() + (el.id ? '#' + el.id : '') + classes;
+
+        },
+
         /**
          * Re-request every same-origin stylesheet. What window.sassy.reload() is for: swapping
          * the CSS without recompiling and without a page load.
@@ -356,6 +734,11 @@
             const forceButton = document.getElementById('wp-admin-bar-sassy-force-compile');
             if (forceButton) {
                 forceButton.addEventListener('click', () => this.liveCompile(true));
+            }
+
+            const captureButton = document.getElementById('wp-admin-bar-sassy-capture');
+            if (captureButton) {
+                captureButton.addEventListener('click', () => this.capture());
             }
 
             document.addEventListener('keydown', this.onKeyDown.bind(this));

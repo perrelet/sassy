@@ -74,18 +74,40 @@ const copied = [];
 // Node 21+ ships a read-only navigator global, so a plain assignment is silently ignored.
 Object.defineProperty(global, 'navigator', { configurable: true, writable: true, value: { clipboard: { writeText: text => { copied.push(text); return Promise.resolve(); } } } });
 
-const panel = element({ 'data-sassy-sheets': '{}' });
+// A fake CSSOM for the paintbrush: two Sassy sheets, one with a map and one without, and a
+// nested rule so the flattening is exercised. Declared before the file loads so the baseline
+// snapshot at init sees them, as a real page's would.
+const rule  = (selectorText, cssText) => ({ selectorText, style: { cssText }, constructor: { name: 'CSSStyleRule' } });
+const front = { href: 'http://test.local/wp-content/scss/frontend.css', ownerNode: {}, cssRules: [
+    rule('.a', 'color: red;'),
+    { constructor: { name: 'CSSMediaRule' }, cssText: '@media (min-width: 1px)', cssRules: [rule('.b', 'gap: 4px;')] },
+    rule('.c', 'background: var(--x);'),
+    rule('.d', 'padding: 1px;'),
+] };
+const nomap = { href: 'http://test.local/wp-content/scss/nomap.css', ownerNode: {}, cssRules: [rule('.n', 'color: red;')] };
+const links = [
+    Object.assign(element(), { href: front.href + '?ver=1', sheet: front }),
+    Object.assign(element(), { href: nomap.href + '?ver=1', sheet: nomap }),
+];
+const managed = {
+    front: { href: front.href, map: front.href + '.map', source: '/srv/site/wp-content/plugins/d-pace/scss/frontend.scss' },
+    nomap: { href: nomap.href, map: null, source: '/srv/site/nomap.scss' },
+};
+
+const panel = element({ 'data-sassy-sheets': JSON.stringify(managed) });
 
 global.document = {
     body: element(),
     readyState: 'complete',
     getElementById: id => (id === 'sassy-errors' ? panel : null),
     querySelector: () => null,
-    querySelectorAll: sel => (String(sel).includes('sassy-log-toggle') ? toggles : []),
+    querySelectorAll: sel => (String(sel).includes('sassy-log-toggle') ? toggles : (String(sel).includes('stylesheet') ? links : [])),
     createElement: () => element(),
     addEventListener: (name, fn) => { if (name === 'keydown') keydown = fn; if (name === 'click') click = fn; },
-    dispatchEvent: e => dispatched.push(e.type),
+    dispatchEvent: e => { dispatched.push(e.type); lastEvent = e; },
+    styleSheets: [front, nomap],
 };
+let lastEvent = null;
 
 global.window = { sass_params: { ajax_url: '/ajax', sassy_compile_nonce: 'n', keybinding: ['ctrl+space', 'meta+space'] } };
 global.location = { href: 'http://test.local/', origin: 'http://test.local' };
@@ -271,6 +293,89 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
     global.fetch = () => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ success: false, data: {} }) });
     await global.window.sassy.poll();
     ok('a failing endpoint is reported, not retried silently', errors.some(e => e.includes('auto-reload stopped')));
+
+    // --- The paintbrush ----------------------------------------------------------
+
+    const inline = [];
+    document.querySelectorAll = sel => (String(sel).includes('stylesheet') ? links : (String(sel) === '[style]' ? inline : []));
+
+    ok('the baseline was taken at load', global.window.sassy.capture !== undefined && links[0].listeners.load !== undefined);
+
+    // The sheet's text, and a map for it encoded here rather than trusted from the code under test.
+    const text = '.a{color:red}@media (min-width:1px){.b{gap:4px}}.c{background:var(--x)}.d{padding:1px}';
+    const off  = s => text.indexOf(s);
+    const segments = [
+        [off('.a{'), 0, 0, 0], [off('color:'), 0, 1, 2],
+        [off('@media'), 0, 3, 0], [off('.b{'), 0, 4, 2], [off('gap:'), 0, 5, 4],
+        [off('.c{'), 0, 7, 0], [off('background:'), 0, 8, 2],
+        [off('.d{'), 0, 10, 0], [off('padding:'), 0, 11, 2],
+    ];
+    const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    const enc = n => { let v = n < 0 ? ((-n) << 1) | 1 : n << 1, out = ''; do { let d = v & 31; v >>= 5; if (v > 0) d |= 32; out += B64[d]; } while (v > 0); return out; };
+    let prev = [0, 0, 0, 0];
+    const mappings = segments.map(seg => { const rel = seg.map((v, i) => v - prev[i]); prev = seg; return rel.map(enc).join(''); }).join(',');
+    const map = { version: 3, sources: ['../plugins/d-pace/scss/frontend.scss'], mappings };
+
+    global.fetch = url => {
+        url = String(url);
+        if (url.endsWith('.map')) return Promise.resolve({ ok: true, json: () => Promise.resolve(map) });
+        return Promise.resolve({ ok: true, arrayBuffer: () => Promise.resolve(new TextEncoder().encode(text).buffer) });
+    };
+
+    // Paint: one changed, one added, one shorthand changed, one removed, one in the mapless sheet,
+    // a rule created in the inspector, and an inline style.
+    front.cssRules[0].style.cssText = 'color: blue;';
+    front.cssRules[1].cssRules[0].style.cssText = 'gap: 4px; margin: 0;';
+    front.cssRules[2].style.cssText = 'background: red;';
+    front.cssRules[3].style.cssText = '';
+    nomap.cssRules[0].style.cssText = 'color: green;';
+    document.styleSheets.push({ href: null, ownerNode: null, cssRules: [rule('.a', 'color: green;')] });
+    inline.push(Object.assign(element({ style: 'color: red' }), { tagName: 'DIV', id: 'hero' }));
+
+    const result = await global.window.sassy.capture();
+
+    const expected = [
+        'plugins/d-pace/scss/frontend.scss:2  .a',
+        '  color: red → blue',
+        'plugins/d-pace/scss/frontend.scss:5  .b',
+        '  + margin: 0',
+        'plugins/d-pace/scss/frontend.scss:9  .c',
+        '  background: var(--x) → red',
+        'plugins/d-pace/scss/frontend.scss:12  .d',
+        '  - padding: 1px',
+        'nomap (nomap.css)  .n',
+        '  color: red → green',
+        'inspector-stylesheet  .a  (no source location; try /srv/site/wp-content/plugins/d-pace/scss/frontend.scss)',
+        '  + color: green',
+        'element.style on <div#hero>  (no stylesheet)',
+        '  color: red',
+        'nomap: no source map for this sheet, so no lines; a post-processor may have removed its link.',
+    ].join('\n');
+
+    ok('the patch is exactly the plan\'s format', result.patch === expected);
+    if (result.patch !== expected) results['got: ' + result.patch.replace(/\n/g, ' | ')] = false;
+    ok('a changed declaration maps to its own line, not the rule\'s', result.patch.includes(':2  .a'));
+    ok('an added declaration maps to the rule\'s line',             result.patch.includes(':5  .b'));
+    ok('a shorthand stays a shorthand',                              result.patch.split('\n').filter(l => l.includes('background')).length === 1);
+    ok('the panel shows it, titled and kinded',                      panel.classList.contains('show') && panel.attrs['data-kind'] === 'capture' && header.children[0].textContent === 'Captured styles');
+    ok('the panel text is the patch',                                panel.querySelectorAll('.sassy-error').map(el => el.textContent).join('\n\n') === expected);
+    ok('sassy:captured carries it',                                  lastEvent && lastEvent.type === 'sassy:captured' && lastEvent.detail.patch === expected && lastEvent.detail.changes.length === 5);
+    buttons[0].click();
+    ok('Copy yields the patch',                                      copied[copied.length - 1] === expected);
+
+    // A rule the text does not have: lines are withheld for that sheet, not invented.
+    front.cssRules.push(rule('.e', 'color: pink;'));
+    const misaligned = await global.window.sassy.capture();
+    ok('a misaligned sheet withholds lines',  misaligned.patch.includes('front: its text and its rules did not align (5 blocks, 6 rules)'));
+    ok('and names the sheet instead',         misaligned.patch.includes('front (frontend.css)  .e') && misaligned.patch.includes('front (frontend.css)  .a'));
+
+    // A reload re-baselines: what was painted is now the sheet, so nothing is a change.
+    front.cssRules.pop();
+    links[0].listeners.load(); links[1].listeners.load();
+    document.styleSheets.pop();
+    inline.length = 0;
+    const quiet = await global.window.sassy.capture();
+    ok('after a sheet reloads, the paint is the new baseline', quiet.patch === 'Nothing changed since the last snapshot.' && quiet.changes.length === 0);
 
     process.stdout.write(JSON.stringify(results));
 
