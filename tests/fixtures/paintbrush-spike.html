@@ -1,0 +1,143 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Sassy paintbrush spike</title>
+<!--
+  Phase 7's spike, plan §3 and §7. Open it on the site the sheet belongs to, same origin:
+
+      https://staging.d-pace.com/wp-content/plugins/sassy/tests/fixtures/paintbrush-spike.html
+
+  It loads the compiled sheet, snapshots every rule from the CSSOM, and on Capture diffs the
+  live CSSOM against that snapshot and maps each change through the source map to file:line.
+  Two questions, one page: are styles-pane edits visible to page JS, and does one real mapping
+  decode. Edit a declaration below in DevTools' styles pane, then press Capture.
+
+  ?css=/path/to/sheet.css picks another sheet; the map is read from its sourceMappingURL.
+-->
+<style>
+  body { font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 2rem; max-width: 60rem; }
+  #out { background: #1a1a1a; color: #e6e6e6; padding: 1rem; white-space: pre; overflow-x: auto; font: 12px/1.6 "SFMono-Regular", Consolas, Menlo, monospace; min-height: 8em; }
+  #sample { border: 1px dashed #999; padding: 1rem; margin: 1rem 0; }
+  button { font: inherit; padding: 0.4em 1em; }
+</style>
+
+<h1>Paintbrush spike</h1>
+<p>Select an element in <b>#sample</b>, edit one of its declarations in the styles pane, then <button id="capture">Capture</button> <button id="reset">Re-snapshot</button></p>
+<div id="sample">
+  <header class="site-header"><div class="site-header-inner"><a class="site-header-logo" href="#">Logo</a></div></header>
+  <p class="editorial">Editorial paragraph</p>
+  <button class="btn">A button</button>
+</div>
+<pre id="out">loading…</pre>
+
+<script>
+(async () => {
+
+  const out = document.getElementById('out');
+  const log = (...lines) => { out.textContent += lines.join('\n') + '\n'; };
+  out.textContent = '';
+
+  const cssUrl = new URLSearchParams(location.search).get('css') || '/wp-content/scss/frontend.css';
+
+  // 1. The sheet, into the page, and its text as the map sees it: bytes, so the byte-order mark
+  //    Dart writes in compressed mode keeps its column.
+  const link = Object.assign(document.createElement('link'), { rel: 'stylesheet', href: cssUrl });
+  await new Promise((ok, no) => { link.onload = ok; link.onerror = no; document.head.appendChild(link); });
+
+  const bytes = await (await fetch(cssUrl)).arrayBuffer();
+  const css   = new TextDecoder('utf-8', { ignoreBOM: true }).decode(bytes);
+
+  const mapRef = css.match(/sourceMappingURL=(\S+?)\s*\*\//);
+  if (!mapRef) { log('No sourceMappingURL in the sheet. Lightning CSS strips it; tier 1 has nothing to map through here.'); return; }
+  const map = await (await fetch(new URL(mapRef[1], new URL(cssUrl, location.href)))).json();
+
+  // 2. The map, decoded. Twenty lines.
+  const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const lines = []; let src = 0, oline = 0, ocol = 0;
+  for (const encoded of map.mappings.split(';')) {
+    const segs = []; let col = 0;
+    for (const seg of encoded.split(',')) {
+      if (!seg) continue;
+      const vals = []; let shift = 0, value = 0;
+      for (const ch of seg) {
+        const d = B64.indexOf(ch); value += (d & 31) << shift; shift += 5;
+        if (!(d & 32)) { vals.push(value & 1 ? -(value >> 1) : value >> 1); value = 0; shift = 0; }
+      }
+      col += vals[0];
+      if (vals.length > 1) { src += vals[1]; oline += vals[2]; ocol += vals[3]; }
+      segs.push({ col, src, oline, ocol });
+    }
+    lines.push(segs);
+  }
+  const lookup = offset => {
+    const before = css.slice(0, offset);
+    const line = (before.match(/\n/g) || []).length;
+    const col  = offset - (before.lastIndexOf('\n') + 1);
+    let hit = null;
+    for (const s of lines[line] || []) { if (s.col <= col) hit = s; else break; }
+    return hit ? `${map.sources[hit.src].replace(/^(\.\.\/)+/, '')}:${hit.oline + 1}` : '(unmapped)';
+  };
+
+  // 3. Every block in the text, in order, so it can be aligned with the CSSOM's rules in order.
+  //    Depth-aware: strings, comments, nested at-rules, keyframe selectors.
+  const blocks = []; const stack = [];
+  let i = 0, preludeStart = 0, quote = null;
+  while (i < css.length) {
+    const c = css[i];
+    if (quote) { if (c === '\\') i++; else if (c === quote) quote = null; }
+    else if (c === '"' || c === "'") quote = c;
+    else if (c === '/' && css[i + 1] === '*') { i = css.indexOf('*/', i + 2) + 1; preludeStart = i + 1; }
+    else if (c === '{') { const prelude = css.slice(preludeStart, i).trim(); blocks.push({ start: preludeStart + css.slice(preludeStart, i).search(/\S/), prelude }); stack.push(prelude); preludeStart = i + 1; }
+    else if (c === '}') { stack.pop(); preludeStart = i + 1; }
+    else if (c === ';') preludeStart = i + 1;
+    i++;
+  }
+
+  // 4. The CSSOM, flattened in the same order. Statements without a block (@import, @layer a;)
+  //    are skipped on both sides.
+  const sheet = [...document.styleSheets].find(s => s.href && s.href.includes(cssUrl.split('/').pop()));
+  const flat = [];
+  const walk = rules => { for (const r of rules) { if (r instanceof CSSImportRule || r instanceof CSSNamespaceRule || (r.constructor.name === 'CSSLayerStatementRule')) continue; flat.push(r); if (r.cssRules) walk(r.cssRules); } };
+  try { walk(sheet.cssRules); } catch (e) { log('Cannot read cssRules: ' + e.message + ' (cross-origin?)'); return; }
+
+  log(`sheet: ${cssUrl}`, `map: ${map.sources.length} sources, ${lines.reduce((n, l) => n + l.length, 0)} segments`, `text blocks: ${blocks.length}   CSSOM rules: ${flat.length}   ${blocks.length === flat.length ? 'aligned' : 'MISALIGNED: mapping will be off; report this'}`, '');
+
+  // 5. Snapshot and diff.
+  const declarations = rule => { const d = {}; if (rule.style) for (const p of rule.style) d[p] = rule.style.getPropertyValue(p) + (rule.style.getPropertyPriority(p) ? ' !important' : ''); return d; };
+  const inline = () => [...document.querySelectorAll('[style]')].map(el => [el, el.getAttribute('style')]);
+  let base, baseInline;
+  const snapshot = () => { base = flat.map(declarations); baseInline = new Map(inline()); log(`snapshot: ${flat.length} rules at ${new Date().toLocaleTimeString()}`); };
+  snapshot();
+
+  const declOffset = (block, prop) => { const at = css.indexOf(prop + ':', block.start); return at > -1 && at < (blocks[blocks.indexOf(block) + 1] || { start: css.length }).start ? at : block.start; };
+
+  document.getElementById('capture').onclick = () => {
+    log('', `capture at ${new Date().toLocaleTimeString()}`);
+    let changes = 0;
+    flat.forEach((rule, n) => {
+      const now = declarations(rule), was = base[n], block = blocks[n];
+      const props = new Set([...Object.keys(was), ...Object.keys(now)]);
+      let header = false;
+      for (const p of props) {
+        if (was[p] === now[p]) continue;
+        if (!header) { log(`${lookup(block.start)}  ${rule.selectorText || block.prelude}`); header = true; }
+        changes++;
+        if (!(p in was))       log(`  + ${p}: ${now[p]}    (${lookup(declOffset(block, p))})`);
+        else if (!(p in now))  log(`  - ${p}: ${was[p]}    (${lookup(declOffset(block, p))})`);
+        else                   log(`  ${p}: ${was[p]} → ${now[p]}    (${lookup(declOffset(block, p))})`);
+      }
+    });
+    for (const s of document.styleSheets) {
+      if (s.href || (s.ownerNode && s.ownerNode.id !== undefined && s.ownerNode.tagName)) continue;
+      for (const r of s.cssRules) { changes++; log(`inspector-stylesheet (no source location; copy only)  ${r.cssText}`); }
+    }
+    for (const [el, style] of inline()) {
+      if (baseInline.get(el) === style) continue;
+      changes++; log(`element.style on <${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}> (no stylesheet; copy only)  ${style}`);
+    }
+    log(changes ? `${changes} change(s): styles-pane edits ARE visible to page JS.` : 'no changes seen. If you did edit a declaration, styles-pane edits are NOT visible and tier 1 dies.');
+  };
+
+  document.getElementById('reset').onclick = snapshot;
+
+})().catch(e => { document.getElementById('out').textContent += '\nfailed: ' + e.message; });
+</script>
