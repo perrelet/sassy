@@ -38,7 +38,6 @@ Sassy will compile a source file if any of the following are met:
 | `sassy-variables` | See [Variables](#variables) | Array of variables to be available. |
 | `sassy-import-paths` | `[dirname($src_path), SASSY_PATH]` (plus `DIGITALIS_FRAMEWORK_PATH` if defined) | Filesystem paths searched by `@import`/`@use`. |
 | `sassy-src-map` | `true` | Whether to generate the source map. |
-| `sassy-src-map-options` | See [Source Maps](#source-maps) | Source map options array. |
 | `sassy-css` | N/A | The compiled css (post‑SCSS engine; used by Lightning CSS). |
 | `sassy-lightning-css` | `true` | Whether to run the optional Lightning CSS post‑processor. |
 | `sassy-lightning-css-binary` | `null` | Returns the Lightning CSS CLI binary/command to use. See [Lightning CSS post-processing](#lightning-css-post-processing). |
@@ -46,6 +45,9 @@ Sassy will compile a source file if any of the following are met:
 | `sassy-dart-sass-binary` | `SASSY_DART_SASS_BIN` constant (or `null`) | Path to the Dart Sass binary. If unset, compilation fails — there is no implicit fallback. |
 | `sassy-src-path` | (resolved from URL) | Override the resolved filesystem path of the source SCSS file. |
 | `sassy-print-errors` | `true` | Whether to render compile errors to the page footer. |
+| `sassy-style-queues` | `[wp_styles()]` | Registries discovery reads. Later queues win on a duplicate handle. |
+| `sassy-dev` | `current_user_can('edit_theme_options')` | Whether the dev surface is active for this request. See [Live Compile](#live-compile). |
+| `sassy-keybinding` | `['ctrl+space', 'meta+space']` | Live Compile key combinations. `false` disables the key and leaves the button. |
 
 ## Variables
 
@@ -103,8 +105,8 @@ Sassy exposes `window.sassy.compile()` and fires `sassy:before-compile`, `sassy:
 When live compile runs, Sassy also:
 
 - Reloads any compiled stylesheets in-place (by adding a cache-busting `sassy` query parameter).
-- Logs compile metadata for each stylesheet to the browser console (engine, compiled file, source, handle, variables, source-map status, compile time, etc.).
-- Logs any SCSS compiler warnings for each stylesheet as a single, readable block in the console.
+- With **Logging → Compile meta** on, logs each stylesheet's compile metadata to the console (engine, compiled file, source, handle, content hash, source-map status, compile time).
+- With **Logging → Diagnostics** on, logs each stylesheet's warnings and deprecations, rendered exactly as the CLI renders them.
 
 ## WP-CLI
 
@@ -160,7 +162,7 @@ Handles are discovered once at startup — registering a new one needs a restart
 
 ## Lightning CSS post-processing
 
-Sassy can optionally run your compiled CSS through [Lightning CSS](https://lightningcss.dev/) for minification and modern CSS transforms. This happens **after** SCSS compilation, via the `sassy-css` filter.
+Sassy can optionally run your compiled CSS through [Lightning CSS](https://lightningcss.dev/) for minification and modern CSS transforms. It is a registered post-processor, so it runs after SCSS compilation and after the `sassy-css` filter.
 
 Lightning CSS is **disabled by default** until you point Sassy at a binary.
 
@@ -191,7 +193,7 @@ add_filter('sassy-lightning-css-binary', function ($bin) {
 To toggle Lightning CSS on/off without changing code, use:
 
 ```php
-add_filter('sassy-lightning-css', function ($enabled, $src, $handle, $compiler) {
+add_filter('sassy-lightning-css', function ($enabled, $src, $handle, $asset) {
     // Example: only run in production, or skip for certain handles.
     if (defined('WP_DEBUG') && WP_DEBUG) {
         return false; // disable in debug/dev
@@ -200,12 +202,12 @@ add_filter('sassy-lightning-css', function ($enabled, $src, $handle, $compiler) 
 }, 10, 4);
 ```
 
-By default, Sassy runs Lightning CSS with `--minify`. If the binary cannot be found, or Lightning CSS fails, the original compiled CSS is returned unchanged and the Lightning CSS error is logged to PHP’s error log.
+By default, Sassy runs Lightning CSS with `--minify`. If the binary cannot be found, or Lightning CSS fails, the original compiled CSS is returned unchanged and a warning carrying Lightning's stderr joins the compile's diagnostics, so `wp sassy compile` prints it and `wp sassy check --strict` fails on it.
 
 To customize Lightning CSS options such as `--minify`, `--bundle`, `--targets`, or `--error-recovery`, you can use:
 
 ```php
-add_filter('sassy-lightning-css-options', function ($options, $src, $handle, $compiler) {
+add_filter('sassy-lightning-css-options', function ($options, $src, $handle, $asset) {
     // Disable minification for certain handles:
     if (in_array($handle, ['editor-style', 'admin-style'], true)) {
         $options['minify'] = false;

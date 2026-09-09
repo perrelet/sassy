@@ -45,9 +45,9 @@ It also settles four debts earlier phases deliberately deferred here. Read those
 
 **The admin page is not in this phase.** It was carved out into phase 6b (plan §3) because it is the only part of the dev surface needing visual design, and that conversation deserves its own room rather than being squeezed in beside a keybinding rewrite. Do not build it, and do not half-build it: no menu registration, no page callback.
 
-**Clear Cache stays in the admin bar**, against what an older draft of the plan said. It was dropped because the admin page would carry it, and that justification expires while the page waits in 6b. Removing it now would ship 3.0.0 with no UI route to clearing the cache at all. Force Recompile still goes: Live Compile already skips the cache, which is a real redundancy rather than a deferred replacement.
+**Clear Cache stays in the admin bar**, against what an older draft of the plan said. It was dropped because the admin page would carry it, and that justification expires while the page waits in 6b. Removing it now would ship 3.0.0 with no UI route to clearing the cache at all. Force Recompile stays too, renamed Force Compile and moved onto the endpoint: Live Compile checks the cache rather than skipping it, so the forced route is not redundant. The claim that it was survived six passes before code review caught it.
 
-**Removals are a set, not a list.** `?sassy-vars=1`, `?sassy-recompile=1`, `UI::print_variables()`, `Sassy::get_all_variables()` and `meta.variables` all go together, along with Force Recompile and Clear Cache leaving the bar. Live Compile already skips the cache, which is what makes Force Recompile redundant rather than merely unfashionable.
+**Removals are a set, not a list.** `?sassy-vars=1`, `?sassy-recompile=1`, `UI::print_variables()`, `Sassy::get_all_variables()` and `meta.variables` all go together. Force Compile, Clear Cache and the per-handle entries stay, as above.
 
 ## Strangler order
 

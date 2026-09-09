@@ -572,7 +572,7 @@ Pruned to actions. Detail lives on the admin page.
 | Log Variables | **Replaced by 📜 Logging** — a submenu of console-logging toggles (diagnostics, compile meta, stack summary, capture diffs), persisted client-side, rendered via the canonical formatter |
 | 🖌️ Capture | New, phase 7, present only when enabled |
 | Clear Cache | **Stays for 3.0.0.** It was dropped because the admin page would carry it, and that reason expires while the page waits in 6b. Removed from the bar when its replacement ships |
-| Per-file submenus | Drop from bar; per-handle detail moves to the admin page |
+| Per-file submenus | **Stay for 3.0.0**, with Clear Cache and for the same reason. Per-handle detail moves to the admin page when it ships |
 
 #### Live compile
 
@@ -602,7 +602,7 @@ implied covered — the `watch` precedent.
 
 **Breaks:** `wp sassy list`'s `state` column takes the canonical asset-state vocabulary, changing
 `no source`/`not built`/`current`/`stale` into that set plus `error` and `warning`; the
-`wp_ajax_nopriv_sassy_compile` registration is dropped; `?sassy-vars=1`, `Sassy::get_all_variables()` and `meta.variables` are gone; Force Recompile and Clear Cache leave the admin bar, as do the per-file submenus; errors and DOM nodes are keyed by handle, so `meta.index` goes with the JS rewrite.
+`wp_ajax_nopriv_sassy_compile` registration is dropped; `?sassy-vars=1`, `Sassy::get_all_variables()` and `meta.variables` are gone; Force Recompile is renamed Force Compile and runs through the endpoint; Clear Cache and the per-file submenus stay until 6b; errors and DOM nodes are keyed by handle, so `meta.index` goes with the JS rewrite.
 
 **Acceptance:**
 - With `sassy-dev` returning false, no dev-surface assets reach the page: no JS, no panel

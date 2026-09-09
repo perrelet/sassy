@@ -59,11 +59,16 @@ sassy/
 │   │   ├── admin.class.php            # Admin loader (just boots Updater)
 │   │   └── updater.class.php          # Custom update checker against digitalis.ca
 │   ├── view/
-│   │   └── ui.class.php              # Admin bar SCSS menu, clipboard support
+│   │   └── ui.class.php              # Admin bar SCSS menu and Clear Cache
 │   └── cli/
 │       └── sassy-cli-command.class.php  # WP-CLI: status, list, compile, watch, vars, deps, clear
 ├── assets/
-│   └── css/sassy.css                 # Plugin's own admin styles (hand-maintained)
+│   ├── css/sassy.css                 # Plugin's own admin styles (hand-maintained)
+│   └── js/sassy.js                   # Dev surface: Live Compile, logging toggles, keybinding, window.sassy
+├── docs/
+│   ├── style-stack-plan.md           # The 3.0 spec of record on this branch
+│   ├── upgrading-to-3.0.md           # What breaks for third parties, appended per phase
+│   └── briefs/                       # Builder briefs, one per landed phase
 ├── tests/                            # `php tests/run.php` — no PHPUnit, no WordPress
 ├── vendor/                           # Composer dependencies (scssphp/scssphp v2.x)
 └── composer.json                     # Requires scssphp/scssphp ^2.1.0
@@ -73,7 +78,7 @@ sassy/
 
 ## Boot Sequence
 
-1. **`sassy.php`** — Defines constants, creates `new Sassy\Sassy()` stored in `$Sassy` global, registers `SASSY()` helper. Registers WP-CLI command if `WP_CLI` is defined.
+1. **`sassy.php`** — Defines constants, creates `new Sassy\Sassy()` stored in `$Sassy` global, registers `SASSY()` helper. The constructor also registers `wp_ajax_sassy_compile` → `Sassy::compile_all()`, with no `nopriv` counterpart. Registers WP-CLI command if `WP_CLI` is defined.
 2. **`plugins_loaded`** → `Sassy::boot()`:
    - Loads vendors (Composer autoload)
    - Loads model classes (require_once in order: `Diagnostic`, `Compile_Request`, `Compile_Result`, `Lightning_CSS_Postprocessor`, `Scss_Map`, `Asset`, `Style_Stack`, `Build_Target`, `Variable_Resolver`, `Compile_Cache`, `Import_Graph`, `Import_Resolver`, `Import_Scanner`, `Compiler_Engine` interface, engine implementations, `Printer`)
@@ -89,7 +94,7 @@ sassy/
 
 ### Trigger
 
-`style_loader_src` filter intercepts any enqueued style whose URL ends in `.scss`. A fresh `Printer` is created per file and tracked in `Sassy::$printers`, keyed by a 1-based index the admin bar and its JS use for DOM ids.
+`style_loader_src` filter intercepts any enqueued style whose URL ends in `.scss`. A fresh `Printer` is created per file and tracked in `Sassy::$printers`, keyed by handle. `UI::node_id($handle)` derives the admin bar DOM id from it, and the AJAX payload carries that id as `meta.node`.
 
 ### `Printer::compile($src, $handle)`
 
@@ -102,7 +107,7 @@ sassy/
 3. **Build the request** — a `Compile_Request` carrying source, source_path, load_paths (source dir + SASSY_PATH + DIGITALIS_FRAMEWORK_PATH if defined), variables, style, source_map, map_path and map_url. No key is any engine's option name.
 4. **Delegate to engine** — calls `Compiler_Engine::compile($request)`, returns `Compile_Result` carrying `Diagnostic[]` whether it succeeded or failed.
 5. **URL rewriting** — rewrites relative `url()` references in the compiled CSS to absolute paths based on the source SCSS location.
-6. **`sassy-css` filter** — passes CSS through registered post-processors (Lightning CSS hooks here at priority 20).
+6. **Post-processing** — the `sassy-css` filter first, then every registered post-processor with a `Post_Process_Context` (Lightning CSS is one). Whatever they report joins the diagnostics, and a notice is added if the CSS no longer links its source map.
 7. **Write to disk** — CSS to `wp-content/scss/{name}.css`; source map alongside if enabled.
 8. **Update transients** — refreshes filemtime cache.
 9. Returns the compiled CSS URL (passing through any query string from the original `.scss` URL).
@@ -150,7 +155,7 @@ Owned entirely by `Compile_Cache`. Nothing else reads or writes these keys.
 
 | Transient key | Content | Invalidated when |
 |---|---|---|
-| `sassy-filemtimes-{handle}` | `build_file => filemtime`, `__compile_time__`, `deps`, `dirs`, `truncated` | Directory creation error; rewritten after each successful compile |
+| `sassy-filemtimes-{handle}` | `build_file => filemtime`, `__compile_time__`, `__diagnostics__` (severity tally), `deps`, `dirs`, `truncated` | Directory creation error; rewritten after each successful compile |
 | `sassy-vars-sig-{handle}` | sha1 of serialized variables | Written only after a **successful** compile, so a failed one is never remembered as current |
 
 ### Dependency tracking
@@ -225,7 +230,7 @@ Uses `scssphp/scssphp` v2.x — pure PHP, no external processes.
 - Variables passed as `ScssPhp\ScssPhp\Value\Value` instances (parsed via `ValueConverter::parseValue()`).
 - Exposes the `sassy-compiler` action, passing the raw `ScssPhp\ScssPhp\Compiler` object for direct manipulation before compile. Engine-specific by nature, so it has no equivalent on Dart Sass.
 - Source maps generated via `Compiler::SOURCE_MAP_FILE`.
-- Warnings returned in `Compile_Result::info`.
+- Warnings and deprecations arrive through `Scssphp_Logger` as `Diagnostic`s on `Compile_Result::diagnostics`.
 
 > **scssphp v2.1.0 does not implement Sass modules.** `@use` and `@forward` throw
 > `Sass modules are not implemented yet`; only `@import` works. This engine is the zero-dependency
@@ -262,7 +267,7 @@ Because the temp input is not co-located with the real source, explicitly relati
 
 ## Post-Processing: Lightning CSS
 
-`Lightning_CSS_Postprocessor` is a static class that hooks into `sassy-css` (priority 20). It is **disabled by default** — it only activates when a binary is configured.
+`Lightning_CSS_Postprocessor` is registered as the `lightning-css` post-processor in `Sassy::boot()`, so it runs after the `sassy-css` filter. It is **disabled by default** — it only activates when a binary is configured.
 
 Binary resolution order:
 1. `SASSY_LIGHTNINGCSS_BIN` constant
@@ -271,7 +276,7 @@ Binary resolution order:
 
 If none of these are configured, `resolve_bin()` returns `null` and the post-processor returns the CSS untouched. There is deliberately no "try `npx` and hope" fallback — that made the post-processor appear enabled on every install.
 
-Process execution uses `proc_open()` with non-blocking I/O and a 60s timeout. Fails gracefully (returns original CSS) if binary is missing or process fails. stderr is discarded silently (logged to PHP error log on error).
+Process execution uses `proc_open()` with non-blocking I/O and a 60s timeout. A missing binary returns the CSS untouched. A failed run also returns it untouched and warns through the context, with stderr as the trace, so the failure reaches the compile's diagnostics rather than the error log.
 
 Default CLI options: `--minify`. Customizable via `sassy-lightning-css-options` filter (keys: `minify`, `bundle`, `targets`, `error_recovery`).
 
@@ -352,21 +357,24 @@ If the extension API ever cannot express one of them, the API is wrong. That is 
 
 ## Admin UI
 
-`UI` (`include/view/ui.class.php`) adds a **SCSS** item to the WordPress admin bar (visible to users with `edit_theme_options`). Requires at least one active compiler to appear.
+`UI` (`include/view/ui.class.php`) adds a **SCSS** item to the WordPress admin bar when `Policy::active()` and at least one `Printer` exists.
 
 Admin bar structure:
 - **SCSS** (root) — shows ❌ SCSS on compile errors
-  - ⚡ **Live Compile** — triggers AJAX recompile + in-place stylesheet reload (see JS)
-  - 🤖 **Force Recompile** — toggles `?sassy-recompile=1` query param
-  - 📝 **Log Variables** — toggles `?sassy-vars=1`; logs all SCSS variables to browser console on page load
+  - ⚡ **Live Compile** — the endpoint with the cache check, then an in-place stylesheet reload
+  - 🤖 **Force Compile** — the same endpoint with `force=1`, which applies `sassy-force-compile`
+  - 📜 **Logging** — console toggles for Diagnostics and Compile meta, kept per browser in `localStorage`
+  - 🗑️ **Clear Cache** — `?sassy-clear-cache=1`, handled on `init` by `UI::clear_cache()`
+  - `sassy-admin-bar` action, for third parties adding to the menu
   - _(separator)_
-  - Per-compiler entries (filename, state badge: error/compiled/cache)
-    - Source SCSS link
-    - Compiled CSS link
-    - Source map link
-    - Imported partials (from source map sources)
+  - Per-handle entries, id `sassy-<handle>`, state word from `Printer::get_state()`
+    - Source SCSS and Compiled CSS links, engine and last compile time
+    - Source map link and its other sources, when a map exists
 
-**Force recompile** via `?sassy-recompile=1`: `UI::run_compiler()` hooks `sassy-force-compile` and returns true.
+Two things here describe the code rather than the intent, and both go when the admin page (6b) replaces this menu:
+
+- Clear Cache calls `Compile_Cache::forget_all()`, which deletes by pattern from the options table. Under an external object cache, which the reference install runs, it removes nothing. `wp sassy clear` detects that case; the bar does not.
+- The per-source links are built by prefix-matching absolute paths. The Dart engine writes map `sources` relative to the map, so under Dart every source renders without a link and the entry file is listed among them.
 
 ---
 
@@ -504,14 +512,17 @@ there as needing both.
 | `sassy-src-path` | (resolved from URL, or `null`) | Override the source filesystem path. Applies even when resolution returned `null`, which is how a source Sassy cannot resolve gets placed. Receives `($path, $src, $handle, $asset)` |
 | `sassy-style-queues` | `[wp_styles()]` | Registries discovery reads. Later queues win on a duplicate handle |
 | `sassy-engine` | `null` (→ Scssphp_Engine) | Return a `Compiler_Engine` instance to override |
-| `sassy-dart-sass-binary` | `null` (→ `"sass"`) | Dart Sass binary path |
+| `sassy-dart-sass-binary` | `SASSY_DART_SASS_BIN`, else `null` | Dart Sass binary. No implicit fallback: unset, the compile fails and the error names the constant and the filter |
 | `sassy-css` | N/A | Post-process compiled CSS string |
 | `sassy-lightning-css` | `true` | Enable/disable Lightning CSS post-processing |
 | `sassy-lightning-css-binary` | `null` | Lightning CSS binary path |
 | `sassy-lightning-css-options` | `['minify'=>true, 'bundle'=>false, ...]` | Lightning CSS CLI flags |
 | `sassy-print-errors` | `true` | Whether to render compile errors to the page footer |
+| `sassy-dev` | `current_user_can('edit_theme_options')` | Whether the dev surface is active for this request. See [The dev surface](#the-dev-surface) |
+| `sassy-write-source` | `false` | The stricter gate for writing to source files, reserved for phase 7. Never implied by `sassy-dev` |
+| `sassy-keybinding` | `['ctrl+space', 'meta+space']` | Live Compile key combinations. `false` disables the key and leaves the button |
 
-All per-compile filters receive `($value, $src, $handle, $asset)`. The fourth argument was the `SCSS_Compiler` before 3.0; it is now the `Asset`, which is available before a compile starts and carries no build state.
+Per-compile filters receive `($value, $src, $handle, $asset)`, except `sassy-compile`, which receives `($value, $src, $handle)`. The fourth argument was the `SCSS_Compiler` before 3.0; it is now the `Asset`, which is available before a compile starts and carries no build state.
 
 ### Actions consumed by Sassy
 
@@ -525,13 +536,12 @@ All per-compile filters receive `($value, $src, $handle, $asset)`. The fourth ar
 | Hook | Callback |
 |---|---|
 | `plugins_loaded` | `Sassy::boot()` |
-| `after_setup_theme` | `Sassy::load_integrations()` |
-| `wp_ajax_sassy_compile` | `Sassy::compile_all()` (authenticated) |
-| `wp_ajax_nopriv_sassy_compile` | `Sassy::compile_all()` (unauthenticated — nonce verified inside) |
-| `wp_enqueue_scripts` | `Sassy::enqueue_scripts()` |
-| `admin_enqueue_scripts` | `Sassy::enqueue_scripts()` |
-| `wp_footer` / `admin_footer` | `Sassy::print_errors()` |
+| `after_setup_theme` | `Extensions::boot()`, which fires `sassy-register` |
+| `wp_ajax_sassy_compile` | `Sassy::compile_all()`. Checks `Policy::active()`, then the nonce. No `nopriv` registration |
+| `wp_enqueue_scripts` / `admin_enqueue_scripts` | `Sassy::enqueue_scripts()`, gated by `Policy::active()` |
+| `wp_footer` / `admin_footer` | `Sassy::print_errors()`, gated by `Policy::active()` and `sassy-print-errors` |
 | `admin_bar_menu` (priority 100) | `UI::admin_bar_menu()` |
+| `init` | `UI::clear_cache()`, only when `?sassy-clear-cache` is present |
 
 ---
 
@@ -539,7 +549,7 @@ All per-compile filters receive `($value, $src, $handle, $asset)`. The fourth ar
 
 | Constant | Set in | Value |
 |---|---|---|
-| `SASSY_VERSION` | `sassy.php` | `'2.1.0'` — kept identical to the plugin header |
+| `SASSY_VERSION` | `sassy.php` | `'3.0.0'` — kept identical to the plugin header |
 | `SASSY_PATH` | `sassy.php` | Absolute path to plugin directory (trailing slash) |
 | `SASSY_URI` | `sassy.php` | URL to plugin directory (trailing slash) |
 | `SASSY_ROOT_FILE` | `sassy.php` | `__FILE__` of sassy.php |
@@ -639,8 +649,7 @@ place an asset Sassy cannot resolve itself. It receives `($path, $src, $handle, 
 
 `Printer::get_src_path()` delegates here and keeps returning the URL when resolution comes
 back `null`, because its callers `file_exists()` that value and print it, so both outcomes are
-still plain strings. Phase 3 converts them to `Diagnostic`s, an absent local source naming the
-path and one that maps nowhere naming the URL.
+still plain strings. `Printer::compile()` reports both as `Diagnostic`s: an absent local source names the path, one that maps nowhere names the URL.
 
 ### `Style_Stack`
 
@@ -649,7 +658,8 @@ Style_Stack::discover(['frontend', 'admin'])   // fires those enqueue hooks, the
     ->all()            // Asset[] keyed by handle
     ->compilable()     // just the ones Sassy builds
     ->handle('x')      // ?Asset
-    ->dependents_of($file)   // [] until phase 5 inverts the import graph
+    ->dependents_of($file)   // every asset whose recorded import graph contains the file
+    ->audit()          // Diagnostic[] for wp sassy check
     ->context_errors() // context => message, for contexts that raised
 ```
 
@@ -677,9 +687,8 @@ need the filter or they stop being discovered — see
 - **`Compile_Cache` is the sole owner of "is it stale"**, including both transient keys. The CLI and admin bar used to read and delete them directly, which is how `wp sassy list` grew a staleness rule that disagreed with the one the compiler acted on.
 - **Transient-based caching** — avoids recompilation on every page load; invalidated by file changes or variable changes.
 - **Engine abstraction** — `Compiler_Engine` interface allows swapping scssphp for Dart Sass (or a custom engine) without changing the orchestration layer. Engines never call back into the domain: `Variable_Resolver::prepend()` is theirs to call, and each backend owns its own temp files.
-- **Filter-driven extensibility** — nearly every step is filterable; integrations work entirely through `sassy-variables`.
-- **Graceful degradation** — Lightning CSS and Dart Sass both fail silently (returning unprocessed CSS), so the site never breaks due to missing binaries.
-- **All three integrations are instantiated by Sassy** — Bricks, Oxygen, and Digitalis are all booted in `load_integrations()`; each self-disables via `condition()` if its builder/framework is absent.
+- **Filter-driven extensibility** — nearly every step is filterable, and the `Extensions` registry adds a name and a way to report on top of the four points that matter most.
+- **Graceful degradation** — a missing Lightning binary leaves the CSS untouched and a failed run says so as a warning; a missing Dart binary is a compile error like any other, and the previous build keeps serving.
 
 ---
 
@@ -688,4 +697,4 @@ need the filter or they stop being discovered — see
 - The plugin's own admin CSS is `assets/css/sassy.css`, edited directly — the SCSS source was dropped in `398e1c6`, so the VS Code Sass task in `.vscode/tasks.json` no longer has an input.
 - The `Scssphp_Engine` is the only engine that needs no external binaries — safe default for all environments.
 - When adding a new per-compile filter, keep the signature consistent: `($value, $src, $handle, $asset)`.
-- The `Compile_Result::info` field carries warnings (array of strings) from the engine. `Dart_Sass_Engine` populates it from stderr output; `Scssphp_Engine` currently returns `null` (reserved for future use).
+
