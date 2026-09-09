@@ -856,11 +856,11 @@ Status is ✅ done, **open** for something still to decide or do, and unmarked f
 | 1 ✅ | `Sassy::get_scss_styles()` removed | Verified: no usage in d-pace *or* lattice. Nothing to do |
 | **1, open** | `$digitalis_styles` no longer read | `Theme::enqueue_style_last()` **stays** — it is live Lattice API on other sites. Earlier revisions of this table called it dead code on the strength of zero callers under this `wp-content/`, which measures one consumer of a shared submodule and proves nothing about the rest. The fix belongs in Lattice, not per-site: register `sassy-style-queues` there so every site calling `enqueue_style_last()` keeps working under 3.0. **Decision pending** |
 | 2 ✅ | Fourth filter argument becomes `Asset` | All four d-pace callbacks ignore it: `engine($engine, $compiler)` declares it unused, the rest do not declare it. **No change needed**; verified against the shipped code, not assumed |
-| 3 | `sassy-src-map-options` removed | No d-pace or lattice binding. Nothing to do |
-| 4 | `Digitalis` integration removed | Confirmed unused (measured: 0 live occurrences — the only hits are two commented-out `@import`s in `scss-template/front.scss`). Note `lattice/load.php` injects the *same two variables* through `sassy-variables`, so removal changes nothing at runtime. That duplicate is dead too, but it is outside this table: **punch-list, not an edit** |
-| 4 | `Sassy\Dart_Sass_Engine` may move namespace/directory | Update `sassy.integration.php` |
-| 6 | New: register the dev gate | `add_filter('sassy-dev', fn () => current_user_can('dev'))` in the Sassy integration |
-| any | `wp_tempnam` workaround comment | Unnecessary since 2.1; remove |
+| 3 ✅ | `sassy-src-map-options` removed | No d-pace or lattice binding. Nothing to do |
+| 4 ✅ | `Digitalis` integration removed | Confirmed unused (measured: 0 live occurrences — the only hits are two commented-out `@import`s in `scss-template/front.scss`). Note `lattice/load.php` injects the *same two variables* through `sassy-variables`, so removal changes nothing at runtime. That duplicate is dead too, but it is outside this table: **punch-list, not an edit** |
+| 4 ✅ | `Sassy\Dart_Sass_Engine` may move namespace/directory | It did not move: still `Sassy\Dart_Sass_Engine` in `include/engines/`. Nothing to do |
+| 6 ✅ | New: register the dev gate | Bound in `sassy.integration.php` as a `sassy-dev` hook returning `current_user_can('dev')`. Verified 2026-09-09: a holder of `dev` sees the surface, an administrator without it does not, which is the phase 6 acceptance and needed this binding to be testable at all |
+| any ✅ | `wp_tempnam` workaround | Removed. Nothing in Sassy calls `wp_tempnam`: the Dart engine writes its own temp input and Lightning CSS owns a private `temp_file()` |
 | — | Comment claiming source maps resolve | Now accurate. Row kept so nobody "corrects" a correct comment |
 
 Production policy to adopt alongside (all built in 2.1):
