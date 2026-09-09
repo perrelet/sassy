@@ -56,12 +56,42 @@ Untested surface is named rather than implied covered. If you add browser behavi
 
 | Check | Expected |
 |---|---|
-| Open the **SCSS** menu | Live Compile, Logging, Clear Cache, then one entry per compiled handle |
+| Open the **SCSS** menu | Live Compile, Force Compile, Logging, Dashboard. Nothing per handle: that detail is on the page |
 | Click **🤖 Force Compile** with nothing changed | Handles recompile anyway. Live Compile in the same state should report cached instead: that difference is the reason both exist |
-| Confirm what is absent | No **Log Variables**: `wp sassy vars` and the Logging menu replace it |
-| Inspect a per-handle node's id | `sassy-<handle>`, e.g. `sassy-d-pace-frontend`. Not a number: a handle keeps its node across requests even when another handle stops compiling |
-| Check the glyph against `wp sassy list` | Same word for the same handle: `current`, `stale`, `warning`, `not built`, `no source` |
-| Click **Clear Cache** | Page reloads, handles recompile, glyphs return to current |
+| Confirm what is absent | No **Log Variables**, no **Clear Cache**, no per-handle entries: `wp sassy vars`, the Logging menu and the page replace them |
+| On a wp-admin screen, edit `admin.scss` and click **⚡ Live Compile** | The admin sheet on screen updates. Before 6b the endpoint only ever discovered the frontend |
+| Click **🧭 Dashboard** | Tools → Sassy opens |
+
+## The page
+
+Tools → Sassy, as a dev. Walk it once on a current install and once after breaking a partial.
+
+| Check | Expected |
+|---|---|
+| Log in as an administrator without `dev` | No **Sassy** under Tools, and `tools.php?page=sassy` is refused |
+| **Check** with everything current | The green "Everything current" notice, matching `wp sassy check` |
+| Break a partial, run `wp sassy compile`, reload the page | The handle reads `stale` in Stack and Check, and its section shows the error under **Last diagnostics**, with the engine's frame in the dark block. `check` never compiles, so this is the recorded failure, not a fresh one |
+| **Status** against `wp sassy status` | Same rows, same words. `dev surface` reads active for you |
+| **Stack** filters | `all` shows every handle (353 here); `managed`, `compilable`, `third-party` narrow, and the pressed button is outlined |
+| The page's own footer | No theme stylesheet, no frontend script: discovery ran into copies of the registries |
+| A handle's **Last diagnostics** on `d-pace-frontend` | Ten deprecations folded into one `global-builtin` group; the group opens on click; each has a location like `wp-content/plugins/d-pace/lattice-css/scss/_harness.scss:54:13`, resolved from the bare `_harness.scss` Dart cites |
+| Click a location | A "Copied" notice; the clipboard holds the absolute path with `:line:column` |
+| Click **Copy** on one diagnostic, paste into a terminal beside `wp sassy compile d-pace-frontend --force` | Byte-identical to that diagnostic's block there. Copy yields the canonical text, never the DOM |
+| **Copy all** | Every diagnostic for the handle, blank-line separated, as `Diagnostic::render_all()` prints them |
+| Import graph `<details>` | Files with modified time and `current`/`changed`/`missing`; the watched directories below |
+| **Compile all** | Notice, then the page reloads with every handle current and fresh compile times |
+| **Clear cache** | Redirects back with "Caches cleared"; every handle now reads `not built` or `stale` until the next request compiles it. Works under the external object cache staging runs |
+| Load the page over plain `http` (or with `navigator.clipboard` stubbed out in the console) | The Copy buttons are hidden; locations still render |
+
+## Auto-reload
+
+| Check | Expected |
+|---|---|
+| Turn **Logging → Auto-reload** on | Network tab shows the compile endpoint every two seconds with `hooks=<context>` and no `force` |
+| Edit a partial and save, with the tab in the foreground | Within two seconds the affected sheet re-requests with `?sassy=<new hash>`; the others do not |
+| Switch to another tab for ten seconds | No requests while hidden |
+| Turn it off | The requests stop. Reload: they do not resume, and the toggle is unticked |
+| Log out in another tab while it is on | One console error saying auto-reload stopped, then no further requests |
 
 ## The event contract
 
@@ -91,5 +121,5 @@ document.addEventListener('sassy:compiled', e => {
 ## Finally
 
 - Console is clean: no errors, no warnings Sassy did not intend.
-- `wp sassy check` exits zero.
+- `wp sassy check` exits zero, and it says the same thing the page's Check section does.
 - Note anything you had to hard-reload twice for. That means something is versioning wrong.
