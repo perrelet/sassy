@@ -307,3 +307,46 @@ Default `['ctrl+space', 'meta+space']`, preserving 2.x behaviour, which accepted
 ### State words changed
 
 `wp sassy list`'s `state` column and the admin bar glyph now use one vocabulary: `no source`, `not built`, `stale`, `warning`, `current`, plus `error` from a compile that just failed. `wp sassy deps` uses `missing`, `changed`, `current`, lowercased from `MISSING`.
+
+## Phase 6b: the admin page
+
+Ships as 3.1.0.
+
+### The admin bar loses what the page now carries
+
+**Who this affects:** anyone clicking the per-handle entries or Clear Cache in the bar, or linking to `?sassy-clear-cache=1`.
+
+- The per-handle entries and **Clear Cache** are gone from the bar. Tools → Sassy has both, and the bar gains a **Dashboard** link to it.
+- `?sassy-clear-cache=1` and `UI::clear_cache()` are gone. Clear cache is a nonced POST to `admin_post_sassy_clear`.
+- **Logging** gains an **Auto-reload** toggle. Off by default, per browser, like the other two.
+
+### The compile endpoint takes `hooks`
+
+**Who this affects:** anything calling `admin-ajax.php?action=sassy_compile` directly.
+
+`hooks` is a comma list of `frontend`, `admin` and `editor`, or `all`, defaulting to `frontend` as before. The shipped JS sends the context it was served in (`admin,editor` under wp-admin), so Live Compile on an admin screen now rebuilds the sheet on that screen. `window.sassy.compile(force, hooks)` takes it as a second argument.
+
+`meta.src_url` is gone from the payload. It held the map URL under a misleading name and nothing read it; `meta.compiled_url` and `has_source_map` remain.
+
+### A `sassy` handle appears in the stack
+
+**Who this affects:** anything counting `wp sassy list`, or a `sassy-compile` filter that assumed every `.scss` was yours.
+
+Sassy's own stylesheet is now `assets/scss/sassy.scss`, registered on every request and enqueued for the dev surface, so it is compiled like any other handle and listed as `sassy`. The checked-in `assets/css/sassy.css` is gone; its replacement is a build output at `wp-content/scss/sassy.css`.
+
+### Diagnostics are recorded under their own key
+
+**Who this affects:** anything reading Sassy's transients directly, which nothing should.
+
+`sassy-diagnostics-{handle}` holds the last compile's diagnostics, written after failures too. `Compile_Cache::get_diagnostics()` reads it and `forget_handle()` drops it. The currency record and its severity tally are unchanged.
+
+### Discovery no longer touches the live registries
+
+**Who this affects:** code relying on `Style_Stack::discover()` leaving hook-enqueued handles in `wp_styles()` afterwards.
+
+Discovery with contexts now runs against copies of `wp_styles()` and `wp_scripts()` and restores the originals, and hands back the current screen. `discover()` with no contexts still reads the live queue as it stands.
+
+### `Printer::get_src_url()` is removed
+
+It reported the map URL. `Printer::get_map_url()` has since phase 2.
+

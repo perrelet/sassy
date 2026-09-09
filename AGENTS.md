@@ -7,13 +7,13 @@
 > the present, this file wins — so **each phase updates this file as part of landing**, or the
 > sentence you are reading becomes a trap.
 >
-> **Phases 1 to 6 have landed**, which is all of 3.0.0. Phase 6b (the admin page), 7, 8 and 9 are still as the plan describes them.
+> **Phases 1 to 6b have landed**: phases 1 to 6 are 3.0.0 and 6b, the admin page, is 3.1.0. Phases 7, 8 and 9 are still as the plan describes them.
 >
 > **Starting fresh?** Plan §8 opens with what to read and the four commands to run before touching anything. Run them: this file has been wrong about the present three times, and each time the code was right.
 
 ## Overview
 
-**Sassy** is a WordPress plugin (v3.0.0, by Digitalis Web Build Co.) that compiles SCSS files on-demand. The core premise: enqueue `.scss` files exactly as you would `.css` files via `wp_enqueue_style`, and Sassy intercepts the URL, compiles the SCSS to CSS, writes the result to disk, and returns the compiled CSS URL to WordPress instead.
+**Sassy** is a WordPress plugin (v3.1.0, by Digitalis Web Build Co.) that compiles SCSS files on-demand. The core premise: enqueue `.scss` files exactly as you would `.css` files via `wp_enqueue_style`, and Sassy intercepts the URL, compiles the SCSS to CSS, writes the result to disk, and returns the compiled CSS URL to WordPress instead.
 
 ```php
 wp_enqueue_style('my-theme', get_template_directory_uri() . '/style.scss');
@@ -48,6 +48,7 @@ sassy/
 │   │   ├── import-graph.class.php     # Recorded dependency set; answers "has anything changed?"
 │   │   ├── import-resolver.class.php  # Sass file-resolution rules (partials, _index, load paths)
 │   │   ├── import-scanner.class.php   # Walks the @use/@forward/@import graph into an Import_Graph
+│   │   ├── status.class.php           # How Sassy is configured, as rows for the CLI and the page
 │   │   └── lightning-css-postprocessor.class.php  # Optional Lightning CSS post-processing
 │   ├── engines/
 │   │   ├── compiler-engine.interface.php            # Contract for engine implementations
@@ -59,12 +60,13 @@ sassy/
 │   │   ├── admin.class.php            # Admin loader (just boots Updater)
 │   │   └── updater.class.php          # Custom update checker against digitalis.ca
 │   ├── view/
-│   │   └── ui.class.php              # Admin bar SCSS menu and Clear Cache
+│   │   ├── ui.class.php              # Admin bar SCSS menu
+│   │   └── admin-page.class.php      # Tools → Sassy: check, status, the stack, per-handle detail, actions
 │   └── cli/
 │       └── sassy-cli-command.class.php  # WP-CLI: status, list, compile, watch, vars, deps, clear
 ├── assets/
-│   ├── css/sassy.css                 # Plugin's own admin styles (hand-maintained)
-│   └── js/sassy.js                   # Dev surface: Live Compile, logging toggles, keybinding, window.sassy
+│   ├── scss/sassy.scss               # Sassy's own stylesheet, compiled by Sassy; authored for scssphp
+│   └── js/sassy.js                   # Dev surface: Live Compile, logging toggles, keybinding, the page, window.sassy
 ├── docs/
 │   ├── style-stack-plan.md           # The 3.0 spec of record on this branch
 │   ├── upgrading-to-3.0.md           # What breaks for third parties, appended per phase
@@ -81,8 +83,8 @@ sassy/
 1. **`sassy.php`** — Defines constants, creates `new Sassy\Sassy()` stored in `$Sassy` global, registers `SASSY()` helper. The constructor also registers `wp_ajax_sassy_compile` → `Sassy::compile_all()`, with no `nopriv` counterpart. Registers WP-CLI command if `WP_CLI` is defined.
 2. **`plugins_loaded`** → `Sassy::boot()`:
    - Loads vendors (Composer autoload)
-   - Loads model classes (require_once in order: `Diagnostic`, `Compile_Request`, `Compile_Result`, `Lightning_CSS_Postprocessor`, `Scss_Map`, `Asset`, `Style_Stack`, `Build_Target`, `Variable_Resolver`, `Compile_Cache`, `Import_Graph`, `Import_Resolver`, `Import_Scanner`, `Compiler_Engine` interface, engine implementations, `Printer`)
-   - Loads view (`UI` class, instantiated immediately)
+   - Loads model classes (require_once in order: `Diagnostic`, `Compile_Request`, `Compile_Result`, `Lightning_CSS_Postprocessor`, `Scss_Map`, `Asset`, `Style_Stack`, `Build_Target`, `Variable_Resolver`, `Compile_Cache`, `Import_Graph`, `Import_Resolver`, `Import_Scanner`, `Compiler_Engine` interface, engine implementations, `Printer`, `Status`)
+   - Loads views: `UI`, instantiated immediately, and `Admin_Page` under `is_admin()`
    - Registers `Lightning_CSS_Postprocessor::process` as the `lightning-css` post-processor
    - If `is_admin()`: loads and boots `Admin` → `Updater`
    - Registers `style_loader_src`, `wp_enqueue_scripts`, `wp_footer`, `admin_enqueue_scripts`, `admin_footer` hooks
@@ -157,7 +159,8 @@ Owned entirely by `Compile_Cache`. Nothing else reads or writes these keys.
 |---|---|---|
 | `sassy-filemtimes-{handle}` | `build_file => filemtime`, `__compile_time__`, `__diagnostics__` (severity tally), `deps`, `dirs`, `truncated` | Directory creation error; rewritten after each successful compile |
 | `sassy-vars-sig-{handle}` | sha1 of serialized variables | Written only after a **successful** compile, so a failed one is never remembered as current |
-| `sassy-handles` | Every handle `record()` has written, so `forget_all()` can clear by handle under an external object cache | Dropped by `forget_all()` |
+| `sassy-handles` | Every handle `record()` or `record_diagnostics()` has written, so `forget_all()` can clear by handle under an external object cache | Dropped by `forget_all()` |
+| `sassy-diagnostics-{handle}` | `time` and the last compile's diagnostics as arrays, **written after failures too**, so the page can show the error that made a handle stale. Read by `get_diagnostics()`, never by `get_state()` | `forget_handle()`, `forget_all()`; rewritten after every compile that ran |
 
 ### Dependency tracking
 
@@ -348,7 +351,7 @@ If the extension API ever cannot express one of them, the API is wrong. That is 
 
 **Admin bar node ids come from the server.** `UI::node_id($handle)` produces `sassy-<handle>` and the payload carries it as `meta.node`, so the JS never reconstructs the id and the two cannot drift. Errors and printers are keyed by handle rather than a request counter.
 
-**Cache-busting uses the build's content hash**, `meta.hash`, which is exact where `Math.random()` was merely different and is the primitive an opt-in change poll would compare. Nothing polls it yet: the poll, the copy affordances and two further logging toggles are phase 6b's (plan §3).
+**Cache-busting uses the build's content hash**, `meta.hash`, which is exact where `Math.random()` was merely different and is the primitive an opt-in change poll would compare. **Logging → Auto-reload** polls the compile endpoint every two seconds with the page's context and swaps only the sheets whose hash moved; off by default, per browser, paused while the tab is hidden, and it stops itself when the endpoint stops answering cleanly. The stack summary and capture diff toggles wait for phases 8 and 7.
 
 **The keybinding is filterable.** `sassy-keybinding` defaults to `['ctrl+space', 'meta+space']`; `false` disables it and leaves the button. The handler ignores repeats and bails unless focus is on `body`, which is what stops it fighting IME and autocomplete.
 
@@ -358,21 +361,36 @@ If the extension API ever cannot express one of them, the API is wrong. That is 
 
 ## Admin UI
 
+Two surfaces: the admin bar, pruned to actions, and the page under Tools that carries the detail.
+
+### Admin bar
+
 `UI` (`include/view/ui.class.php`) adds a **SCSS** item to the WordPress admin bar when `Policy::active()` and at least one `Printer` exists.
 
-Admin bar structure:
 - **SCSS** (root) — shows ❌ SCSS on compile errors
   - ⚡ **Live Compile** — the endpoint with the cache check, then an in-place stylesheet reload
   - 🤖 **Force Compile** — the same endpoint with `force=1`, which applies `sassy-force-compile`
-  - 📜 **Logging** — console toggles for Diagnostics and Compile meta, kept per browser in `localStorage`
-  - 🗑️ **Clear Cache** — a nonced `?sassy-clear-cache=1`, handled on `init` by `UI::clear_cache()`
+  - 📜 **Logging** — console toggles for Diagnostics and Compile meta, plus Auto-reload, kept per browser in `localStorage`
+  - 🧭 **Dashboard** — the page
   - `sassy-admin-bar` action, for third parties adding to the menu
-  - _(separator)_
-  - Per-handle entries, id `sassy-<handle>`, state word from `Printer::get_state()`
-    - Source SCSS and Compiled CSS links, engine and last compile time
-    - Source map link and its other sources, when a map exists
 
-One thing here describes the code rather than the intent, and it goes when the admin page (6b) replaces this menu: the per-source links are built by prefix-matching absolute paths, and the Dart engine writes map `sources` relative to the map, so under Dart every source renders without a link and the entry file is listed among them.
+### The page
+
+`Admin_Page` (`include/view/admin-page.class.php`) registers Tools → Sassy with capability `read` when `Policy::active()`, and the callback checks the gate again: the filter is the gate, not the capability string. It reads the model once per request through `Admin_Page::data()` and renders through `Admin_Page::html()`, a function from that array to markup, which is how the suite reads it.
+
+- **Check** — `Style_Stack::audit()`, rendered rather than exited on.
+- **Status** — `Status::rows()`, the same rows `wp sassy status` prints.
+- **Stack** — every handle under all three contexts with kind (`managed`, `compilable`, `third-party`), state, deps, imports, engine and time; the filter buttons hide rows client-side.
+- **Per handle** — build target links, the recorded import graph with each file's state, and the last diagnostics from `sassy-diagnostics-{handle}` grouped by `code` in `<details>`. Each diagnostic is a header (severity badge, click-to-copy `file:line:column`, first message line, documentation link) over the engine's verbatim body, with the canonical `Diagnostic::render()` text in a hidden `<pre>` for Copy, and a copy-all per handle.
+- **Actions** — Compile all, which is `window.sassy.compile(true, 'all')` followed by a reload, and Clear cache, a nonced POST to `admin_post_sassy_clear`.
+
+Cited files resolve through the recorded graph by path suffix (`Admin_Page::resolve_file()`): Dart cites bare basenames and cwd-relative paths in the same run, and exactly one recorded dependency ending in the cited string resolves it; anything else keeps the engine's text. The stored diagnostic is never rewritten. Discovery on the page runs into copies of the registries (see [`Style_Stack`](#style_stack)), which is what keeps the theme's stylesheets out of the page's footer.
+
+Behaviour is declared in attributes and served by one delegated click listener in `assets/js/sassy.js`: `data-sassy-copy` (the text itself), `data-sassy-copy-from` (an element id), `data-sassy-action="compile"` and `data-sassy-filter`. Copy buttons hide themselves where `navigator.clipboard` is absent, which is plain http.
+
+### Sassy's own stylesheet
+
+`assets/scss/sassy.scss` is registered on every request and enqueued for the dev surface, so it compiles through `style_loader_src` like any other handle, appears in `wp sassy list` as `sassy`, and outputs to `wp-content/scss/sassy.css`. Registered before the gate so a deploy compile primes it. Authored for scssphp, the default engine; `tests/test-admin-page.php` compiles it on both.
 
 ---
 
@@ -461,20 +479,21 @@ binary is absent.
 | File | Covers |
 |---|---|
 | `test-frontend-safety.php` | Nothing in the compile path calls an admin-only function; Lightning CSS stays off unless configured, and its cli.js route runs through node |
-| `test-clear-cache.php` | `Compile_Cache` indexes the handles it records, and `forget_all()` walks that index under an external object cache |
+| `test-clear-cache.php` | `Compile_Cache` indexes the handles it records, and `forget_all()` walks that index under an external object cache; the diagnostics record on both outcomes, and a `Diagnostic` round-tripping through it |
 | `test-error-panel.php` | `Sassy::get_errors()` reports a failure compiled after it was first asked, which is what a footer-enqueued style is |
 | `test-import-graph.php` | Import parsing and resolution; editing a partial invalidates; shadowing; a failed compile is not remembered as current |
 | `test-multiple-handles.php` | Handles sharing a source directory do not invalidate each other |
 | `test-source-maps.php` | Every map source resolves from where the map is served, and line numbers are unshifted |
 | `test-output-style.php` | `sassy-style` accepts the enum and the string, on both engines |
 | `test-printer.php` | `Build_Target` path math and its filters; `Variable_Resolver` defaults, Sass maps, scheme normalization and signatures; `Compile_Cache` currency across a partial edit, a variable change, a missing build file and both cache filters; `Printer` agreeing with all three |
-| `test-js.php` | Boots the shipped `assets/js/sassy.js` under a minimal DOM in node and exercises it through `window.sassy`: the canonical rendering, the log toggles, the keybinding including exact modifier matching, and `reload()`. Skips when node is absent |
+| `test-js.php` | Boots the shipped `assets/js/sassy.js` under a minimal DOM in node and exercises it through `window.sassy`: the canonical rendering, the log toggles, the keybinding including exact modifier matching, `reload()`, the context and `hooks` on the endpoint URL, the page's copy, filter and Compile all attributes, and the poll across three answers. Skips when node is absent |
 | `test-policy.php` | The dev gate: the `edit_theme_options` default, `sassy-dev` overriding both ways, and `sassy-write-source` never implied by it |
 | `test-check.php` | `dependents_of()` including non-canonical paths; the audit's three hard failures; orphan scoping against a dotfile, a directory and a real orphan; truncation as a fatal warning; the severity tally |
 | `test-extensions.php` | The registry: four kinds, named providers, re-registration replacing by slug, per-asset timing, and a post-processor's report reaching the `Printer` |
 | `test-fixtures.php` | The retired Bricks, Oxygen and Digitalis integrations rebuilt on the extension API, against stubbed builder APIs |
 | `test-diagnostics.php` | The `Diagnostic` schema and its rendering; Dart stderr parsing for all three shapes plus unrecognised output; the scssphp logger and its structured exceptions; engine capabilities |
-| `test-style-stack.php` | `Asset` field resolution (local, root-relative, remote, `src === false`), `sassy-src-path` over an unresolvable URL, discovery per context, a context that raises, the multi-queue filter, and `Printer` delegating rather than duplicating |
+| `test-style-stack.php` | `Asset` field resolution (local, root-relative, remote, `src === false`), `sassy-src-path` over an unresolvable URL, discovery per context, a context that raises, the multi-queue filter, `Printer` delegating rather than duplicating, discovery leaving the live registries and the screen as it found them, and `parse_contexts()` |
+| `test-admin-page.php` | Sassy's own stylesheet on both engines; cited files resolving by path suffix; the page's data and markup: kinds, escaping, check findings, a diagnostic's canonical text kept verbatim for copy, the actions |
 
 The second argument is what makes these worth having: point the runner at a checkout from before
 a fix and the relevant tests should fail. A test that passes against both is not testing the fix.
@@ -535,11 +554,12 @@ Per-compile filters receive `($value, $src, $handle, $asset)`, except `sassy-com
 |---|---|
 | `plugins_loaded` | `Sassy::boot()` |
 | `after_setup_theme` | `Extensions::boot()`, which fires `sassy-register` |
-| `wp_ajax_sassy_compile` | `Sassy::compile_all()`. Checks `Policy::active()`, then the nonce. No `nopriv` registration |
+| `wp_ajax_sassy_compile` | `Sassy::compile_all()`. Checks `Policy::active()`, then the nonce; takes `hooks` and `force`. No `nopriv` registration |
 | `wp_enqueue_scripts` / `admin_enqueue_scripts` | `Sassy::enqueue_scripts()`, gated by `Policy::active()` |
 | `wp_footer` / `admin_footer` | `Sassy::print_errors()`, gated by `Policy::active()` and `sassy-print-errors` |
 | `admin_bar_menu` (priority 100) | `UI::admin_bar_menu()` |
-| `init` | `UI::clear_cache()`, only when `?sassy-clear-cache` is present |
+| `admin_menu` | `Admin_Page::register()`, only when `Policy::active()` |
+| `admin_post_sassy_clear` | `Admin_Page::clear()`: the gate, then `check_admin_referer()`, then `Compile_Cache::forget_all()` |
 
 ---
 
@@ -547,7 +567,7 @@ Per-compile filters receive `($value, $src, $handle, $asset)`, except `sassy-com
 
 | Constant | Set in | Value |
 |---|---|---|
-| `SASSY_VERSION` | `sassy.php` | `'3.0.0'` — kept identical to the plugin header |
+| `SASSY_VERSION` | `sassy.php` | `'3.1.0'` — kept identical to the plugin header |
 | `SASSY_PATH` | `sassy.php` | Absolute path to plugin directory (trailing slash) |
 | `SASSY_URI` | `sassy.php` | URL to plugin directory (trailing slash) |
 | `SASSY_ROOT_FILE` | `sassy.php` | `__FILE__` of sassy.php |
@@ -661,6 +681,8 @@ Style_Stack::discover(['frontend', 'admin'])   // fires those enqueue hooks, the
     ->context_errors() // context => message, for contexts that raised
 ```
 
+**Discovery with contexts runs against copies of the live registries.** Inside a wp-admin page request the enqueue hooks would otherwise land the theme's assets in `wp_styles()` and `wp_scripts()` and print them in the footer, and `admin_screen()` would replace the page's own screen. `discover()` swaps in copies (clones, with each `_WP_Dependency` cloned too, so `wp_add_inline_style()` on an existing handle cannot reach the live page), fires, reads, and restores the originals and the screen. Copies rather than fresh instances: a handle registered at `init` outside any hook lives only in the live registry. `discover()` with no contexts reads the live queue as it stands. `Style_Stack::parse_contexts()` turns a `--hooks` value into contexts, or `null` for an unknown one; the CLI and the endpoint both use it.
+
 `discover()` fires each context inside an output buffer and records anything that raises rather
 than losing the run — third-party callbacks on the admin and editor hooks assume a request
 WP-CLI is not making. Surfaces render `context_errors()`; they do not decide. Passing no contexts reads
@@ -692,7 +714,7 @@ need the filter or they stop being discovered — see
 
 ## Development Notes
 
-- The plugin's own admin CSS is `assets/css/sassy.css`, edited directly — the SCSS source was dropped in `398e1c6`, so the VS Code Sass task in `.vscode/tasks.json` no longer has an input.
+- Sassy's own stylesheet is `assets/scss/sassy.scss` and Sassy compiles it; there is no checked-in CSS. See [Admin UI](#admin-ui).
 - The `Scssphp_Engine` is the only engine that needs no external binaries — safe default for all environments.
 - When adding a new per-compile filter, keep the signature consistent: `($value, $src, $handle, $asset)`.
 

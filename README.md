@@ -100,13 +100,26 @@ Who sees the dev surface at all is one filter. It defaults to `edit_theme_option
 add_filter('sassy-dev', fn () => current_user_can('dev'));
 ```
 
-Sassy exposes `window.sassy.compile()` and fires `sassy:before-compile`, `sassy:compiled` and `sassy:reload` on `document`, so driving it from a builder iframe is a listener rather than a reach-in.
+Sassy exposes `window.sassy.compile(force, hooks)`, `window.sassy.reload()` and `window.sassy.poll()`, and fires `sassy:before-compile`, `sassy:compiled` and `sassy:reload` on `document`, so driving it from a builder iframe is a listener rather than a reach-in. Live Compile sends the context it was served in, so on a wp-admin screen it rebuilds the sheet on that screen.
 
 When live compile runs, Sassy also:
 
 - Reloads any compiled stylesheets in-place (by adding a cache-busting `sassy` query parameter).
 - With **Logging → Compile meta** on, logs each stylesheet's compile metadata to the console (engine, compiled file, source, handle, content hash, source-map status, compile time).
 - With **Logging → Diagnostics** on, logs each stylesheet's warnings and deprecations, rendered exactly as the CLI renders them.
+- With **Logging → Auto-reload** on, polls every two seconds and swaps only the stylesheets whose content changed, so a save in your editor or a `wp sassy watch` compile appears without a keypress. Off by default, per browser, paused while the tab is hidden.
+
+## The dashboard
+
+Tools → Sassy, for anyone the dev surface is active for. It shows what `wp sassy check`, `status`, `list` and `deps` print, for a person who is not at a terminal:
+
+- **Check**: is everything current, unbroken and accounted for.
+- **Status**: engine, binaries, providers, build path, and whether the dev surface is active for you.
+- **Stack**: every registered style under every hook set, filterable by whether Sassy builds it.
+- **Per handle**: source, build and map links, the recorded import graph with each file's state, and the last compile's diagnostics, grouped and folded, each with the engine's own frame and trace.
+- **Actions**: Compile all, and Clear cache.
+
+Every `file:line:column` is click-to-copy, and **Copy** on a diagnostic yields exactly what the CLI prints, so it pastes into an agent or a ticket unchanged. Where Dart Sass cites a bare `_partial.scss`, the page resolves it to a path through the recorded import graph.
 
 ## WP-CLI
 

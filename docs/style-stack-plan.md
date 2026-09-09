@@ -937,7 +937,7 @@ anything**:
 git status                       # clean, on style-stack
 php tests/run.php                # 15 files
 wp sassy check                   # exit 0
-wp sassy status                  # version 3.0.0
+wp sassy status                  # version 3.1.0
 ```
 
 That is not ceremony. Documentation in this repo has drifted from the code three times: filters
@@ -951,7 +951,7 @@ Two things about this machine that no document upstream of you will mention:
   yours**, and has had throughout. Two of the modified lines in `sassy.integration.php` are the §4
   dev-gate and `wp_tempnam` changes; everything else in that tree belongs to someone else. Do not
   commit there.
-- 3.0.0 is tagged in the plugin header but **not released**. The digitalis.ca update JSON is not
+- 3.1.0 is tagged in the plugin header and neither it nor 3.0.0 is **released**. The digitalis.ca update JSON is not
   yet version-fenced, so publishing would offer a breaking upgrade to every 1.x install polling
   it. That fence is Jamie's and it is not done.
 
