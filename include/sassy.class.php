@@ -70,6 +70,7 @@ class Sassy {
 		require_once(SASSY_PATH . 'include/engines/dart-sass-parser.class.php');
 		require_once(SASSY_PATH . 'include/engines/dart-sass-engine.compiler-engine.php');
 		require_once(SASSY_PATH . 'include/model/printer.class.php');
+		require_once(SASSY_PATH . 'include/model/status.class.php');
 
 	}
 	

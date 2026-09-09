@@ -8,10 +8,6 @@
 
 require __DIR__ . '/bootstrap.php';
 
-function add_action () {}
-function add_filter () {}
-function sanitize_key ($key) { return preg_replace('/[^a-z0-9_\-]/', '', strtolower($key)); }
-
 require $SASSY_PLUGIN . 'include/sassy.class.php';
 require $SASSY_PLUGIN . 'include/view/ui.class.php';
 

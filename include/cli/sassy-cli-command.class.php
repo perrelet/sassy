@@ -522,63 +522,14 @@ class Sassy_CLI_Command extends WP_CLI_Command {
      */
     public function status ($args, $assoc_args) {
 
-        $compiler = new Printer();
-        $items    = [];
+        $items = [];
 
-        $row = function ($key, $value) use (&$items) {
-            $items[] = ['setting' => $key, 'value' => (string) $value];
-        };
-
-        $row('version',     defined('SASSY_VERSION') ? SASSY_VERSION : '?');
-        $row('engine',      $compiler->get_engine_class());
-        $row('capabilities', implode(', ', $compiler->get_engine()->capabilities()));
-        $row('output style', $compiler->get_style());
-        // Every per-compile filter takes the Asset as its fourth argument, so status has to hand
-        // one over too: a callback typed against it would fatal here otherwise.
-        $probe = new Asset('sassy-status-probe', false);
-
-        $row('source maps', apply_filters('sassy-src-map', true, false, $probe->handle, $probe) ? 'on' : 'off');
-        $row('dependency checking', apply_filters('sassy-check-dependencies', true, false, $probe->handle, $probe) ? 'on' : 'off (compile explicitly)');
-
-        foreach (Extensions::providers() as $kind => $slugs) {
-            $row(str_replace('_', ' ', $kind), $slugs ? implode(', ', $slugs) : '(none registered)');
-        }
-
-        $sass_bin = (new Dart_Sass_Engine())->get_sass_bin();
-        $row('dart sass binary', $sass_bin ?: '(not configured)');
-        if ($sass_bin) $row('dart sass version', $this->probe($sass_bin . ' --version'));
-
-        if (!apply_filters('sassy-lightning-css', true, false, $probe->handle, $probe)) {
-            $row('lightning css', 'disabled by filter');
-        } else if ($bin = Lightning_CSS_Postprocessor::resolve_bin()) {
-            $row('lightning css', 'enabled');
-            $row('lightning css binary', $bin);
-        } else {
-            $row('lightning css', 'off (no binary configured)');
-        }
-
-        $build_path = $compiler->get_build_path();
-        $row('build path', $build_path);
-        $row('build path writable', is_dir($build_path) ? (is_writable($build_path) ? 'yes' : 'NO') : '(not created yet)');
-
-        foreach (['SASSY_DART_SASS_BIN', 'SASSY_LIGHTNINGCSS_BIN', 'SASSY_TOOLS_DIR'] as $constant) {
-            $row($constant, defined($constant) ? constant($constant) : '(undefined)');
-        }
+        foreach (Status::rows() as $setting => $value) $items[] = ['setting' => $setting, 'value' => (string) $value];
 
         Utils\format_items($assoc_args['format'] ?? 'table', $items, ['setting', 'value']);
 
     }
 
-    /**
-     * Fire the requested enqueue hooks, then collect the SCSS styles they registered.
-     *
-     * @param array $assoc_args Parsed options.
-     * @param array $handles    Optional handle filter.
-     * @return array<string, object>
-     */
-    /**
-     * Every discovered style, with any context that raised already reported.
-     */
     /**
      * The reverse direction: which handles recompile when this file changes.
      */
@@ -676,17 +627,6 @@ class Sassy_CLI_Command extends WP_CLI_Command {
         if (!$asset) WP_CLI::error($this->why_not($stack, $handle));
 
         return $asset;
-
-    }
-
-    protected function probe ($command) {
-
-        $out  = [];
-        $code = 0;
-
-        exec($command . ' 2>&1', $out, $code);
-
-        return $code === 0 && $out ? trim($out[0]) : '(not runnable)';
 
     }
 

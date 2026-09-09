@@ -74,6 +74,17 @@ $GLOBALS['wp_styles'] = new Sassy_Test_Queue();
 function wp_styles ()                      { return $GLOBALS['wp_styles']; }
 function current_user_can ($capability)    { return in_array($capability, $GLOBALS['capabilities'] ?? [], true); }
 function on_action ($tag, $callback)       { $GLOBALS['action_callbacks'][$tag][] = $callback; }
+function add_action ()                     {}
+function add_filter ()                     {}
+function has_filter ($tag)                 { return isset($GLOBALS['filter_overrides'][$tag]); }
+function sanitize_key ($key)               { return preg_replace('/[^a-z0-9_\-]/', '', strtolower($key)); }
+function esc_html ($text)                  { return htmlspecialchars((string) $text, ENT_QUOTES, 'UTF-8'); }
+function esc_attr ($text)                  { return htmlspecialchars((string) $text, ENT_QUOTES, 'UTF-8'); }
+function esc_url ($url)                    { return htmlspecialchars((string) $url, ENT_QUOTES, 'UTF-8'); }
+function __ ($text, $domain = null)        { return $text; }
+function admin_url ($path = '')            { return 'http://test.local/wp-admin/' . ltrim($path, '/'); }
+function wp_date ($format, $timestamp)     { return date($format, $timestamp); }
+function wp_nonce_field ($action, $name = '_wpnonce') { return "<input type='hidden' name='$name' value='nonce:$action'>"; }
 
 // --- Plugin ------------------------------------------------------------------
 
@@ -103,6 +114,7 @@ foreach ([
     'include/engines/dart-sass-engine.compiler-engine.php',
     'include/model/scss-compiler.class.php',
     'include/model/printer.class.php',
+    'include/model/status.class.php',
 ] as $file) {
     // Files absent from an older checkout are skipped so the suite still reports on it.
     if (file_exists($SASSY_PLUGIN . $file)) require $SASSY_PLUGIN . $file;
