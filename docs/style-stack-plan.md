@@ -1021,7 +1021,10 @@ phase says X goes because Y covers it, open Y.
 **The browser is not covered by the suite, and it is where the bugs are.** `tests/test-js.php`
 boots the shipped JS under node and `tests/manual.md` is walked by a person; between them they are
 all the coverage `assets/js/sassy.js` has. Nine of eleven findings in phase 6's review were in that
-one file. A phase touching it owes both.
+one file. A phase touching it owes both. And the harness's DOM must be as incomplete as the real one
+is when the script runs: phase 7 moved the panel to print after the footer scripts, the harness had
+it in the DOM from the start, and Capture shipped showing a toast and no panel. The harness now loads
+the file while the document is still parsing.
 
 **Scope fences.**
 
