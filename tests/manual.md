@@ -56,7 +56,7 @@ Untested surface is named rather than implied covered. If you add browser behavi
 
 | Check | Expected |
 |---|---|
-| Open the **SCSS** menu | Live Compile, Force Compile, Logging, Dashboard. Nothing per handle: that detail is on the page |
+| Open the **SCSS** menu | Live Compile, Force Compile, Capture, Logging, Dashboard. Nothing per handle: that detail is on the page |
 | Click **🤖 Force Compile** with nothing changed | Handles recompile anyway. Live Compile in the same state should report cached instead: that difference is the reason both exist |
 | Confirm what is absent | No **Log Variables**, no **Clear Cache**, no per-handle entries: `wp sassy vars`, the Logging menu and the page replace them |
 | On a wp-admin screen, edit `admin.scss` and click **⚡ Live Compile** | The admin sheet on screen updates. Before 6b the endpoint only ever discovered the frontend |
@@ -82,6 +82,23 @@ Tools → Sassy, as a dev. Walk it once on a current install and once after brea
 | **Compile all** | Notice, then the page reloads with every handle current and fresh compile times |
 | **Clear cache** | Redirects back with "Caches cleared"; every handle now reads `not built` or `stale` until the next request compiles it. Works under the external object cache staging runs |
 | Load the page over plain `http` (or with `navigator.clipboard` stubbed out in the console) | The Copy buttons are hidden; locations still render |
+
+## Capture
+
+Tier 1 of the paintbrush. Everything here is observation; nothing is written.
+
+| Check | Expected |
+|---|---|
+| Press **🖌️ Capture** with nothing edited | The panel opens titled **Captured styles** reading "Nothing changed since the last snapshot" |
+| Inspect the site header, set `background: red` in the styles pane, Capture | One header line `plugins/d-pace/scss/components/_site-header.scss:33  .site-header` over one row `background: var(--material-bg, var(--surface-dark)) → red`. One row, not nine longhands, and line 33 (the declaration), not 23 (the rule) |
+| Open the cited file at that line | It is the `background:` declaration |
+| Click **Copy** on the panel | The clipboard holds exactly the panel's text |
+| Edit a declaration inside a `@media` rule, Capture | It maps to its own line inside the partial that declares it |
+| Add a new rule in the inspector (the `+` in the styles pane), Capture | Listed as `inspector-stylesheet  <selector>  (no source location; try …frontend.scss)` with its declarations |
+| Set a style on an element directly (`element.style` in the styles pane), Capture | Listed as `element.style on <tag#id.class>  (no stylesheet)` |
+| Live Compile, then Capture | "Nothing changed": the reload re-baselined, so the compile is not a paint |
+| Turn **Logging → Capture diffs** on, Capture again | The same patch is in the console |
+| `document.addEventListener('sassy:captured', e => console.log(e.detail))` then Capture | `patch` is the panel's text; `changes` has one entry per row |
 
 ## Auto-reload
 
