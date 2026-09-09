@@ -53,7 +53,7 @@
 
             // The declared surface, replacing the Angular reach-in a builder used to need.
             window.sassy = {
-                compile: (force) => this.liveCompile(force === true),
+                compile: (force, hooks) => this.liveCompile(force === true, hooks),
                 reload:  () => this.reloadSheets(),
                 render:  (diagnostic) => renderDiagnostic(diagnostic),
                 logging: (key) => this.logging(key),
@@ -190,9 +190,14 @@
 
         },
 
-        liveCompile (force = false) {
+        /**
+         * hooks defaults to the context this page was served in, so Live Compile in wp-admin
+         * rebuilds the sheet on screen rather than the frontend's.
+         */
+        liveCompile (force = false, hooks = null) {
 
-            const url = `${this.params.ajax_url}?action=sassy_compile&nonce=${this.params.sassy_compile_nonce}${force ? '&force=1' : ''}`;
+            const context = hooks || this.params.context || 'frontend';
+            const url = `${this.params.ajax_url}?action=sassy_compile&nonce=${this.params.sassy_compile_nonce}&hooks=${encodeURIComponent(context)}${force ? '&force=1' : ''}`;
 
             this.clearErrors();
             this.showNotice('⚡ Compiling\u2026', 'pending');

@@ -104,6 +104,8 @@ class Sassy {
 			'ajax_url'            => admin_url('admin-ajax.php'),
 			'sassy_compile_nonce' => wp_create_nonce('sassy_compile'),
 			'keybinding'          => apply_filters('sassy-keybinding', ['ctrl+space', 'meta+space']),
+			// The block editor is an admin screen, and its sheet registers on the editor hook.
+			'context'             => is_admin() ? 'admin,editor' : 'frontend',
 		]);  
 
 	}
@@ -147,9 +149,16 @@ class Sassy {
 
 		if (!empty($_REQUEST['force'])) add_filter('sassy-force-compile', '__return_true', 10, 4);
 
+		$contexts = Style_Stack::parse_contexts($_REQUEST['hooks'] ?? 'frontend');
+
+		if ($contexts === null) {
+			wp_send_json_error('Unknown hooks. Use frontend, admin, editor or all.', 400);
+			wp_die();
+		}
+
 		$response = [];
 
-		foreach (Style_Stack::discover(['frontend'])->compilable() as $asset) {
+		foreach (Style_Stack::discover($contexts)->compilable() as $asset) {
 
             $compiler = $this->add_printer(new Printer(), $asset->handle);
 

@@ -151,6 +151,14 @@ ok('the forced request is distinct',        String(fetched[fetched.length - 1]).
 
 global.window.sassy.compile(true);
 ok('compile(true) asks the server to force', String(fetched[fetched.length - 1]).includes('force=1'));
+ok('and names the frontend context by default', String(fetched[fetched.length - 1]).includes('hooks=frontend'));
+
+global.window.sassy.compile(false, 'all');
+ok('compile(false, "all") asks for every context', String(fetched[fetched.length - 1]).includes('hooks=all') && !String(fetched[fetched.length - 1]).includes('force=1'));
+
+global.window.sass_params.context = 'admin,editor';
+global.window.sassy.compile();
+ok('the served context is the default', String(fetched[fetched.length - 1]).includes('hooks=admin%2Ceditor'));
 
 // --- reload ------------------------------------------------------------------
 
