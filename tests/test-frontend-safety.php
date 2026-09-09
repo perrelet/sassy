@@ -49,6 +49,38 @@ check('as a warning',
 
 unset($GLOBALS['filter_overrides']['sassy-lightning-css-binary']);
 
+section('A cli.js binary runs through node');
+
+if (!node_available()) {
+
+    skip('the cli.js route', 'node not installed');
+
+} else {
+
+    // Stands in for node_modules/lightningcss-cli/dist/cli.js, which is what SASSY_TOOLS_DIR
+    // falls back to. Copies input to output with a marker so the route is seen end to end.
+    $cli = $GLOBALS['SASSY_ROOT'] . '/cli.js';
+    fixture($cli, "const fs = require('fs');\nconst a = process.argv.slice(2);\nconst o = a.indexOf('-o');\nfs.writeFileSync(a[o + 1], fs.readFileSync(a[o - 1], 'utf8').trim() + '/*lightning*/');\n");
+
+    $GLOBALS['filter_overrides']['sassy-lightning-css-binary'] = $cli;
+    $ran = new Sassy\Post_Process_Context($asset);
+
+    check('the CSS comes back processed', Lightning_CSS_Postprocessor::process($css, $ran) === '.foo { color: red; }/*lightning*/');
+    check('with nothing to report',        $ran->get_diagnostics() === []);
+
+    $failing = $GLOBALS['SASSY_ROOT'] . '/failing.js';
+    fixture($failing, "process.stderr.write('boom');\nprocess.exit(1);\n");
+
+    $GLOBALS['filter_overrides']['sassy-lightning-css-binary'] = $failing;
+    $broke = new Sassy\Post_Process_Context($asset);
+
+    check('a script that fails degrades gracefully', Lightning_CSS_Postprocessor::process($css, $broke) === $css);
+    check('and its stderr is the warning\'s trace',  ($broke->get_diagnostics()[0]->trace ?? null) === 'boom');
+
+    unset($GLOBALS['filter_overrides']['sassy-lightning-css-binary']);
+
+}
+
 section('Temp files');
 
 $a = invoke_protected('temp_file', 'sassy-in-');

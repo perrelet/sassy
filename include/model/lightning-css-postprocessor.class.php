@@ -5,8 +5,7 @@ namespace Sassy;
 /**
  * Optional Lightning CSS post-processor for compiled CSS.
  *
- * Invoked via the sassy-css filter, and shells out to a lightningcss CLI
- * binary when configured. If the binary is not configured or execution
+ * Shells out to a lightningcss CLI binary when one is configured. Otherwise, or when the run
  * fails, the original CSS is returned unchanged.
  */
 class Lightning_CSS_Postprocessor {
@@ -65,6 +64,9 @@ class Lightning_CSS_Postprocessor {
             // node cli.js ...
             $node = self::find_node();
             if (!$node) {
+                $context->warn('Lightning CSS needs node to run ' . $bin . ' and none is on PATH; the CSS is unprocessed.');
+                @unlink($in);
+                @unlink($out);
                 return $css;
             }
 
@@ -180,6 +182,20 @@ class Lightning_CSS_Postprocessor {
     
         // mac/linux
         $out = @shell_exec('command -v npx 2>/dev/null');
+        $path = $out ? trim($out) : null;
+        return ($path && file_exists($path)) ? $path : null;
+
+    }
+
+    protected static function find_node () {
+
+        if (stripos(PHP_OS, 'WIN') === 0) {
+            $out  = @shell_exec('where node 2>NUL');
+            $line = $out ? trim(strtok($out, "\r\n")) : '';
+            return ($line && file_exists($line)) ? $line : null;
+        }
+
+        $out  = @shell_exec('command -v node 2>/dev/null');
         $path = $out ? trim($out) : null;
         return ($path && file_exists($path)) ? $path : null;
 
