@@ -491,13 +491,6 @@ class Printer {
 
     }
 
-    /** @deprecated Reports the map URL, despite the name. Kept until phase 6 rewrites the payload. */
-    public function get_src_url () {
-
-        return $this->get_target()->get_map_url();
-
-    }
-
     public function get_build_directory () {
 
         return $this->get_target()->get_directory();

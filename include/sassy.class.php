@@ -179,7 +179,6 @@ class Sassy {
                 'compiled_url'   => $compiler->get_build_url(),
                 'src'            => $compiler->get_src(),
                 'src_path'       => $compiler->get_src_path(),
-                'src_url'        => $compiler->get_src_url(),
                 'handle'         => $compiler->get_handle(),
                 'node'           => UI::node_id($asset->handle),
                 'style'          => $compiler->get_style(),

@@ -380,24 +380,12 @@
                         newHref.searchParams.set('sassy', (meta && meta.hash) || Date.now().toString());
                         link.href = newHref.toString();
 
-                        if (meta) {
-                            if (this.logging('meta')) console.info(`Sassy compile info for ${property}:`, meta);
-
-                            const engineItem = document.querySelector(`#wp-admin-bar-${meta.node}-engine .ab-item`);
-                            if (engineItem) {
-                                const engineLabel = (meta.engine || '').replace(/^Sassy\\/, '').replace(/_Engine$/, '').replace(/_/g, ' ');
-                                const compileMs   = meta.compile_time ? Math.round(meta.compile_time * 1000) + 'ms' : '\u2014';
-                                engineItem.textContent = `${engineLabel} \u2014 ${compileMs}`;
-                            }
-                        }
+                        if (meta && this.logging('meta')) console.info(`Sassy compile info for ${property}:`, meta);
 
                         if (warnings.length) {
                             hadWarnings = true;
                             const block = warnings.map(renderDiagnostic).join('\n\n');
                             if (this.logging('diagnostics')) console.warn(`Sassy warnings for ${property}:\n${block}`);
-                            const menuItem = meta && meta.node ? document.querySelector(`#wp-admin-bar-${meta.node} [data-state]`) : null;
-                            if (menuItem) menuItem.setAttribute('data-state', 'warning');
-                        } else {
                         }
 
                     }
@@ -436,9 +424,6 @@
 
                     this.els.errors.appendChild(errorNode);
 
-                    const menuItem = document.querySelector(`#wp-admin-bar-${instance} [data-state]`);
-                    if (menuItem) menuItem.setAttribute('data-state', 'error');
-
                 }
 
                 this.els.errors.classList.add('show');
@@ -461,12 +446,6 @@
                 this.els.errors.querySelectorAll('.sassy-error').forEach(el => el.remove());
 
             }
-
-            const menuItems = document.querySelectorAll('#wpadminbar .sassy-file [data-state]');
-
-            menuItems.forEach(menuItem => {
-                menuItem.setAttribute('data-state', 'current');
-            });
 
         },
 
@@ -494,27 +473,6 @@
 
             if (!this.els.notice) return;
             this.els.notice.classList.remove('show');
-
-        },
-
-        debounce (callback, delay) {
-
-            let timeoutId;
-
-            return function debounced (...args) {
-
-                const context = this;
-
-                if (timeoutId) {
-                    clearTimeout(timeoutId);
-                }
-
-                timeoutId = setTimeout(() => {
-                    timeoutId = null;
-                    callback.apply(context, args);
-                }, delay);
-
-            };
 
         },
 
