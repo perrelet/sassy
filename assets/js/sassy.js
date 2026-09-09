@@ -992,6 +992,11 @@
 
     };
 
-    sassy.init(window.sass_params || {});
+    // A footer script runs while the document is still parsing, and the panel prints after it
+    // at wp_footer 30. Boot once the markup is all there.
+    const boot = () => sassy.init(window.sass_params || {});
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+    else boot();
 
 })();

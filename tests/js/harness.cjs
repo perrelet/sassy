@@ -69,6 +69,8 @@ global.CustomEvent = class { constructor (type, init) { this.type = type; Object
 
 let keydown = null;
 let click   = null;
+let domReady = null;
+let windowLoad = null;
 
 const copied = [];
 // Node 21+ ships a read-only navigator global, so a plain assignment is silently ignored.
@@ -98,18 +100,19 @@ const panel = element({ 'data-sassy-sheets': JSON.stringify(managed) });
 
 global.document = {
     body: element(),
-    readyState: 'complete',
+    // Still parsing when a footer script runs, and the panel prints after the scripts do.
+    readyState: 'loading',
     getElementById: id => (id === 'sassy-errors' ? panel : null),
     querySelector: () => null,
     querySelectorAll: sel => (String(sel).includes('sassy-log-toggle') ? toggles : (String(sel).includes('stylesheet') ? links : [])),
     createElement: () => element(),
-    addEventListener: (name, fn) => { if (name === 'keydown') keydown = fn; if (name === 'click') click = fn; },
+    addEventListener: (name, fn) => { if (name === 'keydown') keydown = fn; if (name === 'click') click = fn; if (name === 'DOMContentLoaded') domReady = fn; },
     dispatchEvent: e => { dispatched.push(e.type); lastEvent = e; },
     styleSheets: [front, nomap],
 };
 let lastEvent = null;
 
-global.window = { sass_params: { ajax_url: '/ajax', sassy_compile_nonce: 'n', keybinding: ['ctrl+space', 'meta+space'] } };
+global.window = { sass_params: { ajax_url: '/ajax', sassy_compile_nonce: 'n', keybinding: ['ctrl+space', 'meta+space'] }, addEventListener: (name, fn) => { if (name === 'load') windowLoad = fn; } };
 global.location = { href: 'http://test.local/', origin: 'http://test.local' };
 
 // --- Load the real file ------------------------------------------------------
@@ -123,7 +126,15 @@ const source = readFileSync(plugin.replace(/\/$/, '') + '/assets/js/sassy.js', '
 // below vacuous.
 (0, eval)(source);
 
-ok('the file boots under a bare DOM', typeof global.window.sassy === 'object');
+// The panel is printed after the footer scripts, so booting at parse time found nothing and
+// Capture showed a toast and no panel. Boot waits for DOMContentLoaded.
+ok('while the document is parsing, nothing boots yet', typeof global.window.sassy === 'undefined' && typeof domReady === 'function');
+global.document.readyState = 'interactive';
+domReady();
+ok('the file boots on DOMContentLoaded', typeof global.window.sassy === 'object');
+ok('and waits for the window to load before its baseline', typeof windowLoad === 'function');
+global.document.readyState = 'complete';
+windowLoad();
 
 // --- The panel ---------------------------------------------------------------
 
