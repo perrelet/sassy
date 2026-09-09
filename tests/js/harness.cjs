@@ -211,4 +211,37 @@ const before = fetched.length;
 clickOn(element({ 'data-sassy-action': 'compile' }));
 ok('Compile all forces every context', fetched.length === before + 1 && String(fetched[fetched.length - 1]).includes('hooks=all') && String(fetched[fetched.length - 1]).includes('force=1'));
 
-process.stdout.write(JSON.stringify(results));
+// --- The change poll ---------------------------------------------------------
+
+(async () => {
+
+    const sheet = { href: 'http://test.local/wp-content/scss/frontend.css' };
+    document.querySelectorAll = sel => (String(sel).includes('stylesheet') ? [sheet] : []);
+
+    let hash = 'aaa';
+    const answer = () => ({ success: true, data: { 'd-pace-frontend': { href: 'http://test.local/wp-content/scss/frontend.css', warnings: [], meta: { hash } } } });
+    global.fetch = url => { fetched.push(url); return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(answer()) }); };
+
+    const reloadsBefore = dispatched.filter(t => t === 'sassy:reload').length;
+
+    await global.window.sassy.poll();
+    ok('the first poll only records the hash', !sheet.href.includes('sassy='));
+    ok('and does not force',                   !String(fetched[fetched.length - 1]).includes('force=1'));
+
+    await global.window.sassy.poll();
+    ok('an unchanged hash reloads nothing',    !sheet.href.includes('sassy='));
+
+    hash = 'bbb';
+    await global.window.sassy.poll();
+    ok('a changed hash reloads that sheet',    sheet.href.includes('sassy=bbb'));
+    ok('and announces the reload',             dispatched.filter(t => t === 'sassy:reload').length === reloadsBefore + 1);
+
+    global.fetch = () => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ success: false, data: {} }) });
+    const errors = [];
+    console.error = (...args) => errors.push(args.join(' '));
+    await global.window.sassy.poll();
+    ok('a failing endpoint is reported, not retried silently', errors.some(e => e.includes('auto-reload stopped')));
+
+    process.stdout.write(JSON.stringify(results));
+
+})();

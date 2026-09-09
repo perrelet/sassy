@@ -51,6 +51,7 @@
             this.addEventListeners();
             this.bindLogToggles();
             this.bindPage();
+            this.syncPoll();
 
             // The declared surface, replacing the Angular reach-in a builder used to need.
             window.sassy = {
@@ -58,6 +59,7 @@
                 reload:  () => this.reloadSheets(),
                 render:  (diagnostic) => renderDiagnostic(diagnostic),
                 logging: (key) => this.logging(key),
+                poll:    () => this.poll(),
             };
 
         },
@@ -164,9 +166,95 @@
                     event.preventDefault();
                     try { localStorage.setItem('sassy:log:' + key, this.logging(key) ? '0' : '1'); } catch (e) {}
                     reflect();
+                    this.syncPoll();
                 });
 
             });
+
+        },
+
+        /**
+         * The change poll, opt-in from Logging → Auto-reload. Asks the same endpoint Live Compile
+         * does, so it sees a partial edited on disk, a compile from another tab or from wp sassy
+         * watch, and swaps only the sheets whose content hash moved.
+         */
+        syncPoll () {
+
+            const wanted = this.logging('reload');
+
+            if (wanted && !this.pollTimer) {
+                this.hashes = {};
+                this.pollTimer = setInterval(() => this.poll(), 2000);
+            } else if (!wanted && this.pollTimer) {
+                clearInterval(this.pollTimer);
+                this.pollTimer = null;
+            }
+
+        },
+
+        poll () {
+
+            if (this.polling) return Promise.resolve();
+            if (typeof document.hidden !== 'undefined' && document.hidden) return Promise.resolve();
+
+            this.polling = true;
+            this.hashes  = this.hashes || {};
+
+            const context = this.params.context || 'frontend';
+            const url = `${this.params.ajax_url}?action=sassy_compile&nonce=${this.params.sassy_compile_nonce}&hooks=${encodeURIComponent(context)}`;
+
+            return fetch(url, { credentials: 'same-origin' })
+                .then(response => (response.ok ? response.json() : null))
+                .then(payload => {
+
+                    if (!payload || !payload.success) {
+                        // Logged out, or a compile error: stop rather than knock every two seconds.
+                        console.error('Sassy: auto-reload stopped; the compile endpoint did not answer cleanly.', payload && payload.data);
+                        if (this.pollTimer) { clearInterval(this.pollTimer); this.pollTimer = null; }
+                        return;
+                    }
+
+                    let swapped = false;
+
+                    for (const handle in payload.data) {
+
+                        if (!Object.prototype.hasOwnProperty.call(payload.data, handle)) continue;
+
+                        const entry = payload.data[handle];
+                        const hash  = entry && entry.meta ? entry.meta.hash : null;
+                        const known = this.hashes[handle];
+
+                        this.hashes[handle] = hash;
+
+                        if (!hash || known === undefined || known === hash) continue;
+
+                        const link = this.sheetFor(entry.href);
+                        if (!link) continue;
+
+                        const next = new URL(link.href);
+                        next.searchParams.set('sassy', hash);
+                        link.href = next.toString();
+                        swapped = true;
+
+                    }
+
+                    if (swapped) this.emit('sassy:reload');
+
+                })
+                .catch(err => console.error('Sassy: auto-reload request failed.', err))
+                .then(() => { this.polling = false; });
+
+        },
+
+        sheetFor (href) {
+
+            if (typeof href !== 'string' || !href) return null;
+
+            for (const link of document.querySelectorAll('link[rel="stylesheet"]')) {
+                if (link.href.includes(href)) return link;
+            }
+
+            return null;
 
         },
 

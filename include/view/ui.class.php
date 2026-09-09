@@ -88,6 +88,8 @@ class UI {
 		return [
 			'diagnostics' => __('Diagnostics', 'sassy'),
 			'meta'        => __('Compile meta', 'sassy'),
+			// Never a default: a page that reloads itself uninvited is how a tool loses trust.
+			'reload'      => __('Auto-reload', 'sassy'),
 		];
 
 	}
