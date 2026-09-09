@@ -932,6 +932,32 @@ change to what hot-wiring feels like, so it is named rather than implied.
 For builder agents. Every rule here exists because of something that actually happened during
 the 2.x work.
 
+**Starting a session.** Read `AGENTS.md` for what exists, this section for how to work, and the
+brief for your phase. Then **prove the tree is where the documents say it is, before touching
+anything**:
+
+```
+git status                       # clean, on style-stack
+php tests/run.php                # 13 files
+wp sassy check                   # exit 0
+wp sassy status                  # version 3.0.0
+```
+
+That is not ceremony. Documentation in this repo has drifted from the code three times: filters
+documented as taking the `Asset` while four still passed the `Printer`, AGENTS.md crediting phase 2
+with a conversion it never made, and a removal justified by a capability the code did not have.
+**Where a document and the code disagree, the code is what ships.** Fix the document and say so.
+
+Two things about this machine that no document upstream of you will mention:
+
+- `/var/www/dpace/staging/public/wp-content/plugins/d-pace` has **uncommitted work that is not
+  yours**, and has had throughout. Two of the modified lines in `sassy.integration.php` are the §4
+  dev-gate and `wp_tempnam` changes; everything else in that tree belongs to someone else. Do not
+  commit there.
+- 3.0.0 is tagged in the plugin header but **not released**. The digitalis.ca update JSON is not
+  yet version-fenced, so publishing would offer a breaking upgrade to every 1.x install polling
+  it. That fence is Jamie's and it is not done.
+
 **One builder at a time, on `style-stack`, in place.** No worktrees, no parallel phases. The
 phases are *mostly* serial by dependency; by §3's graph the genuinely parallelizable pairs are
 4∥5, 4∥6, 5∥6 and 8∥anything-after-1, and none are worth the coordination cost. Note one

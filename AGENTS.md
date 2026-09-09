@@ -8,6 +8,8 @@
 > sentence you are reading becomes a trap.
 >
 > **Phases 1 to 6 have landed**, which is all of 3.0.0. Phase 6b (the admin page), 7, 8 and 9 are still as the plan describes them.
+>
+> **Starting fresh?** Plan §8 opens with what to read and the four commands to run before touching anything. Run them: this file has been wrong about the present three times, and each time the code was right.
 
 ## Overview
 
