@@ -15,8 +15,9 @@ class Sassy {
 		
 		add_action('plugins_loaded', [$this, 'boot']);
 
+		// No nopriv: a dev is by definition logged in, and a nonce is a CSRF token rather than
+		// an authorization model.
 		add_action('wp_ajax_sassy_compile', [$this, 'compile_all']);
-		add_action('wp_ajax_nopriv_sassy_compile', [$this, 'compile_all']);
 
 	}
 
@@ -54,6 +55,7 @@ class Sassy {
 		require_once(SASSY_PATH . 'include/model/compile-result.class.php');
 		require_once(SASSY_PATH . 'include/model/lightning-css-postprocessor.class.php');
 		require_once(SASSY_PATH . 'include/model/scss-map.class.php');
+		require_once(SASSY_PATH . 'include/model/policy.class.php');
 		require_once(SASSY_PATH . 'include/model/asset.class.php');
 		require_once(SASSY_PATH . 'include/model/post-process-context.class.php');
 		require_once(SASSY_PATH . 'include/model/extensions.class.php');
@@ -91,7 +93,7 @@ class Sassy {
 
 	public function enqueue_scripts () {
 
-		if (!current_user_can('edit_theme_options')) return;
+		if (!Policy::active()) return;
 
 		wp_enqueue_style('sassy', SASSY_URI . 'assets/css/sassy.css', [], static::asset_version('assets/css/sassy.css'));
 
@@ -142,7 +144,12 @@ class Sassy {
 
 	public function compile_all () {
 
-		if (!wp_verify_nonce($_REQUEST['nonce'], 'sassy_compile')) {
+		if (!Policy::active()) {
+			wp_send_json_error('Sassy. But not sassy enough.', 403);
+			wp_die();
+		}
+
+		if (!wp_verify_nonce($_REQUEST['nonce'] ?? '', 'sassy_compile')) {
 			wp_send_json_error('Sassy. But no sassy enough.', 401);
 			wp_die(); 
 		}
@@ -197,7 +204,7 @@ class Sassy {
 	
 	public function print_errors () {
 
-		if (!current_user_can('edit_theme_options')) return;
+		if (!Policy::active()) return;
 		if (!apply_filters('sassy-print-errors', true)) return;
 
 		echo "<div id='sassy-errors' class='" . ($this->has_error() ? 'show' : '') . "'>";

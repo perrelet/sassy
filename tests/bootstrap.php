@@ -30,6 +30,7 @@ $GLOBALS['transients']       = [];
 $GLOBALS['filter_overrides'] = [];
 $GLOBALS['actions']          = [];
 $GLOBALS['action_callbacks'] = [];
+$GLOBALS['capabilities']     = [];
 
 function apply_filters ($tag, $value) {
     $override = $GLOBALS['filter_overrides'][$tag] ?? null;
@@ -71,6 +72,7 @@ class Sassy_Test_Queue {
 $GLOBALS['wp_styles'] = new Sassy_Test_Queue();
 
 function wp_styles ()                      { return $GLOBALS['wp_styles']; }
+function current_user_can ($capability)    { return in_array($capability, $GLOBALS['capabilities'] ?? [], true); }
 function on_action ($tag, $callback)       { $GLOBALS['action_callbacks'][$tag][] = $callback; }
 
 // --- Plugin ------------------------------------------------------------------
@@ -83,6 +85,7 @@ foreach ([
     'include/model/compile-result.class.php',
     'include/model/lightning-css-postprocessor.class.php',
     'include/model/scss-map.class.php',
+    'include/model/policy.class.php',
     'include/model/asset.class.php',
     'include/model/post-process-context.class.php',
     'include/model/extensions.class.php',

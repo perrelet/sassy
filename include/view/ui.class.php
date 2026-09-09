@@ -29,7 +29,7 @@ class UI {
 
 	public function admin_bar_menu ($admin_bar) {
 		
-		if (!current_user_can('edit_theme_options')) return;
+		if (!Policy::active()) return;
 		if (!SASSY()->get_printers()) return;
 		
 		$compiler_menus = [
@@ -196,7 +196,7 @@ class UI {
 	
 	public function clear_cache () {
 
-		if (!current_user_can('edit_theme_options')) return;
+		if (!Policy::active()) return;
 
 		Compile_Cache::forget_all();
 
