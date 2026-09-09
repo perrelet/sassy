@@ -347,7 +347,7 @@ If the extension API ever cannot express one of them, the API is wrong. That is 
 
 **Admin bar node ids come from the server.** `UI::node_id($handle)` produces `sassy-<handle>` and the payload carries it as `meta.node`, so the JS never reconstructs the id and the two cannot drift. Errors and printers are keyed by handle rather than a request counter.
 
-**Cache-busting uses the build's content hash**, `meta.hash`, which is exact where `Math.random()` was merely different and is the primitive an opt-in change poll would compare.
+**Cache-busting uses the build's content hash**, `meta.hash`, which is exact where `Math.random()` was merely different and is the primitive an opt-in change poll would compare. Nothing polls it yet: the poll, the copy affordances and two further logging toggles are phase 6b's (plan §3).
 
 **The keybinding is filterable.** `sassy-keybinding` defaults to `['ctrl+space', 'meta+space']`; `false` disables it and leaves the button. The handler ignores repeats and bails unless focus is on `body`, which is what stops it fighting IME and autocomplete.
 

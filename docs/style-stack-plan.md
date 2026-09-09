@@ -569,15 +569,14 @@ Pruned to actions. Detail lives on the admin page.
 | State glyph on root | Keep — error / warning / ok |
 | ⚡ Live Compile | **Keep.** No reload, skips cache, instant, it just works |
 | Force Recompile | **Keep**, renamed 🤖 Force Compile. An earlier draft dropped it as redundant because "Live Compile already skips cache", which contradicts the live-compile section below and is false: `compile_all()` goes through `Compile_Cache::needs_compile()` like everything else. Being a *check* and not a rebuild is the whole reason the keypress is cheap, so a forced route has to exist separately. Caught by code review in phase 6, after the claim had survived six passes |
-| Log Variables | **Replaced by 📜 Logging** — a submenu of console-logging toggles (diagnostics, compile meta, stack summary, capture diffs), persisted client-side, rendered via the canonical formatter |
+| Log Variables | **Replaced by 📜 Logging** — a submenu of console-logging toggles, persisted client-side, rendered via the canonical formatter. Diagnostics and compile meta ship here; stack summary and capture diffs arrive with phases 8 and 7, which produce what they log |
 | 🖌️ Capture | New, phase 7, present only when enabled |
 | Clear Cache | **Stays for 3.0.0.** It was dropped because the admin page would carry it, and that reason expires while the page waits in 6b. Removed from the bar when its replacement ships |
 | Per-file submenus | **Stay for 3.0.0**, with Clear Cache and for the same reason. Per-handle detail moves to the admin page when it ships |
 
 #### Live compile
 
-- Payload carries `Diagnostic[]` per handle; panel, console and clipboard render it through the
-  canonical formatter. Per-diagnostic copy and copy-all produce agent-pasteable text.
+- Payload carries `Diagnostic[]` per handle; panel and console render it through the canonical formatter. Copy affordances arrive with the admin page in 6b, where copy yields that same text.
 - The compile keybinding is **configurable**:
   `apply_filters('sassy-keybinding', ['ctrl+space', 'meta+space'])`, passed to the browser via
   localized params and parsed there. Each entry is `+`-separated modifiers + key; the default
@@ -589,9 +588,7 @@ Pruned to actions. Detail lives on the admin page.
   reload", not "rebuild the world".
 - Cache-busting via a server content-hash instead of `Math.random()` — exact, and doubles as the
   change-poll primitive.
-- Auto-reload polling against that hash is **opt-in only**, toggled from the Logging menu — never
-  on by default, even under `sassy-dev`. A page that reloads itself uninvited is the one
-  behaviour that would make the team distrust the tool.
+- Auto-reload polling against that hash is 6b's, not this phase's: this phase ships the hash as `meta.hash` and nothing polls it yet. When it arrives it is **opt-in only**, toggled from the Logging menu, never on by default even under `sassy-dev`. A page that reloads itself uninvited is the one behaviour that would make the team distrust the tool.
 - Errors keyed by **handle**, not admin-bar DOM index.
 
 **Verification.** The suite is PHP-only; nothing here gets a browser harness. Browser behaviour
@@ -636,6 +633,8 @@ and rewriting what "phase 7" means would make the history ambiguous in a way no 
 Two debts move here with it: **full diagnostic persistence** (the per-handle view needs the
 diagnostic *text*, which needs its own transient key, because phase 5's severity tally lives in a
 record read on every request) and the **provider listing** in Status.
+
+Three more moved here on 2026-09-09, after phase 6 landed without them: the **opt-in change poll** against `meta.hash` (its `data-sassy-poll` attribute is already listed below), **per-diagnostic copy and copy-all**, and the **stack summary and capture diff** logging toggles, which cannot ship before phases 8 and 7 produce what they log. The bar's **per-source links** come too: they prefix-match absolute paths, and the Dart engine writes map `sources` relative to the map, so on the reference install they resolve nothing. The per-handle view resolves sources against the recorded `Import_Graph` instead, the same move the basename resolution below makes for diagnostics.
 
 #### The page
 
@@ -705,9 +704,7 @@ unstyled rather than broken, and the failure appears in the diagnostics panel it
 input deleted in `398e1c6`; this phase restores the source, which is also what makes that task
 mean something again.
 
-**Breaks:** Clear Cache leaves the admin bar here, not in phase 6. It was dropped from the bar
-*because this page would have it*, and that reason expires while the page is unbuilt, so the bar
-keeps it until its replacement exists.
+**Breaks:** Clear Cache and the per-handle entries leave the admin bar here, not in phase 6. They were dropped from the bar *because this page would have them*, and that reason expires while the page is unbuilt, so the bar keeps them until their replacement exists.
 
 ---
 
