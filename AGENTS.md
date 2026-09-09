@@ -460,6 +460,7 @@ binary is absent.
 | `test-source-maps.php` | Every map source resolves from where the map is served, and line numbers are unshifted |
 | `test-output-style.php` | `sassy-style` accepts the enum and the string, on both engines |
 | `test-printer.php` | `Build_Target` path math and its filters; `Variable_Resolver` defaults, Sass maps, scheme normalization and signatures; `Compile_Cache` currency across a partial edit, a variable change, a missing build file and both cache filters; `Printer` agreeing with all three |
+| `test-js.php` | Boots the shipped `assets/js/sassy.js` under a minimal DOM in node and exercises it through `window.sassy`: the canonical rendering, the log toggles, the keybinding including exact modifier matching, and `reload()`. Skips when node is absent |
 | `test-policy.php` | The dev gate: the `edit_theme_options` default, `sassy-dev` overriding both ways, and `sassy-write-source` never implied by it |
 | `test-check.php` | `dependents_of()` including non-canonical paths; the audit's three hard failures; orphan scoping against a dotfile, a directory and a real orphan; truncation as a fatal warning; the severity tally |
 | `test-extensions.php` | The registry: four kinds, named providers, re-registration replacing by slug, per-asset timing, and a post-processor's report reaching the `Printer` |
@@ -469,6 +470,15 @@ binary is absent.
 
 The second argument is what makes these worth having: point the runner at a checkout from before
 a fix and the relevant tests should fail. A test that passes against both is not testing the fix.
+`tests/js/harness.cjs` honours it too: it reads the JS from the checkout under test rather than
+from beside itself.
+
+**`assets/js/sassy.js` gets the most scrutiny and has had the least.** Nine of the eleven findings
+in phase 6's code review were in it, and three separate bugs shipped in that one phase, each
+invisible to PHP and to a careful read: a payload verified while the file consuming it was never
+opened, admin-bar `rel` read off the wrong element, and a state value the same commit had deleted.
+`test-js.php` is the answer, and `tests/manual.md` covers what node cannot reach. Treat a change
+there as needing both.
 
 ---
 

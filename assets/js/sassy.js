@@ -1,26 +1,26 @@
-/**
- * Mirrors Sassy\Diagnostic::render(): the header is ours, everything below it is the engine's
- * own drawing and is reproduced verbatim.
- */
-function renderDiagnostic (d) {
-
-    if (typeof d === 'string') return d;
-
-    const where = d.file ? d.file + (d.line ? ':' + d.line + (d.column ? ':' + d.column : '') : '') + '  ' : '';
-    const lines = String(d.message || '').split(/\r?\n/);
-    const parts = [d.severity.toUpperCase() + '  ' + where + lines[0]];
-
-    if (lines.length > 1 && lines.slice(1).join('\n').trim()) parts.push(lines.slice(1).join('\n'));
-    if (d.frame) parts.push(d.frame);
-    if (d.trace) parts.push(d.trace);
-
-    return parts.join('\n');
-
-}
-
 (() => {
 
     'use strict';
+
+    /**
+     * Mirrors Sassy\Diagnostic::render(): the header is ours, everything below it is the engine's
+     * own drawing and is reproduced verbatim.
+     */
+    function renderDiagnostic (d) {
+
+        if (typeof d === 'string') return d;
+
+        const where = d.file ? d.file + (d.line ? ':' + d.line + (d.column ? ':' + d.column : '') : '') + '  ' : '';
+        const lines = String(d.message || '').split(/\r?\n/);
+        const parts = [d.severity.toUpperCase() + '  ' + where + lines[0]];
+
+        if (lines.length > 1 && lines.slice(1).join('\n').trim()) parts.push(lines.slice(1).join('\n'));
+        if (d.frame) parts.push(d.frame);
+        if (d.trace) parts.push(d.trace);
+
+        return parts.join('\n');
+
+    }
 
     const sassy = {
 
@@ -55,6 +55,7 @@ function renderDiagnostic (d) {
             window.sassy = {
                 compile: (force) => this.liveCompile(force === true),
                 reload:  () => this.reloadSheets(),
+                render:  (diagnostic) => renderDiagnostic(diagnostic),
                 logging: (key) => this.logging(key),
             };
 

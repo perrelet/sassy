@@ -152,6 +152,11 @@ function fixture ($path, $body, $age = 0) {
     if ($new) touch(dirname($path), time() - 1000 + $age);
 }
 
+function node_available () {
+    exec('command -v node 2>/dev/null', $out, $code);
+    return $code === 0;
+}
+
 function dart_available () {
     exec('command -v sass 2>/dev/null', $out, $code);
     return $code === 0;

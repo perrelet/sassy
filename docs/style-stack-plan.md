@@ -977,6 +977,18 @@ protocol.
   `wp sassy list --hooks=all`, and a real compile. The suite stubs WordPress; the live install is
   where discovery assumptions go to die.
 
+**Before removing something, check its replacement exists.** Three capabilities were dropped this
+way and had to come back: Clear Cache and the per-handle bar entries, justified by an admin page
+that moved to 6b, and Force Recompile, justified by "Live Compile already skips cache", which the
+code has never done. The pattern is always the same shape, a removal resting on a sentence about
+some other phase, and it is invisible in review because the sentence reads as settled. When a
+phase says X goes because Y covers it, open Y.
+
+**The browser is not covered by the suite, and it is where the bugs are.** `tests/test-js.php`
+boots the shipped JS under node and `tests/manual.md` is walked by a person; between them they are
+all the coverage `assets/js/sassy.js` has. Nine of eleven findings in phase 6's review were in that
+one file. A phase touching it owes both.
+
 **Scope fences.**
 
 - Never touch `scssphp-v2.x` or `main`.
