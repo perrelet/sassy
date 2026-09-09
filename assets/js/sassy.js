@@ -661,6 +661,8 @@
             }
 
             for (const [el, style] of this.inlineStyles()) {
+                // A script that sets and clears a property leaves style="" behind; that is not a paint.
+                if (!String(style || '').trim()) continue;
                 if ((this.inlineBaseline && this.inlineBaseline.get(el)) === style) continue;
                 extras.push({ kind: 'inline', text: `element.style on <${this.describe(el)}>  (no stylesheet)`, rows: [`  ${style}`] });
             }

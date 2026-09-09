@@ -342,6 +342,8 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
     nomap.cssRules[0].style.cssText = 'color: green;';
     document.styleSheets.push({ href: null, ownerNode: null, cssRules: [rule('.a', 'color: green;')] });
     inline.push(Object.assign(element({ style: 'color: red' }), { tagName: 'DIV', id: 'hero' }));
+    // What a script leaves behind after setting and clearing a property: not a paint.
+    inline.push(Object.assign(element({ style: '' }), { tagName: 'HEADER' }));
 
     const result = await global.window.sassy.capture();
 
@@ -368,6 +370,7 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
     ok('a changed declaration maps to its own line, not the rule\'s', result.patch.includes(':2  .a'));
     ok('an added declaration maps to the rule\'s line',             result.patch.includes(':5  .b'));
     ok('a shorthand stays a shorthand',                              result.patch.split('\n').filter(l => l.includes('background')).length === 1);
+    ok('an empty style attribute is not listed',                    !result.patch.includes('<header>'));
     ok('the panel shows it, titled and kinded',                      panel.classList.contains('show') && panel.attrs['data-kind'] === 'capture' && header.children[0].textContent === 'Captured styles');
     ok('the panel text is the patch',                                panel.querySelectorAll('.sassy-error').map(el => el.textContent).join('\n\n') === expected);
     ok('sassy:captured carries it',                                  lastEvent && lastEvent.type === 'sassy:captured' && lastEvent.detail.patch === expected && lastEvent.detail.changes.length === 5);
