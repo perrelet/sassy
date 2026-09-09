@@ -7,6 +7,13 @@ namespace Sassy;
  */
 class Compile_Cache {
 
+    const NO_SOURCE = 'no source';
+    const NOT_BUILT = 'not built';
+    const STALE     = 'stale';
+    const WARNING   = 'warning';
+    const CURRENT   = 'current';
+    const ERROR     = 'error';
+
     const GRAPH_KEY = 'sassy-filemtimes-';
     const VARS_KEY  = 'sassy-vars-sig-';
 
@@ -39,6 +46,28 @@ class Compile_Cache {
         if ($this->resolver->get_signature() !== get_transient(static::VARS_KEY . $this->asset->handle)) return true;
 
         return !file_exists($build_file);
+
+    }
+
+    /**
+     * The one asset-state vocabulary. Every surface renders these words; none derives its own.
+     *
+     * `error` is deliberately absent: a failed compile is never recorded, so the cache cannot
+     * know about one. Only a Printer that just ran can report it, and Printer::get_state() does.
+     */
+    public function get_state () {
+
+        $source = $this->asset->get_source_path();
+
+        if (!$source || !file_exists($source))          return static::NO_SOURCE;
+        if (!file_exists($this->target->get_file()))    return static::NOT_BUILT;
+        if ($this->needs_compile())                     return static::STALE;
+
+        $tally = static::get_tally($this->asset->handle);
+
+        if (!empty($tally[Diagnostic::WARNING]) || !empty($tally[Diagnostic::DEPRECATION])) return static::WARNING;
+
+        return static::CURRENT;
 
     }
 

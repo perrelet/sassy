@@ -407,6 +407,16 @@ class Printer {
 
     }
 
+    /**
+     * The cache's answer, unless this run knows better: only a Printer that just compiled can
+     * report an error, because a failed compile is never recorded.
+     */
+    public function get_state () {
+
+        return $this->has_error() ? Compile_Cache::ERROR : $this->get_cache()->get_state();
+
+    }
+
     public function is_current () {
 
         return $this->get_cache()->is_current();

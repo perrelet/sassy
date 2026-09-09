@@ -139,6 +139,51 @@ clearstatcache();
 check('sassy-check-dependencies off ignores the graph', !$cache->needs_compile());
 unset($GLOBALS['filter_overrides']['sassy-check-dependencies']);
 
+section('One asset-state vocabulary');
+
+$state_asset  = new Asset('stateful', $BASE . 'entry.scss');
+$state_target = new Build_Target($state_asset);
+$state_cache  = new Compile_Cache($state_asset, $state_target, new Variable_Resolver($state_asset));
+
+@unlink($state_target->get_file());
+check('an unbuilt handle',   $state_cache->get_state() === 'not built', $state_cache->get_state());
+
+compile($BASE . 'entry.scss', 'stateful');
+check('a fresh build',       $state_cache->get_state() === 'current', $state_cache->get_state());
+
+fixture("$SCSS/_shared.scss", "\$pad: 24px;\n", 40);
+clearstatcache();
+check('after editing a partial', $state_cache->get_state() === 'stale', $state_cache->get_state());
+
+compile($BASE . 'entry.scss', 'stateful');
+
+$recorded = get_transient('sassy-filemtimes-stateful');
+$recorded['__diagnostics__'] = ['deprecation' => 2];
+set_transient('sassy-filemtimes-stateful', $recorded);
+
+check('deprecations show as warning', $state_cache->get_state() === 'warning', $state_cache->get_state());
+
+$recorded['__diagnostics__'] = [];
+set_transient('sassy-filemtimes-stateful', $recorded);
+
+$missing = new Asset('gone', $BASE . 'never-existed.scss');
+$missing_cache = new Compile_Cache($missing, new Build_Target($missing), new Variable_Resolver($missing));
+check('a missing source',    $missing_cache->get_state() === 'no source', $missing_cache->get_state());
+
+// Only a Printer that just ran can know this: a failed compile is never recorded.
+$broken_printer = new Sassy\Printer();
+$broken_printer->compile($BASE . 'never-existed.scss', 'gone');
+check('a Printer reports its own error', $broken_printer->get_state() === 'error', $broken_printer->get_state());
+
+section('One file-state vocabulary');
+
+$graph = Compile_Cache::get_graph('stateful');
+$paths = array_keys($graph->deps);
+
+check('an unchanged dependency', Sassy\Import_Graph::state_of($paths[0], $graph->deps[$paths[0]]) === 'current');
+check('a missing one',           Sassy\Import_Graph::state_of('/tmp/never.scss', [1, 1]) === 'missing');
+check('a changed one',           Sassy\Import_Graph::state_of($paths[0], [1, 1]) === 'changed');
+
 section('Compile_Cache::forget');
 
 $cache->forget();

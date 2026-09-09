@@ -85,16 +85,22 @@
   border-bottom: 1px solid #2a2a2a;
 }
 
-#wpadminbar [data-state][data-state=compiled]:before {
+#wpadminbar [data-state="current"]:before {
   content: "✔️ ";
 }
-#wpadminbar [data-state][data-state=error]:before {
+#wpadminbar [data-state="error"]:before {
   content: "❌ ";
 }
-#wpadminbar [data-state][data-state=cache]:before {
+#wpadminbar [data-state="stale"]:before {
   content: "💾 ";
 }
-#wpadminbar [data-state][data-state=warning]:before {
+#wpadminbar [data-state="not built"]:before {
+  content: "💾 ";
+}
+#wpadminbar [data-state="no source"]:before {
+  content: "❓ ";
+}
+#wpadminbar [data-state="warning"]:before {
   content: "⚠️ ";
 }
 

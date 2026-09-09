@@ -265,10 +265,7 @@ class Sassy_CLI_Command extends WP_CLI_Command {
                 $graph    = Compile_Cache::get_graph($asset->handle);
                 $built    = $compiler->get_build_file();
 
-                if      (!file_exists($compiler->get_src_path())) $item['state'] = 'no source';
-                else if (!file_exists($built))                    $item['state'] = 'not built';
-                else                                              $item['state'] = $compiler->is_current() ? 'current' : 'stale';
-
+                $item['state']   = $compiler->get_state();
                 $item['imports'] = $graph ? count($graph->deps) : 0;
                 $item['engine']  = $compiler->get_engine_class();
                 $item['time']    = ($t = $compiler->get_last_compile_time()) ? sprintf('%.3fs', $t) : '';
@@ -387,7 +384,7 @@ class Sassy_CLI_Command extends WP_CLI_Command {
             $items[] = [
                 'file'     => $path,
                 'modified' => wp_date('Y-m-d H:i:s', is_array($stamp) ? $stamp[0] : $stamp),
-                'state'    => !is_file($path) ? 'MISSING' : (Import_Graph::stamp_matches($path, $stamp) ? 'current' : 'changed'),
+                'state'    => Import_Graph::state_of($path, $stamp),
             ];
         }
 

@@ -87,8 +87,7 @@ class UI {
 		foreach (SASSY()->get_printers() as $index => $compiler) {
 
 			//$icon = $compiler->has_error() ? '❌' : ($compiler->has_compiled() ? '✔️' : '💾');
-			$has_warnings = !empty($compiler->get_warnings());
-		$state = $compiler->has_error() ? 'error' : ($compiler->has_compiled() ? ($has_warnings ? 'warning' : 'compiled') : 'cache');
+			$state = $compiler->get_state();
 			$title = "<span data-state='{$state}'>" . basename(explode('?', $compiler->get_src())[0]). "</span>";
 
 			$admin_bar->add_menu([
