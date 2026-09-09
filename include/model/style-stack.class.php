@@ -26,11 +26,43 @@ class Style_Stack {
 
         $stack = new static();
 
-        foreach ($contexts as $context) $stack->fire($context);
+        if (!$contexts) {
+            $stack->read_queues();
+            return $stack;
+        }
 
-        $stack->read_queues();
+        // Inside a real request the enqueue hooks would land the theme's assets in the live
+        // registries and print them in the footer, and admin_screen() would replace the page's
+        // own screen. Discover into copies and hand the originals back.
+        $restore = static::isolate();
+
+        try {
+            foreach ($contexts as $context) $stack->fire($context);
+            $stack->read_queues();
+        } finally {
+            $restore();
+        }
 
         return $stack;
+
+    }
+
+    /**
+     * The contexts a --hooks value names, or null when one is unknown.
+     *
+     * @return string[]|null
+     */
+    public static function parse_contexts ($hooks) {
+
+        if ($hooks === 'all') return static::CONTEXTS;
+
+        $contexts = array_values(array_filter(array_map('trim', explode(',', (string) $hooks))));
+
+        foreach ($contexts as $context) {
+            if (!in_array($context, static::CONTEXTS, true)) return null;
+        }
+
+        return $contexts ?: null;
 
     }
 
@@ -207,6 +239,45 @@ class Style_Stack {
     public function context_errors () {
 
         return $this->context_errors;
+
+    }
+
+    /**
+     * Copies rather than fresh registries: a handle registered at init outside any enqueue hook
+     * is in the live registry and nowhere else, and discovery has to keep seeing it.
+     *
+     * @return callable Puts the originals back.
+     */
+    protected static function isolate () {
+
+        $styles  = wp_styles();
+        $scripts = function_exists('wp_scripts') ? wp_scripts() : null;
+        $screen  = function_exists('get_current_screen') ? get_current_screen() : null;
+
+        $GLOBALS['wp_styles'] = static::copy($styles);
+        if ($scripts) $GLOBALS['wp_scripts'] = static::copy($scripts);
+
+        return function () use ($styles, $scripts, $screen) {
+            $GLOBALS['wp_styles'] = $styles;
+            if ($scripts) $GLOBALS['wp_scripts'] = $scripts;
+            if ($screen) set_current_screen($screen);
+        };
+
+    }
+
+    protected static function copy ($registry) {
+
+        $copy = clone $registry;
+
+        // A shallow clone shares the _WP_Dependency objects, so wp_add_inline_style() on an
+        // existing handle would reach the live page.
+        if (isset($copy->registered) && is_array($copy->registered)) {
+            foreach ($copy->registered as $handle => $dependency) {
+                if (is_object($dependency)) $copy->registered[$handle] = clone $dependency;
+            }
+        }
+
+        return $copy;
 
     }
 

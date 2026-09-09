@@ -611,12 +611,10 @@ class Sassy_CLI_Command extends WP_CLI_Command {
     protected function stack ($assoc_args) {
 
         $hooks    = $assoc_args['hooks'] ?? 'frontend';
-        $contexts = ($hooks === 'all') ? Style_Stack::CONTEXTS : array_map('trim', explode(',', $hooks));
+        $contexts = Style_Stack::parse_contexts($hooks);
 
-        foreach ($contexts as $context) {
-            if (!in_array($context, Style_Stack::CONTEXTS, true)) {
-                WP_CLI::error(sprintf("Unknown hook set '%s'. Use: %s, all.", $context, implode(', ', Style_Stack::CONTEXTS)));
-            }
+        if ($contexts === null) {
+            WP_CLI::error(sprintf("Unknown hook set '%s'. Use: %s, all.", $hooks, implode(', ', Style_Stack::CONTEXTS)));
         }
 
         $stack = Style_Stack::discover($contexts);

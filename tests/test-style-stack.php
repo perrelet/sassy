@@ -221,4 +221,31 @@ $after  = ob_get_level();
 check('the raise is still recorded',   isset($leaky->context_errors()['admin']));
 check('and the buffer level is restored', $after === $before, "before $before, after $after");
 
+section('Discovery leaves the live registries and the screen as it found them');
+
+// In a wp-admin page request, everything the hooks enqueue would otherwise print in the footer.
+$live = wp_styles();
+$live->add('live-only', $BASE . 'live.scss');
+
+$GLOBALS['screen'] = 'tools_page_sassy';
+function get_current_screen () { return $GLOBALS['screen']; }
+function set_current_screen ($screen) { $GLOBALS['screen'] = $screen; $GLOBALS['screens_seen'][] = $screen; }
+$GLOBALS['screens_seen'] = [];
+
+$isolated = Style_Stack::discover(['frontend', 'admin']);
+
+check('the hook\'s handle is in the discovered stack', $isolated->handle('front') instanceof Asset);
+check('and so is what was registered before',         $isolated->handle('live-only') instanceof Asset);
+check('the live registry did not receive the hook\'s', !isset($live->registered['front']));
+check('and is what wp_styles() returns again',        wp_styles() === $live);
+check('the admin context set its screen',             in_array('dashboard', $GLOBALS['screens_seen'], true));
+check('and the page\'s screen is handed back',        $GLOBALS['screen'] === 'tools_page_sassy', (string) $GLOBALS['screen']);
+
+section('parse_contexts');
+
+check('all expands',            Style_Stack::parse_contexts('all') === Style_Stack::CONTEXTS);
+check('a list is split',        Style_Stack::parse_contexts('admin, editor') === ['admin', 'editor']);
+check('an unknown set is null', Style_Stack::parse_contexts('frontend,nope') === null);
+check('an empty value is null', Style_Stack::parse_contexts('') === null);
+
 finish();
