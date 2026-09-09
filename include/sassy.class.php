@@ -33,7 +33,8 @@ class Sassy {
 	
 		add_action('wp_enqueue_scripts', [$this, 'enqueue_scripts']);	
 		add_filter('style_loader_src', [$this, 'style_loader_src'], 10, 2);
-		add_action('wp_footer', [$this, 'print_errors']);
+		// After print_late_styles() at 20, so footer-enqueued sheets are in the panel's list.
+		add_action('wp_footer', [$this, 'print_errors'], 30);
 
 		add_action('admin_enqueue_scripts', [$this, 'enqueue_scripts']);
 		add_action('admin_footer', [$this, 'print_errors']);
@@ -217,9 +218,21 @@ class Sassy {
 		if (!Policy::active()) return;
 		if (!apply_filters('sassy-print-errors', true)) return;
 
-		echo "<div id='sassy-errors' class='" . ($this->has_error() ? 'show' : '') . "'>";
+		// The printers exist only once the head has printed, after wp_localize_script() ran, so
+		// the JS learns which sheets are Sassy's from here.
+		$sheets = [];
 
-			if ($this->has_error()) foreach ($this->get_errors() as $i => $error) echo "<pre class='sassy-error'>{$error}</pre>";
+		foreach ($this->printers as $handle => $printer) {
+			$sheets[$handle] = [
+				'href'   => $printer->get_build_url(),
+				'map'    => $printer->has_src_map() ? $printer->get_map_url() : null,
+				'source' => $printer->get_src_path(),
+			];
+		}
+
+		echo "<div id='sassy-errors' class='" . ($this->has_error() ? 'show' : '') . "' data-kind='error' data-sassy-sheets='" . esc_attr(wp_json_encode($sheets)) . "'>";
+
+			if ($this->has_error()) foreach ($this->get_errors() as $i => $error) echo "<pre class='sassy-error'>" . esc_html($error) . "</pre>";
 
 		echo "</div>";
 		
@@ -234,8 +247,8 @@ class Sassy {
 	}
 
 	/**
-	 * Read every time: print_errors() runs at wp_footer 10 and late styles compile at 20, so a
-	 * remembered answer misses whatever the footer enqueued.
+	 * Read every time: the admin bar asks at wp_footer 1000, long after the panel printed, and a
+	 * remembered answer would miss whatever compiled in between.
 	 */
 	public function get_errors () {
 

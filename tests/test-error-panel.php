@@ -40,4 +40,25 @@ check('keyed by the admin bar node id', array_keys($errors) === ['sassy-bad']);
 check('rendered through Diagnostic',    str_starts_with($errors['sassy-bad'] ?? '', 'ERROR  '));
 check('has_error() agrees',             $sassy->has_error());
 
+section('The panel carries the list of sheets the JS may paint');
+
+$GLOBALS['capabilities'] = ['edit_theme_options'];
+ob_start(); $sassy->print_errors(); $panel = ob_get_clean();
+
+preg_match("/data-sassy-sheets='([^']*)'/", $panel, $m);
+$sheets = json_decode(html_entity_decode($m[1] ?? '', ENT_QUOTES, 'UTF-8'), true);
+
+check('the panel prints for a dev',                str_starts_with($panel, "<div id='sassy-errors' class='show'"));
+check('with every printer listed',                array_keys($sheets ?? []) === ['good', 'bad']);
+check('by build URL',                             ($sheets['good']['href'] ?? '') === 'http://test.local/wp-content/scss/good.css');
+check('map URL',                                  ($sheets['good']['map'] ?? '') === 'http://test.local/wp-content/scss/good.css.map');
+check('and source path',                          ($sheets['good']['source'] ?? '') === "$SCSS/good.scss");
+check('a failed handle has no map',               array_key_exists('map', $sheets['bad'] ?? []) && $sheets['bad']['map'] === null);
+check('the error is escaped, not raw',            !str_contains($panel, '<pre class=\'sassy-error\'>ERROR  <'));
+
+$GLOBALS['capabilities'] = [];
+ob_start(); $sassy->print_errors(); $closed = ob_get_clean();
+
+check('and nothing prints when the gate is closed', $closed === '');
+
 finish();

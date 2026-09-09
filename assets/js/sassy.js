@@ -38,13 +38,7 @@
                 notice,
             };
 
-            if (this.els.errors) {
-                const header = document.createElement('div');
-                header.id = 'sassy-errors-header';
-                header.innerHTML = '<span>SCSS Error</span><button id="sassy-errors-close" type="button">Dismiss</button>';
-                this.els.errors.prepend(header);
-                header.querySelector('#sassy-errors-close').addEventListener('click', () => this.clearErrors());
-            }
+            if (this.els.errors) this.buildPanel();
 
             this.noticeTimeout = null;
 
@@ -61,6 +55,73 @@
                 logging: (key) => this.logging(key),
                 poll:    () => this.poll(),
             };
+
+        },
+
+        /**
+         * One panel for everything that needs a monospace block and a Copy: compile errors, and
+         * the paintbrush's patch. The header follows the content.
+         */
+        buildPanel () {
+
+            const header  = document.createElement('div');
+            const title   = document.createElement('span');
+            const actions = document.createElement('span');
+            const copy    = document.createElement('button');
+            const close   = document.createElement('button');
+
+            header.id     = 'sassy-errors-header';
+            title.id      = 'sassy-errors-title';
+            copy.id       = 'sassy-errors-copy';
+            close.id      = 'sassy-errors-close';
+            copy.type     = close.type = 'button';
+            copy.textContent  = 'Copy';
+            close.textContent = 'Dismiss';
+            title.textContent = 'SCSS Error';
+
+            copy.addEventListener('click',  () => this.copy(this.panelText(), copy));
+            close.addEventListener('click', () => this.clearErrors());
+
+            actions.appendChild(copy);
+            actions.appendChild(close);
+            header.appendChild(title);
+            header.appendChild(actions);
+            this.els.errors.prepend(header);
+
+            this.els.title = title;
+            this.els.copy  = copy;
+
+            if (!this.canCopy()) copy.hidden = true;
+
+        },
+
+        /**
+         * Show the panel with these blocks. kind lands on the element for the stylesheet.
+         */
+        panel (title, blocks, kind) {
+
+            if (!this.els.errors) return;
+
+            this.els.title.textContent = title;
+            this.els.errors.setAttribute('data-kind', kind);
+            this.els.errors.querySelectorAll('.sassy-error').forEach(el => el.remove());
+
+            for (const block of blocks) {
+                const pre = document.createElement('pre');
+                pre.classList.add('sassy-error');
+                pre.textContent = block;
+                this.els.errors.appendChild(pre);
+            }
+
+            this.els.errors.classList.add('show');
+
+        },
+
+        panelText () {
+
+            if (!this.els.errors) return '';
+
+            return Array.from(this.els.errors.querySelectorAll('.sassy-error')).map(el => el.textContent).join('\n\n');
 
         },
 
@@ -490,33 +551,15 @@
 
             this.showNotice('\u2717 Error', 'error');
 
-            if (this.els.adminMenu) {
+            if (this.els.adminMenu) this.els.adminMenu.innerHTML = '❌ SCSS';
 
-                this.els.adminMenu.innerHTML = '❌ SCSS';
+            const blocks = [];
 
+            for (const instance in errors) {
+                if (Object.prototype.hasOwnProperty.call(errors, instance)) blocks.push(String(errors[instance]));
             }
 
-            if (this.els.errors) {
-
-                this.els.errors.querySelectorAll('.sassy-error').forEach(el => el.remove());
-
-                for (const instance in errors) {
-
-                    if (!Object.prototype.hasOwnProperty.call(errors, instance)) continue;
-
-                    const error = errors[instance];
-
-                    const errorNode = document.createElement('pre');
-                    errorNode.classList.add('sassy-error');
-                    errorNode.appendChild(document.createTextNode(error));
-
-                    this.els.errors.appendChild(errorNode);
-
-                }
-
-                this.els.errors.classList.add('show');
-
-            }
+            this.panel('SCSS Error', blocks, 'error');
 
         },
 

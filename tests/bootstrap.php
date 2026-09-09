@@ -86,6 +86,7 @@ function admin_url ($path = '')            { return 'http://test.local/wp-admin/
 function wp_date ($format, $timestamp)     { return date($format, $timestamp); }
 function wp_nonce_field ($action, $name = '_wpnonce', $referer = true, $echo = true) { return "<input type='hidden' name='$name' value='nonce:$action'>"; }
 function esc_html__ ($text, $domain = null)  { return esc_html($text); }
+function wp_json_encode ($data)            { return json_encode($data); }
 
 // --- Plugin ------------------------------------------------------------------
 

@@ -26,21 +26,24 @@ process.on('uncaughtException', error => {
 // --- DOM enough to boot ------------------------------------------------------
 
 function element (attrs = {}) {
+    const classes = new Set();
     const el = {
         attrs,
         listeners: {},
         children: [],
-        classList: { add () {}, remove () {} },
+        classList: { add: c => classes.add(c), remove: c => classes.delete(c), contains: c => classes.has(c) },
         dataset: {},
         style: {},
+        textContent: '',
         getAttribute: n => (n in el.attrs ? el.attrs[n] : null),
         setAttribute: (n, v) => { el.attrs[n] = v; },
         addEventListener: (n, fn) => { el.listeners[n] = fn; },
-        appendChild: c => el.children.push(c),
-        prepend: c => el.children.unshift(c),
+        appendChild: c => { c.parent = el; el.children.push(c); },
+        prepend: c => { c.parent = el; el.children.unshift(c); },
         querySelector: () => null,
-        querySelectorAll: () => [],
-        remove () {},
+        // Enough of a selector engine for '.class' over direct children, which is what the panel uses.
+        querySelectorAll: sel => (String(sel).startsWith('.') ? el.children.filter(c => c.classList.contains(String(sel).slice(1))) : []),
+        remove () { if (el.parent) el.parent.children = el.parent.children.filter(c => c !== el); },
         click: () => el.listeners.click && el.listeners.click({ preventDefault () {} }),
     };
     return el;
@@ -71,10 +74,12 @@ const copied = [];
 // Node 21+ ships a read-only navigator global, so a plain assignment is silently ignored.
 Object.defineProperty(global, 'navigator', { configurable: true, writable: true, value: { clipboard: { writeText: text => { copied.push(text); return Promise.resolve(); } } } });
 
+const panel = element({ 'data-sassy-sheets': '{}' });
+
 global.document = {
     body: element(),
     readyState: 'complete',
-    getElementById: () => null,
+    getElementById: id => (id === 'sassy-errors' ? panel : null),
     querySelector: () => null,
     querySelectorAll: sel => (String(sel).includes('sassy-log-toggle') ? toggles : []),
     createElement: () => element(),
@@ -97,6 +102,13 @@ const source = readFileSync(plugin.replace(/\/$/, '') + '/assets/js/sassy.js', '
 (0, eval)(source);
 
 ok('the file boots under a bare DOM', typeof global.window.sassy === 'object');
+
+// --- The panel ---------------------------------------------------------------
+
+const header = panel.children[0];
+ok('the panel grew a header', header && header.id === 'sassy-errors-header');
+const buttons = header.children[1].children;
+ok('with Copy and Dismiss',   buttons.length === 2 && buttons[0].id === 'sassy-errors-copy' && buttons[1].id === 'sassy-errors-close');
 ok('it leaves no stray globals behind', typeof global.renderDiagnostic === 'undefined');
 ok('a keydown listener is registered', typeof keydown === 'function');
 
@@ -211,9 +223,29 @@ const before = fetched.length;
 clickOn(element({ 'data-sassy-action': 'compile' }));
 ok('Compile all forces every context', fetched.length === before + 1 && String(fetched[fetched.length - 1]).includes('hooks=all') && String(fetched[fetched.length - 1]).includes('force=1'));
 
-// --- The change poll ---------------------------------------------------------
+// --- The change poll, and errors through the panel -----------------------------
+
+const tick = () => new Promise(resolve => setTimeout(resolve, 0));
 
 (async () => {
+
+    // The file reports through console.error, and this harness reports through stdout JSON.
+    const errors = [];
+    console.error = (...args) => errors.push(args.join(' '));
+
+    // Reach error() the way the endpoint does: a failed response with errors keyed by node.
+    global.fetch = () => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ success: false, data: { 'sassy-x': 'ERROR  x.scss:1:1  Expected expression.' } }) });
+    global.window.sassy.compile();
+    await tick(); await tick(); await tick();
+
+    ok('a compile error shows the panel',   panel.classList.contains('show') && panel.attrs['data-kind'] === 'error');
+    ok('titled SCSS Error',                 header.children[0].textContent === 'SCSS Error');
+    ok('with the error text in a block',    panel.querySelectorAll('.sassy-error').length === 1 && panel.querySelectorAll('.sassy-error')[0].textContent === 'ERROR  x.scss:1:1  Expected expression.');
+    buttons[0].click();
+    ok('Copy yields the panel text',        copied[copied.length - 1] === 'ERROR  x.scss:1:1  Expected expression.');
+    buttons[1].click();
+    ok('Dismiss hides it and empties it',   !panel.classList.contains('show') && panel.querySelectorAll('.sassy-error').length === 0);
+
 
     const sheet = { href: 'http://test.local/wp-content/scss/frontend.css' };
     document.querySelectorAll = sel => (String(sel).includes('stylesheet') ? [sheet] : []);
@@ -237,8 +269,6 @@ ok('Compile all forces every context', fetched.length === before + 1 && String(f
     ok('and announces the reload',             dispatched.filter(t => t === 'sassy:reload').length === reloadsBefore + 1);
 
     global.fetch = () => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ success: false, data: {} }) });
-    const errors = [];
-    console.error = (...args) => errors.push(args.join(' '));
     await global.window.sassy.poll();
     ok('a failing endpoint is reported, not retried silently', errors.some(e => e.includes('auto-reload stopped')));
 

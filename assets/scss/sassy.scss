@@ -86,8 +86,18 @@ $notice:  #2271b1;
     font-weight: 600;
     letter-spacing: 0.03em;
     text-transform: uppercase;
+
+    button + button { margin-left: 0.5em; }
 }
 
+// The same panel carries the paintbrush's patch; the header follows the content.
+#sassy-errors[data-kind="capture"] {
+    border-top-color: #7b4ea3;
+
+    #sassy-errors-header { background: #7b4ea3; }
+}
+
+#sassy-errors-copy,
 #sassy-errors-close {
     background: none;
     border: 1px solid rgba(255, 255, 255, 0.4);
