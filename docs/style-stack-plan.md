@@ -96,6 +96,7 @@ were drifting unowned:
                     │  Variable_Resolver  what values apply          │
                     │  Diagnostic         one thing to report        │
                     │  Policy             is the dev surface active? │
+                    │  Extensions         who is extending what      │
                     └────────────────────┬───────────────────────────┘
                                          │
                     ┌────────────────────▼───────────────────────────┐
@@ -130,6 +131,8 @@ formatter. Phase 6 does the same for state.
 | `Compile_Request` / `Compile_Result` | Engine contract | Symmetrical, typed, engine-neutral |
 | `Diagnostic` | One reportable event | The contract between every surface |
 | `Policy` | Whether the dev surface is active for this request | One filterable question |
+| `Extensions` | The four extension points and who is extending them | Phase 4. Filters stay the binding; registering adds a name and a line in `wp sassy status` |
+| `Post_Process_Context` | What a post-processor gets besides the CSS | Phase 4. The `Asset`, plus somewhere to report |
 | `Import_Graph` / `Import_Scanner` / `Import_Resolver` | SCSS dependency tracking | Unchanged from 2.1 |
 | `Style_Surface` | A script's style-mutation profile | Phase 8 |
 
@@ -252,7 +255,7 @@ enough to retire those call sites, or the first acceptance item below cannot pas
   stays the untyped array until phase 3 replaces it with `Compile_Request`; pulling that forward
   is how a phase boundary stops being a review gate.
 - **`Build_Target`** — pure path math. Every `get_build_*` and `sassy-build-*`.
-- **`Compile_Cache`** — takes the `Asset`, `Build_Target` and `Variable_Resolver` on construction, and answers `needs_compile()`, `is_current()`, `record(Import_Graph, $time)` and `forget()`. It also carries handle-addressed statics (`get_graph`, `get_last_compile_time`, `forget_handle`, `forget_all`), because `wp sassy deps` and `wp sassy clear` have a handle and nothing else. Design that static surface from those call sites: without it the acceptance below cannot pass.
+- **`Compile_Cache`** — takes the `Asset`, `Build_Target` and `Variable_Resolver` on construction, and answers `needs_compile()`, `is_current()`, `record(Import_Graph, $time, $diagnostics)` (the third argument arrived with phase 5) and `forget()`. It also carries handle-addressed statics (`get_graph`, `get_last_compile_time`, `forget_handle`, `forget_all`), because `wp sassy deps` and `wp sassy clear` have a handle and nothing else. Design that static surface from those call sites: without it the acceptance below cannot pass.
 - **`Variable_Resolver`** — defaults, `sassy-variables`, map conversion, URL scheme
   normalization, signature hashing, and `prepend()` for engines that inject variables through the source.
 
@@ -273,7 +276,7 @@ remove.
 
 **Breaks:** `SCSS_Compiler` renamed `Printer`; `SASSY()->get_compilers()` renamed `get_printers()`, keyed by a 1-based index; `get_index()` removed from the compiler; the fourth argument of every per-compile filter becomes the `Asset`; `SCSS_Compiler::prepend_variables()` and `::temp_file()` gone.
 
-`Printer` carries no instance counter. `Sassy` assigns the index as it collects printers, because `assets/js/sassy.js` keys admin bar DOM nodes on `meta.index`; phase 6 rewrites that JS and rekeys by handle, and until it does the index has to keep being emitted.
+`Printer` carries no instance counter. `Sassy` assigns the index as it collects printers, because `assets/js/sassy.js` keys admin bar DOM nodes on `meta.index`; phase 6 rewrote that JS and rekeyed by handle, and until it did the index had to keep being emitted.
 
 **Acceptance:**
 - No transient key or staleness rule exists outside `Compile_Cache`.
@@ -484,6 +487,8 @@ Truncation fails `check` by default even though its severity is `warning`. The p
 current", and with a truncated graph that answer is unknowable — epistemic, not stylistic, so it
 does not wait for `--strict`.
 
+The mechanism is `Diagnostic::$fatal`, a flag `Style_Stack::audit()` sets on truncation and on every `error`, so the CLI decides nothing about severities it was not told to promote.
+
 **Breaks:** none. `wp sassy check` and `wp sassy deps --file` are additions.
 
 **Acceptance:**
@@ -533,9 +538,7 @@ Two questions, two owners, one vocabulary each. Every surface renders these and 
 derives its own.
 
 - **Asset state**, from `Compile_Cache`: `no source` (the source is absent or maps nowhere),
-  `not built`, `stale`, `current`. Plus `error` and `warning`, which come from the last compile's
-  `Diagnostic[]` rather than the cache, and outrank the rest when present: an erroring handle is
-  not interesting as "stale".
+  `not built`, `stale`, `current`, plus `warning`, read from the severity tally of the last recorded compile. `error` is not the cache's to know, because a failed compile is never recorded: only a `Printer` that just ran reports it, so it appears on the bar, in the endpoint's payload and from `wp sassy compile`, never in `wp sassy list`. Where present it outranks the rest: an erroring handle is not interesting as "stale".
 - **File state**, from `Import_Graph`, for one dependency inside a graph: `missing`, `changed`,
   `current`. This is a different question from asset state and keeps its own words; `wp sassy
   deps` is the surface that asks it.
@@ -593,12 +596,12 @@ Pruned to actions. Detail lives on the admin page.
 
 **Verification.** The suite is PHP-only; nothing here gets a browser harness. Browser behaviour
 is verified by a manual acceptance checklist kept at `tests/manual.md` and walked before each
-release; the paintbrush spike page is kept as a fixture. **Phase 6 creates that file** — it does
+release. **Phase 6 creates that file** — it does
 not inherit one — covering every browser behaviour this phase ships. Untested surface is named, never
 implied covered — the `watch` precedent.
 
 **Breaks:** `wp sassy list`'s `state` column takes the canonical asset-state vocabulary, changing
-`no source`/`not built`/`current`/`stale` into that set plus `error` and `warning`; the
+`no source`/`not built`/`current`/`stale` into that set plus `warning`; the
 `wp_ajax_nopriv_sassy_compile` registration is dropped; `?sassy-vars=1`, `Sassy::get_all_variables()` and `meta.variables` are gone; Force Recompile is renamed Force Compile and runs through the endpoint; Clear Cache and the per-file submenus stay until 6b; errors and DOM nodes are keyed by handle, so `meta.index` goes with the JS rewrite.
 
 **Acceptance:**
@@ -634,24 +637,23 @@ Two debts move here with it: **full diagnostic persistence** (the per-handle vie
 diagnostic *text*, which needs its own transient key, because phase 5's severity tally lives in a
 record read on every request) and the **provider listing** in Status.
 
-Three more moved here on 2026-09-09, after phase 6 landed without them: the **opt-in change poll** against `meta.hash` (its `data-sassy-poll` attribute is already listed below), **per-diagnostic copy and copy-all**, and the **stack summary and capture diff** logging toggles, which cannot ship before phases 8 and 7 produce what they log. The bar's **per-source links** come too: they prefix-match absolute paths, and the Dart engine writes map `sources` relative to the map, so on the reference install they resolve nothing. The per-handle view resolves sources against the recorded `Import_Graph` instead, the same move the basename resolution below makes for diagnostics.
+Three more moved here on 2026-09-09, after phase 6 landed without them: the **opt-in change poll** against `meta.hash`, which lives in `sassy.js` on the pages whose sheets it reloads rather than on this page, **per-diagnostic copy and copy-all**, and the **stack summary and capture diff** logging toggles, which cannot ship before phases 8 and 7 produce what they log. The bar's **per-source links** come too: they prefix-match absolute paths, and the Dart engine writes map `sources` relative to the map, so on the reference install they resolve nothing. The per-handle view resolves sources against the recorded `Import_Graph` instead, the same move the basename resolution below makes for diagnostics.
 
 #### The page
 
 v3 gets her admin page. A **dashboard, not a settings form** — config remains code.
 
 - **Status** — engine + capabilities, registered extension providers, binaries + versions, build
-  dir + writability, constants, resolved policy (who currently sees the dev surface). Providers
+  dir + writability, constants, and the policy as this request resolves it: whether the current user passes `Policy::active()` and whether `sassy-dev` is bound. Who else sees the surface is not a question a per-request filter can answer. Providers
   arrived with phase 4 and `wp sassy status` already lists them; two status surfaces that
   disagree on their first day is not worth the saving.
-- **Stack** — every handle (337 here under all hook sets), filterable: sassy-managed /
+- **Stack** — every handle (352 here today under all hook sets; never a constant), filterable: sassy-managed /
   compilable / third-party; WP deps; asset state, in the vocabulary phase 6 settled.
 - **Per-handle** — import graph (deps + watched dirs), build target, last diagnostics,
   source / css / map links (relocated from the bar).
 - **Actions** — Compile all, Clear cache.
 
-Server-rendered. Behaviour declared in attributes (`data-sassy-copy`, `data-sassy-dismiss`,
-`data-sassy-poll`); one small hand-rolled JS file does event delegation + fetch. No dependencies.
+Server-rendered. Behaviour declared in attributes (`data-sassy-copy`, `data-sassy-dismiss`); one small hand-rolled JS file does event delegation + fetch. No dependencies.
 Design intent, verified once phase 8 exists: the profiler run over Sassy's own UI reports only
 intended categories.
 
@@ -676,11 +678,7 @@ composes the header and never redraws what the engine drew.
 is dead on the next, while a copied `path:line` always works and feeds the paste-into-an-agent
 loop directly.
 
-This raises something phase 3 left standing: **Dart cites bare basenames**, so half the real
-diagnostics on the reference install say `_harness.scss` rather than a path, and copying that is
-copying nothing useful. 6b resolves cited names against the recorded `Import_Graph`, which is
-unambiguous wherever exactly one recorded dependency matches the basename, and falls back to what
-the engine said. That is the phase where §1's "every string names something a machine can open"
+This raises something phase 3 left standing: **Dart cites what it likes**, bare basenames (`_harness.scss`) and paths relative to the working directory (`wp-content/plugins/d-pace/scss/components/_service-card.scss`) in the same run, and copying either opens nothing. 6b resolves cited names against the recorded `Import_Graph` by path suffix, which is unambiguous wherever exactly one recorded dependency ends in the cited string, and falls back to what the engine said. That is the phase where §1's "every string names something a machine can open"
 finally holds for diagnostics.
 
 **Diagnostics collapse, grouped by `code`.** Thirty across the reference install, four frame lines
@@ -700,11 +698,9 @@ imposes on everyone who has not configured Dart.
 
 The bootstrapping risk is real but mild. A stylesheet that fails to compile leaves the admin page
 unstyled rather than broken, and the failure appears in the diagnostics panel it failed to style.
-`.vscode/tasks.json` still runs `sass assets/scss/sassy.scss assets/css/sassy.css` against an
-input deleted in `398e1c6`; this phase restores the source, which is also what makes that task
-mean something again.
+This phase restores the source as `assets/scss/sassy.scss` and enqueues it directly; the checked-in `assets/css/sassy.css` goes, because its replacement is a build output.
 
-**Breaks:** Clear Cache and the per-handle entries leave the admin bar here, not in phase 6. They were dropped from the bar *because this page would have them*, and that reason expires while the page is unbuilt, so the bar keeps them until their replacement exists.
+**Breaks:** Clear Cache and the per-handle entries leave the admin bar here, not in phase 6. They were dropped from the bar *because this page would have them*, and that reason expires while the page is unbuilt, so the bar keeps them until their replacement exists. `?sassy-clear-cache` goes with the link. A `sassy` handle appears in `wp sassy list` for a logged-in dev, because the plugin's own stylesheet is now enqueued as SCSS and gated like the rest of the dev surface.
 
 ---
 
@@ -737,7 +733,8 @@ loop are the same pipe.
 
 > **SPIKE FIRST.** The tier stands on one assumption: styles-pane edits are visible to page JS
 > via `document.styleSheets` in the browsers the team uses. Believed true for Chromium;
-> unverified. If the spike fails, tier 1 dies and tier 0 is the story.
+> unverified. If the spike fails, tier 1 dies and tier 0 is the story. The spike page is kept as a
+> fixture either way.
 
 Two costs the tier carries, named here so they are priced before the spike rather than after:
 
@@ -814,7 +811,7 @@ with separate counts; an earlier draft fused them at 8, which is the `dataset` f
 - Every file touching `data-theme` on the reference install is identified (one at time of
   writing, `d-pace/assets/js/site-header.js` — assert against grep ground truth, never a
   constant).
-- Run over Sassy's own UI, the profiler reports only intended categories — the phase 6 design
+- Run over Sassy's own UI, the profiler reports only intended categories — the phase 6b design
   intent, verified here.
 - No JS parsing beyond marker detection.
 
@@ -900,7 +897,7 @@ change to what hot-wiring feels like, so it is named rather than implied.
 | Admin page look | **WordPress with a side of Sassy spice**: wp-admin furniture carries it, Sassy's character lives in the accents and the diagnostic block |
 | Diagnostic rendering | Header becomes UI, frame and trace stay verbatim monospace. `file:line:col` is **click-to-copy**, not an editor link. Groups **collapse** by `code`. Copy always yields the canonical text, never the DOM |
 | Sassy's own admin CSS | **She compiles it.** Authored to work on scssphp so the team eats the limitation its default engine imposes. Unstyled-on-failure is an acceptable bootstrapping risk |
-| Admin bar | Glyph + Live Compile + Force Compile + Logging + Clear Cache (+ Capture in 7). The variables surface is removed everywhere (`meta.variables`, `?sassy-vars=1`, `get_all_variables()`), superseded by `wp sassy vars` and the Logging menu. Force Compile and Clear Cache stay: the first was dropped on a false premise, the second because 6b's page was to receive it |
+| Admin bar | Glyph + Live Compile + Force Compile + Logging + Clear Cache + the per-handle entries (+ Capture in 7). The variables surface is removed everywhere (`meta.variables`, `?sassy-vars=1`, `get_all_variables()`), superseded by `wp sassy vars` and the Logging menu. Force Compile and Clear Cache stay: the first was dropped on a false premise, the second because 6b's page was to receive it |
 | Oxygen/builder JS | Angular reach-in deleted; replaced by the `sassy:*` event contract |
 | Paintbrush | In, as phase 7 — tier 0 documented, tier 1 after spike, tier 2 behind `sassy-write-source` |
 | Clear Cache | **Stays in the bar for 3.0.0**, leaving when 6b's page replaces it. Dropping it was justified by the page carrying it, and that justification expires while the page is unbuilt |
@@ -921,6 +918,9 @@ change to what hot-wiring feels like, so it is named rather than implied.
 
 - **Paintbrush spike** — CSSOM visibility of inspector edits; tier 1 stands or falls on it. The
   first thing phase 7 builds, and buildable as a twenty-line scratch page any time before that.
+- **Lattice and `sassy-style-queues`**, §4's open row. `Theme::enqueue_style_last()` still fills
+  `$digitalis_styles` and nothing binds the filter, so a site using it loses those styles from
+  discovery under 3.0. The fix belongs in Lattice, and it is Jamie's.
 
 ---
 
@@ -958,7 +958,7 @@ Two things about this machine that no document upstream of you will mention:
 **One builder at a time, on `style-stack`, in place.** No worktrees, no parallel phases. The
 phases are *mostly* serial by dependency; by §3's graph the genuinely parallelizable pairs are
 4∥5, 4∥6, 5∥6 and 8∥anything-after-1, and none are worth the coordination cost. Note one
-ordering consequence that is not a dependency: phase 6's "profiler reports only intended
+ordering consequence that is not a dependency: 6b's "profiler reports only intended
 categories" acceptance cannot close until phase 8 exists, so it is carried forward explicitly
 rather than waived.
 
