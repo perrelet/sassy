@@ -121,7 +121,7 @@ class Dart_Sass_Engine implements Compiler_Engine {
         $map = file_exists($tmp_map) ? file_get_contents($tmp_map) : null;
 
         if ($map !== null) {
-            $map = static::rewrite_map($map, basename($tmp_in), $build_dir, $src_path);
+            $map = static::rewrite_map($map, basename($tmp_in), $build_dir, $src_path, $request->map_url ? basename(preg_replace('/\.map$/', '', $request->map_url)) : null);
         }
 
         $css = static::rewrite_map_url($css, $request->map_url);
@@ -137,12 +137,15 @@ class Dart_Sass_Engine implements Compiler_Engine {
     /**
      * Point the map's entry source at the real file rather than the temp copy compiled from.
      */
-    protected static function rewrite_map ($map, $tmp_basename, $map_dir, $src_path) {
+    protected static function rewrite_map ($map, $tmp_basename, $map_dir, $src_path, $file = null) {
 
         if (!$src_path) return $map;
 
         $data = json_decode($map, true);
         if (!is_array($data) || empty($data['sources'])) return $map;
+
+        // Dart names the temp output it was handed.
+        if ($file) $data['file'] = $file;
 
         foreach ($data['sources'] as $i => $source) {
             if (basename($source) === $tmp_basename) {

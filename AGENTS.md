@@ -48,6 +48,7 @@ sassy/
 │   │   ├── import-graph.class.php     # Recorded dependency set; answers "has anything changed?"
 │   │   ├── import-resolver.class.php  # Sass file-resolution rules (partials, _index, load paths)
 │   │   ├── import-scanner.class.php   # Walks the @use/@forward/@import graph into an Import_Graph
+│   │   ├── source-map.class.php       # Moves a map's generated columns after the CSS is edited
 │   │   ├── status.class.php           # How Sassy is configured, as rows for the CLI and the page
 │   │   └── lightning-css-postprocessor.class.php  # Optional Lightning CSS post-processing
 │   ├── engines/
@@ -261,7 +262,7 @@ The CLI can only compile a file, so variable injection means compiling a temp co
 
 Because the temp input is not co-located with the real source, explicitly relative imports (`@use "./x"`, `@use "../x"`) resolve against `.sassy-tmp/`. Bare and subdirectory forms are unaffected — `dirname($src_path)` is always a load path.
 
-> Post-compile CSS mutation invalidates the map: both the `url()` rewriting in `Printer::compile()` and any `sassy-css` filter (Lightning CSS included) run *after* the engine has produced it.
+> Post-compile CSS mutation invalidates the map unless the map moves with it. `Printer::rewrite_urls()` records every `url()` insertion and shifts the affected segments through `Source_Map::shift()`, which matters most under compressed output: the whole sheet is one line, so an insertion at column 97 used to put every later rule on the wrong source line. A `sassy-css` filter (Lightning CSS included) still runs after that and can invalidate what it likes.
 >
 > With Lightning CSS enabled the map is not merely stale, it is **unreachable** — Lightning
 > strips the `sourceMappingURL` comment from the CSS it emits, so nothing links to the `.map`
@@ -483,7 +484,7 @@ binary is absent.
 | `test-error-panel.php` | `Sassy::get_errors()` reports a failure compiled after it was first asked, which is what a footer-enqueued style is |
 | `test-import-graph.php` | Import parsing and resolution; editing a partial invalidates; shadowing; a failed compile is not remembered as current |
 | `test-multiple-handles.php` | Handles sharing a source directory do not invalidate each other |
-| `test-source-maps.php` | Every map source resolves from where the map is served, and line numbers are unshifted |
+| `test-source-maps.php` | Every map source resolves from where the map is served, line numbers are unshifted, the map moves with `url()` rewriting under compressed output, and `file` names the built sheet |
 | `test-output-style.php` | `sassy-style` accepts the enum and the string, on both engines |
 | `test-printer.php` | `Build_Target` path math and its filters; `Variable_Resolver` defaults, Sass maps, scheme normalization and signatures; `Compile_Cache` currency across a partial edit, a variable change, a missing build file and both cache filters; `Printer` agreeing with all three |
 | `test-js.php` | Boots the shipped `assets/js/sassy.js` under a minimal DOM in node and exercises it through `window.sassy`: the canonical rendering, the log toggles, the keybinding including exact modifier matching, `reload()`, the context and `hooks` on the endpoint URL, the page's copy, filter and Compile all attributes, and the poll across three answers. Skips when node is absent |

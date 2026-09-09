@@ -98,6 +98,54 @@ $error = Sassy\Diagnostic::render_all($broken->get_errors());
 check('no temp path in the error', !str_contains($error, '.sassy-tmp'), $error);
 check('the error is a Diagnostic',  $broken->get_error() instanceof Sassy\Diagnostic);
 
+section('url() rewriting moves the map with it');
+
+/** The original line a generated position maps to, walking every segment before it. */
+function map_lookup (array $map, $line, $column) {
+    $src = 0; $oline = 0; $ocol = 0; $best = null;
+    foreach (explode(';', $map['mappings']) as $l => $encoded) {
+        $col = 0;
+        foreach (array_filter(explode(',', $encoded), 'strlen') as $segment) {
+            $col   += vlq_field($segment, 0);
+            $src   += vlq_field($segment, 1) ?? 0;
+            $oline += vlq_field($segment, 2) ?? 0;
+            $ocol  += vlq_field($segment, 3) ?? 0;
+            if ($l === $line && $col <= $column) $best = ['src' => $src, 'line' => $oline, 'column' => $ocol];
+        }
+    }
+    return $best;
+}
+
+// Compressed, so the whole sheet is one line and every insertion shifts every later column.
+$GLOBALS['filter_overrides']['sassy-style'] = 'compressed';
+
+// Declarations on their own lines, as written in practice: Dart emits a segment only where the
+// source position changes, so a declaration beside its selector gets none of its own.
+fixture("$SCSS/urls.scss",
+    ".a {\n  background: url(img.png);\n}\n"      // lines 1-3: rewritten
+  . ".b {\n  background: url('two.png');\n}\n"    // lines 4-6: rewritten again
+  . ".c {\n  color: red;\n}\n"                     // lines 7-9: after both insertions
+);
+
+compile('http://test.local/wp-content/themes/t/scss/urls.scss', 'urls');
+
+$ucss = file_get_contents("$BUILD/urls.css");
+$umap = json_decode(file_get_contents("$BUILD/urls.css.map"), true);
+
+check('both urls were rewritten', substr_count($ucss, 'url(/wp-content/themes/t/scss/img.png)') === 1 && substr_count($ucss, '/wp-content/themes/t/scss/two.png') === 1, $ucss);
+
+$rule = map_lookup($umap, 0, strpos($ucss, '.c{'));
+$decl = map_lookup($umap, 0, strpos($ucss, 'color:red'));
+
+// Column as well as line: before the fix the shifted lookup landed on the rule's own
+// declaration, which is on the same line, and the line alone could not tell them apart.
+check('.c maps to source line 7 after two insertions', $rule && $rule['line'] === 6 && $rule['column'] === 0, var_export($rule, true));
+check('and its declaration to line 8',                 $decl && $decl['line'] === 7 && $decl['column'] === 2, var_export($decl, true));
+check('in the entry file',                             $rule && str_ends_with($umap['sources'][$rule['src']] ?? '', 'urls.scss'));
+check('the map names the built file, not the temp output', ($umap['file'] ?? '') === 'urls.css', (string) ($umap['file'] ?? ''));
+
+unset($GLOBALS['filter_overrides']['sassy-style']);
+
 section('Cleanup');
 $strays = array_merge(
     glob("$SCSS/_sassy-*") ?: [],

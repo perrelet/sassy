@@ -709,7 +709,7 @@ This phase restores the source as `assets/scss/sassy.scss` and enqueues it direc
 The authoring loop today: sculpt in the inspector → copy into the stylesheet → `CTRL+SPACE` →
 repeat. The ideal: inspector edits **push to source**. Three tiers.
 
-**Tier 0 — already works on 2.1; costs a docs page.** DevTools Workspaces + the fixed source
+**Tier 0 — works once the map is exact; costs a docs page.** It did not work on 2.1 or 3.0 under compressed output: `Printer` rewrote relative `url()` references after the engine produced the map, and with the whole sheet on one line every insertion shifted every later column, so DevTools landed on the wrong source line for every rule after the first `url()`. Expanded output hid it. Fixed at the start of phase 7 by moving the map with the rewrite. DevTools Workspaces + the exact source
 maps: map the project folder, styles-pane links jump through the map into the real `.scss` in
 Sources, edit, save — DevTools writes to disk, `watch` recompiles, auto-reload repaints. This is
 editing source in the browser rather than pushing painted styles back — half the paintbrush,
@@ -739,10 +739,13 @@ loop are the same pipe.
 Two costs the tier carries, named here so they are priced before the spike rather than after:
 
 - **Mapping requires decoding the map in the browser.** `{file, line}` comes from the `mappings`
-  field, which is VLQ-encoded — roughly a hundred lines of hand-rolled decoder, against a
-  frontend committed to zero dependencies. It is the one place in phase 6–7 where "hand-rolled
-  minimal" is not also "small". The spike should decode one real mapping, not merely prove
-  CSSOM visibility.
+  field, which is VLQ-encoded. Measured while preparing the spike: the decoder is twenty lines,
+  not the hundred an earlier draft priced, and Dart emits a segment per selector and per
+  declaration (6,819 for 1,700 rules on the reference install), so a changed declaration maps
+  to its own source line. Two traps for the reader of that map: compressed output starts with
+  a byte-order mark the map counts as column 0 and `Response.text()` strips, so fetch bytes;
+  and the rewrite fix above is what makes the columns true at all. The spike should decode one
+  real mapping, not merely prove CSSOM visibility.
 - **Tier 1 requires a reachable map.** Lightning CSS strips `sourceMappingURL` from the CSS it
   emits (the canonical `notice` in phase 4), so wherever it is enabled the paintbrush has
   nothing to map through and must degrade to copy-without-location rather than fail silently.

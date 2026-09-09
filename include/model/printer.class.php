@@ -154,7 +154,7 @@ class Printer {
             $this->src_map = $request->source_map;
             $css = $result->css;
 
-            $css = preg_replace('#(url\((?![\'"]?(?:[a-z][a-z0-9+.\-]*:|/|\#))[\'"]?)#miu', '$1' . dirname($parse_src['path']) . '/', $css);
+            [$css, $map] = static::rewrite_urls($css, $result->map, dirname($parse_src['path']) . '/');
             $css = apply_filters('sassy-css', $css, $this->src, $this->handle, $this->get_asset());
 
             $context = new Post_Process_Context($this->get_asset());
@@ -176,7 +176,7 @@ class Printer {
                 return $this->get_build_url();
             }
 
-            if ($result->map !== null && $request->map_path) file_put_contents($request->map_path, $result->map);
+            if ($map !== null && $request->map_path) file_put_contents($request->map_path, $map);
 
             $graph = Import_Scanner::scan($src_path, $this->get_import_paths($src_path));
 
@@ -199,6 +199,28 @@ class Printer {
             $output .= '?' . $parse_src['query'];
         }
         return $output;
+    }
+
+    /**
+     * Relative url() references are rewritten against the source's location, and the map moves
+     * with them: with compressed output the whole sheet is one line, so an insertion at column
+     * 97 put every later rule on the wrong source line.
+     *
+     * @return array{0: string, 1: string|null} The CSS and the map, both rewritten.
+     */
+    protected static function rewrite_urls ($css, $map, $base) {
+
+        $insertions = [];
+
+        $css = preg_replace_callback('#(url\((?![\'"]?(?:[a-z][a-z0-9+.\-]*:|/|\#))[\'"]?)#miu', function ($m) use ($base, &$insertions, $css) {
+            $insertions[] = Source_Map::position($css, $m[0][1] + strlen($m[0][0])) + [2 => strlen(mb_convert_encoding($base, 'UTF-16LE', 'UTF-8')) / 2];
+            return $m[0][0] . $base;
+        }, $css, -1, $count, PREG_OFFSET_CAPTURE);
+
+        if ($map !== null && $insertions) $map = Source_Map::shift($map, $insertions);
+
+        return [$css, $map];
+
     }
 
     /**
