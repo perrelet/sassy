@@ -17,6 +17,7 @@ class Compile_Cache {
     const GRAPH_KEY   = 'sassy-filemtimes-';
     const VARS_KEY    = 'sassy-vars-sig-';
     const HANDLES_KEY = 'sassy-handles';
+    const DIAGNOSTICS_KEY = 'sassy-diagnostics-';
 
     protected $asset;
     protected $target;
@@ -102,6 +103,36 @@ class Compile_Cache {
 
     }
 
+    /**
+     * Written after every compile that ran, failed or not, unlike the currency record: the page
+     * has to show the error that made a handle stale. Nothing here feeds get_state().
+     */
+    public function record_diagnostics (array $diagnostics) {
+
+        set_transient(static::DIAGNOSTICS_KEY . $this->asset->handle, [
+            'time'        => time(),
+            'diagnostics' => array_map(function ($diagnostic) { return $diagnostic->to_array(); }, $diagnostics),
+        ]);
+
+        static::index($this->asset->handle);
+
+    }
+
+    /**
+     * @return array{time: int, diagnostics: Diagnostic[]}|null
+     */
+    public static function get_diagnostics ($handle) {
+
+        $recorded = get_transient(static::DIAGNOSTICS_KEY . $handle);
+        if (!is_array($recorded)) return null;
+
+        return [
+            'time'        => (int) ($recorded['time'] ?? 0),
+            'diagnostics' => array_map([Diagnostic::class, 'from_array'], $recorded['diagnostics'] ?? []),
+        ];
+
+    }
+
     public function forget () {
 
         static::forget_handle($this->asset->handle);
@@ -151,6 +182,7 @@ class Compile_Cache {
 
         delete_transient(static::GRAPH_KEY . $handle);
         delete_transient(static::VARS_KEY . $handle);
+        delete_transient(static::DIAGNOSTICS_KEY . $handle);
 
     }
 

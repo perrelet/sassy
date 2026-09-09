@@ -54,6 +54,15 @@ class Diagnostic {
 
     }
 
+    public static function from_array (array $fields) {
+
+        $diagnostic = new static($fields['severity'] ?? static::NOTICE, (string) ($fields['message'] ?? ''), $fields);
+        $diagnostic->fatal = !empty($fields['fatal']);
+
+        return $diagnostic;
+
+    }
+
     public function is_error () {
 
         return $this->severity === static::ERROR;

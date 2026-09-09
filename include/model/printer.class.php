@@ -24,6 +24,7 @@ class Printer {
     protected $import_paths;
 
     protected $compiled;
+    protected $attempted;
     protected $src_map;
     protected $diagnostics = [];
     protected $compile_time = null;
@@ -40,8 +41,9 @@ class Printer {
         $this->cache            = null;
         $this->import_paths     = null;
 
-        $this->compiled = false;
-        $this->src_map  = false;
+        $this->compiled  = false;
+        $this->attempted = false;
+        $this->src_map   = false;
         $this->diagnostics = [];
         $this->compile_time = null;
 
@@ -97,10 +99,23 @@ class Printer {
 
         $this->prepare($src, $handle);
 
+        $output = $this->run();
+
+        // Whenever a compile was attempted, so a failure is still visible after the request
+        // that produced it. A cache hit leaves the last record standing.
+        if ($this->attempted) $this->get_cache()->record_diagnostics($this->diagnostics);
+
+        return $output;
+
+    }
+
+    protected function run () {
+
         $src_path  = $this->get_src_path();
         $parse_src = parse_url($this->src);
 
         if (!file_exists($src_path)) {
+            $this->attempted = true;
             $this->fail($this->unresolved());
             return $this->src;
         }
@@ -111,6 +126,7 @@ class Printer {
         $variables  = $this->get_variables();
 
         $run = $this->get_cache()->needs_compile();
+        $this->attempted = $run;
 
         if ($run && !$this->ensure_build_directory($build_path)) {
             return $this->get_build_url();
