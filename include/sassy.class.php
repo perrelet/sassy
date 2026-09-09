@@ -8,7 +8,6 @@ class Sassy {
 	protected $build_url;
 	protected $ui;
 	protected $printers = [];
-	protected $errors;
 	
 	public function __construct() {
 		
@@ -217,23 +216,23 @@ class Sassy {
 
 	}
 
+	/**
+	 * Read every time: print_errors() runs at wp_footer 10 and late styles compile at 20, so a
+	 * remembered answer misses whatever the footer enqueued.
+	 */
 	public function get_errors () {
 
-		if (is_null($this->errors)) {
+		$errors = [];
 
-			$this->errors = [];
+		foreach ($this->printers as $handle => $printer) {
 
-			foreach ($this->printers as $handle => $printer) {
+			if (!$printer->has_error()) continue;
 
-				if (!$printer->has_error()) continue;
-
-				$this->errors[UI::node_id($handle)] = Diagnostic::render_all($printer->get_errors());
-
-			}
+			$errors[UI::node_id($handle)] = Diagnostic::render_all($printer->get_errors());
 
 		}
 
-		return $this->errors;
+		return $errors;
 
 	}
 
