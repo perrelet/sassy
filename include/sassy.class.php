@@ -77,8 +77,11 @@ class Sassy {
 	protected function load_views () {
 		
 		require_once(SASSY_PATH . "include/view/ui.class.php");
+		require_once(SASSY_PATH . "include/view/admin-page.class.php");
 		
 		$this->ui = new UI();
+
+		if (is_admin()) new Admin_Page();
 		
 	}
 	

@@ -9,9 +9,17 @@
 
 require __DIR__ . '/bootstrap.php';
 
+use Sassy\Admin_Page;
+use Sassy\Compile_Cache;
 use Sassy\Compile_Request;
 use Sassy\Dart_Sass_Engine;
+use Sassy\Diagnostic;
+use Sassy\Import_Graph;
 use Sassy\Scssphp_Engine;
+use Sassy\Style_Stack;
+
+require $SASSY_PLUGIN . 'include/view/ui.class.php';
+require $SASSY_PLUGIN . 'include/view/admin-page.class.php';
 
 section('Sassy compiles her own stylesheet');
 
@@ -48,5 +56,85 @@ if (!dart_available()) {
     check('with nothing to report there either',        $dart->diagnostics === []);
 
 }
+
+section('Cited files resolve against the recorded graph by path suffix');
+
+$graph = new Import_Graph([
+    '/srv/site/scss/_x.scss'            => [1, 1],
+    '/srv/site/scss/parts/_x.scss'      => [1, 1],
+    '/srv/site/scss/_y.scss'            => [1, 1],
+    '/srv/site/lattice/lib/_break.scss' => [1, 1],
+]);
+
+check('a bare basename with one match resolves',     Admin_Page::resolve_file('_y.scss', $graph) === '/srv/site/scss/_y.scss');
+check('a colliding basename stays unresolved',       Admin_Page::resolve_file('_x.scss', $graph) === null);
+check('a longer suffix disambiguates it',            Admin_Page::resolve_file('parts/_x.scss', $graph) === '/srv/site/scss/parts/_x.scss');
+check('a cwd-relative path resolves',                Admin_Page::resolve_file('lattice/lib/_break.scss', $graph) === '/srv/site/lattice/lib/_break.scss');
+check('a recorded absolute path is itself',          Admin_Page::resolve_file('/srv/site/scss/_y.scss', $graph) === '/srv/site/scss/_y.scss');
+check('a name nothing recorded is unresolved',       Admin_Page::resolve_file('_nope.scss', $graph) === null);
+check('no graph resolves nothing',                   Admin_Page::resolve_file('_y.scss', null) === null);
+check('a prefix is not a suffix',                    Admin_Page::resolve_file('y.scss', $graph) === null);
+
+section('The page renders the model');
+
+$SCSS = ABSPATH . 'wp-content/themes/t';
+$BASE = 'http://test.local/wp-content/themes/t/';
+
+fixture("$SCSS/_shared.scss", "\$pad: 4px;\n@warn 'careful';\n");
+fixture("$SCSS/warned.scss",  "@import 'shared';\n.a { padding: \$pad; }\n");
+fixture("$SCSS/never.scss",   ".b { color: red; }\n");
+fixture("$SCSS/broken.scss",  ".c { color: }\n");
+
+compile($BASE . 'warned.scss', 'warned');
+compile($BASE . 'broken.scss', 'broken');
+
+wp_styles()->add('warned', $BASE . 'warned.scss', ['base']);
+wp_styles()->add('never',  $BASE . 'never.scss');
+wp_styles()->add('broken', $BASE . 'broken.scss');
+wp_styles()->add('base',   '/wp-admin/css/common.min.css');
+wp_styles()->add('bundle', false, ['base']);
+wp_styles()->add('evil<b>', 'https://cdn.example.com/x.css');
+
+$data = Admin_Page::data(Style_Stack::discover());
+$html = Admin_Page::html($data);
+
+$kinds = array_column($data['stack'], 'kind', 'handle');
+
+check('every handle is a row',          count($data['stack']) === 6);
+check('a built handle is managed',      ($kinds['warned'] ?? null) === 'managed');
+check('an unbuilt one is compilable',   ($kinds['never'] ?? null) === 'compilable');
+check('a failed one is compilable',     ($kinds['broken'] ?? null) === 'compilable', $kinds['broken'] ?? 'none');
+check('css is third-party',             ($kinds['base'] ?? null) === 'third-party');
+check('a per-handle section per compilable handle', array_keys($data['handles']) === ['warned', 'never', 'broken']);
+check('WP deps survive',                str_contains($html, '<td>base</td>'));
+check('a handle is escaped',            str_contains($html, 'evil&lt;b&gt;') && !str_contains($html, 'evil<b>'));
+
+section('Check findings are on the page');
+
+$messages = array_map(function ($f) { return $f->code . ': ' . $f->message; }, $data['findings']);
+
+check('the unbuilt handle is a finding', in_array('never: Never built. Run wp sassy compile.', $messages, true), implode(' | ', $messages));
+check('the failed one is stale',         in_array('broken: Stale. Run wp sassy compile.', $messages, true) || in_array('broken: Never built. Run wp sassy compile.', $messages, true));
+check('rendered in the findings table',  str_contains($html, 'sassy-findings') && str_contains($html, 'Never built.'));
+
+section('Diagnostics render as header plus verbatim body, with the canonical text kept');
+
+$recorded  = Compile_Cache::get_diagnostics('warned');
+$warning   = $recorded['diagnostics'][0] ?? null;
+$canonical = $warning ? $warning->render() : '';
+
+check('the warning was recorded',                     $warning && $warning->severity === 'warning');
+check('its canonical text is in the markup verbatim', $canonical !== '' && str_contains($html, esc_html($canonical)));
+check('inside a hidden pre for copy',                 preg_match('/<pre id="sassy-warned-handle-0" class="sassy-canonical" hidden>/', $html) === 1);
+check('with a copy button pointing at it',            str_contains($html, 'data-sassy-copy-from="sassy-warned-handle-0"'));
+check('and a copy-all for the handle',                str_contains($html, 'data-sassy-copy-from="sassy-warned-handle-canonical"'));
+check('the location is click-to-copy',                preg_match('/data-sassy-copy="[^"]*_shared\.scss:2(:\d+)?"/', $html) === 1);
+check('the header shows the first message line',      str_contains($html, '<span class="sassy-message">careful</span>'));
+check('the failure is recorded and shown',            str_contains($html, '<details class="sassy-group" open>'));
+
+section('Actions');
+
+check('Compile all is declared, not wired',  str_contains($html, 'data-sassy-action="compile"'));
+check('Clear cache is a nonced POST',        str_contains($html, 'name="action" value="sassy_clear"') && str_contains($html, "value='nonce:sassy-clear'"));
 
 finish();

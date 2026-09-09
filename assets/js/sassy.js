@@ -50,6 +50,7 @@
 
             this.addEventListeners();
             this.bindLogToggles();
+            this.bindPage();
 
             // The declared surface, replacing the Angular reach-in a builder used to need.
             window.sassy = {
@@ -58,6 +59,81 @@
                 render:  (diagnostic) => renderDiagnostic(diagnostic),
                 logging: (key) => this.logging(key),
             };
+
+        },
+
+        /**
+         * The admin page declares its behaviour in attributes; one delegated listener serves
+         * them all. Copy buttons hide themselves where the clipboard API is absent (plain http)
+         * rather than fail on click.
+         */
+        bindPage () {
+
+            this.reloadAfterCompile = false;
+
+            if (!this.canCopy()) {
+                document.querySelectorAll('button[data-sassy-copy], button[data-sassy-copy-from]').forEach(el => { el.hidden = true; });
+            }
+
+            document.addEventListener('click', event => this.onClick(event));
+
+        },
+
+        canCopy () {
+
+            return typeof navigator !== 'undefined' && !!(navigator.clipboard && navigator.clipboard.writeText);
+
+        },
+
+        onClick (event) {
+
+            const target = event.target && event.target.closest
+                ? event.target.closest('[data-sassy-copy], [data-sassy-copy-from], [data-sassy-action], [data-sassy-filter]')
+                : null;
+
+            if (!target) return;
+
+            if (target.hasAttribute('data-sassy-copy')) {
+                event.preventDefault();
+                this.copy(target.getAttribute('data-sassy-copy'), target);
+            } else if (target.hasAttribute('data-sassy-copy-from')) {
+                event.preventDefault();
+                const source = document.getElementById(target.getAttribute('data-sassy-copy-from'));
+                if (source) this.copy(source.textContent, target);
+            } else if (target.getAttribute('data-sassy-action') === 'compile') {
+                event.preventDefault();
+                this.reloadAfterCompile = true;
+                this.liveCompile(true, 'all');
+            } else if (target.hasAttribute('data-sassy-filter')) {
+                event.preventDefault();
+                this.filterStack(target.getAttribute('data-sassy-filter'));
+            }
+
+        },
+
+        copy (text, el) {
+
+            if (!this.canCopy()) return;
+
+            navigator.clipboard.writeText(text).then(() => {
+                this.showNotice('✔ Copied', 'success');
+                if (el && el.setAttribute) {
+                    el.setAttribute('data-copied', '1');
+                    setTimeout(() => el.removeAttribute && el.removeAttribute('data-copied'), 1500);
+                }
+            }, () => this.showNotice('✗ Copy failed', 'error'));
+
+        },
+
+        filterStack (kind) {
+
+            document.querySelectorAll('[data-sassy-filter]').forEach(button => {
+                button.setAttribute('aria-pressed', button.getAttribute('data-sassy-filter') === kind ? 'true' : 'false');
+            });
+
+            document.querySelectorAll('.sassy-stack tbody tr[data-kind]').forEach(row => {
+                row.hidden = kind !== 'all' && row.getAttribute('data-kind') !== kind;
+            });
 
         },
 
@@ -236,6 +312,10 @@
                             styles: payload.data,
                         });
                         this.showNotice(hadWarnings ? '⚠ Compiled with warnings' : '✔ Compiled', hadWarnings ? 'warning' : 'success');
+
+                        // The dashboard's Compile all: its tables are server-rendered, so show
+                        // the new state the only way they can.
+                        if (this.reloadAfterCompile) location.reload();
 
                     } else {
 

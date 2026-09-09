@@ -65,6 +65,11 @@ const dispatched = [];
 global.CustomEvent = class { constructor (type, init) { this.type = type; Object.assign(this, init); } };
 
 let keydown = null;
+let click   = null;
+
+const copied = [];
+// Node 21+ ships a read-only navigator global, so a plain assignment is silently ignored.
+Object.defineProperty(global, 'navigator', { configurable: true, writable: true, value: { clipboard: { writeText: text => { copied.push(text); return Promise.resolve(); } } } });
 
 global.document = {
     body: element(),
@@ -73,7 +78,7 @@ global.document = {
     querySelector: () => null,
     querySelectorAll: sel => (String(sel).includes('sassy-log-toggle') ? toggles : []),
     createElement: () => element(),
-    addEventListener: (name, fn) => { if (name === 'keydown') keydown = fn; },
+    addEventListener: (name, fn) => { if (name === 'keydown') keydown = fn; if (name === 'click') click = fn; },
     dispatchEvent: e => dispatched.push(e.type),
 };
 
@@ -173,5 +178,37 @@ global.window.sassy.reload();
 ok('a same-origin sheet is re-requested', sheets[0].href.includes('sassy='));
 ok('a third-party sheet is left alone',  !sheets[1].href.includes('sassy='));
 ok('reload announces itself',             dispatched.includes('sassy:reload'));
+
+// --- The admin page's attributes ---------------------------------------------
+
+ok('a click listener is registered', typeof click === 'function');
+
+function clickOn (el) {
+    el.closest = () => el;
+    el.hasAttribute = n => n in el.attrs;
+    click({ target: el, preventDefault () {} });
+}
+
+clickOn(element({ 'data-sassy-copy': '/srv/site/_x.scss:3:7' }));
+ok('a location copies its full path', copied[copied.length - 1] === '/srv/site/_x.scss:3:7');
+
+const canonical = element({ id: 'd1' });
+canonical.textContent = 'ERROR  _x.scss:3:7  Undefined variable.\n  ╷\n3 │ a\n  ╵';
+document.getElementById = id => (id === 'd1' ? canonical : null);
+clickOn(element({ 'data-sassy-copy-from': 'd1' }));
+ok('a copy button copies the canonical text verbatim', copied[copied.length - 1] === canonical.textContent);
+
+const rows = ['managed', 'third-party', 'compilable'].map(kind => element({ 'data-kind': kind }));
+const filters = ['all', 'managed'].map(kind => element({ 'data-sassy-filter': kind }));
+document.querySelectorAll = sel => (String(sel).includes('data-kind') ? rows : (String(sel).includes('data-sassy-filter') ? filters : []));
+clickOn(filters[1]);
+ok('a filter hides the other kinds',   rows[1].hidden === true && rows[2].hidden === true && rows[0].hidden === false);
+ok('and presses its own button',       filters[1].attrs['aria-pressed'] === 'true' && filters[0].attrs['aria-pressed'] === 'false');
+clickOn(filters[0]);
+ok('all shows everything again',       rows.every(r => r.hidden === false));
+
+const before = fetched.length;
+clickOn(element({ 'data-sassy-action': 'compile' }));
+ok('Compile all forces every context', fetched.length === before + 1 && String(fetched[fetched.length - 1]).includes('hooks=all') && String(fetched[fetched.length - 1]).includes('force=1'));
 
 process.stdout.write(JSON.stringify(results));
