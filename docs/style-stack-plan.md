@@ -735,6 +735,14 @@ loop are the same pipe.
 > via `document.styleSheets` in the browsers the team uses. Believed true for Chromium;
 > unverified. If the spike fails, tier 1 dies and tier 0 is the story. The spike page is kept as a
 > fixture either way.
+>
+> **Passed, 2026-09-09**, in Chrome on staging with `tests/fixtures/paintbrush-spike.html`: a
+> styles-pane edit to `.site-header` was visible on Capture, the page's scan of the CSS text
+> aligned 1,700 blocks to 1,700 CSSOM rules, and the change mapped to
+> `_site-header.scss:23`, the rule's own line. One thing the run taught: the CSSOM expands a
+> shorthand, so `background: red` arrived as nine longhands with empty baselines. Tier 1 diffs
+> declarations as the rule serialises them (`style.cssText`), which keeps the shorthand and lets
+> the declaration map to its own line rather than the rule's.
 
 Two costs the tier carries, named here so they are priced before the spike rather than after:
 
@@ -919,8 +927,8 @@ change to what hot-wiring feels like, so it is named rather than implied.
 
 ## 7. Still open
 
-- **Paintbrush spike** — CSSOM visibility of inspector edits; tier 1 stands or falls on it. The
-  first thing phase 7 builds, and buildable as a twenty-line scratch page any time before that.
+- **Paintbrush spike**: closed. Passed on 2026-09-09; the result is recorded under phase 7 and
+  the page is `tests/fixtures/paintbrush-spike.html`.
 - **Lattice and `sassy-style-queues`**, §4's open row. `Theme::enqueue_style_last()` still fills
   `$digitalis_styles` and nothing binds the filter, so a site using it loses those styles from
   discovery under 3.0. The fix belongs in Lattice, and it is Jamie's.
