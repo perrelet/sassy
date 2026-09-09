@@ -68,7 +68,7 @@ class UI {
 			'id'     => 'sassy-clear-cache',
 			'parent' => 'sassy',
 			'title'  => __('🗑️ Clear Cache', 'sassy'),
-			'href'   => add_query_arg('sassy-clear-cache', 1),
+			'href'   => wp_nonce_url(add_query_arg('sassy-clear-cache', 1), 'sassy-clear-cache'),
 		]);
 
 		do_action('sassy-admin-bar', $admin_bar);
@@ -221,10 +221,11 @@ class UI {
 	public function clear_cache () {
 
 		if (!Policy::active()) return;
+		if (!wp_verify_nonce($_GET['_wpnonce'] ?? '', 'sassy-clear-cache')) return;
 
 		Compile_Cache::forget_all();
 
-		wp_safe_redirect(remove_query_arg('sassy-clear-cache'));
+		wp_safe_redirect(remove_query_arg(['sassy-clear-cache', '_wpnonce']));
 		exit;
 
 	}
