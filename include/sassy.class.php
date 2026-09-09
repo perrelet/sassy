@@ -96,23 +96,16 @@ class Sassy {
 
 		wp_enqueue_style('sassy', SASSY_URI . 'assets/css/sassy.css', [], static::asset_version('assets/css/sassy.css'));
 
-		$builder = false;
-		if (defined('CT_VERSION')) $builder = 'oxygen';
+		// The last Oxygen artifact was deciding here whether to load at all, based on which
+		// window the builder had put us in. A builder integration is now a listener on the
+		// sassy:* events, so nothing here needs to know one exists.
+		wp_enqueue_script('sassy', SASSY_URI . 'assets/js/sassy.js', [], static::asset_version('assets/js/sassy.js'), true);
 
-		$backend = false;
-		if (($builder == 'oxygen') && defined("SHOW_CT_BUILDER")) $backend = true;
-
-		if (!$backend || ($backend && defined("OXYGEN_IFRAME"))) {
-
-			wp_enqueue_script('sassy', SASSY_URI . 'assets/js/sassy.js', [], static::asset_version('assets/js/sassy.js'), true);
-			wp_localize_script('sassy', 'sass_params', [
-				'ajax_url'				=> admin_url('admin-ajax.php'),
-				'sassy_compile_nonce'	=> wp_create_nonce('sassy_compile'),
-				'builder'				=> $builder,
-				'backend'				=> $backend,
-			]);      
-
-		}  
+		wp_localize_script('sassy', 'sass_params', [
+			'ajax_url'            => admin_url('admin-ajax.php'),
+			'sassy_compile_nonce' => wp_create_nonce('sassy_compile'),
+			'keybinding'          => apply_filters('sassy-keybinding', ['ctrl+space', 'meta+space']),
+		]);  
 
 	}
 	

@@ -2,7 +2,7 @@
 
 What changes for a site running Sassy, and what to do about it.
 
-**In progress.** 3.0 ships phases 1-6 of [style-stack-plan.md](style-stack-plan.md), and each phase adds its breaks here as it lands. Anything not listed below has not changed yet. Landed so far: **phases 1 to 5**.
+**3.0.0 is complete.** It ships phases 1-6 of [style-stack-plan.md](style-stack-plan.md), and each phase adds its breaks here as it lands. Anything not listed below has not changed yet. Landed so far: **phases 1 to 6**, which is all of 3.0.0.
 
 Nothing on 1.x is auto-updated to 3.0. The digitalis.ca update JSON is version-fenced before 3.0 publishes, so a wild 1.x install is never offered a breaking upgrade.
 
@@ -242,3 +242,68 @@ The diagnostics are stored as a severity tally under `__diagnostics__` in the ex
 ### `Diagnostic` gains a `fatal` flag
 
 Set by `Style_Stack::audit()` for findings that fail a check regardless of severity, which today means a truncated import graph. Defaults to false, so nothing that constructs a `Diagnostic` needs changing.
+
+---
+
+## Phase 6: the dev surface
+
+The largest break for anyone who scripted against Sassy's UI or its AJAX response.
+
+### The AJAX payload changed shape
+
+**Who this affects:** anything reading the `sassy_compile` response.
+
+- `meta.variables` is **gone**. Use `wp sassy vars`.
+- `meta.index` is **gone**, replaced by `meta.node`, the admin bar DOM id the server computed (`sassy-<handle>`). Nothing reconstructs that id client-side any more.
+- `meta.hash` is **new**: a content hash of the built CSS, used for cache-busting and available as a change-poll primitive.
+- `warnings` entries are diagnostic objects, as of phase 3.
+- `wp_ajax_nopriv_sassy_compile` is **not registered**. The endpoint checks the dev gate server-side in addition to the nonce.
+
+### The dev surface has one gate
+
+**Who this affects:** anyone who assumed `edit_theme_options` was the rule.
+
+`Policy::active()` defaults to `current_user_can('edit_theme_options')` and is filterable:
+
+```php
+add_filter('sassy-dev', fn () => current_user_can('dev'));
+```
+
+It gates the assets, the admin bar, the error panel and the endpoint together. Gates are about who, never where: there is no environment check anywhere in Sassy, and anything expressible in PHP is expressible in that filter.
+
+### Admin bar
+
+- **Force Recompile is gone.** Live Compile already skips the cache.
+- **Log Variables and `?sassy-vars=1` are gone**, with `Sassy::get_all_variables()` and `UI::print_variables()`. Use `wp sassy vars` or the new Logging submenu.
+- **`?sassy-recompile=1` is gone**, with the `sassy-force-compile` filter callback behind it. The filter itself is untouched.
+- **Logging is new**: console toggles for diagnostics and compile meta, persisted per-browser in `localStorage`.
+- Clear Cache and the per-handle entries **stay**. They were slated to move to the admin page, which is now phase 6b, and dropping them before their replacement exists would leave no route to them at all.
+- Node ids are `sassy-<handle>` rather than `sassy-<n>`.
+
+### The Oxygen Angular reach-in is replaced by an event contract
+
+**Who this affects:** anyone bridging Sassy into a builder iframe.
+
+`window.sassy.compile()` and `window.sassy.reload()`, plus `sassy:before-compile`, `sassy:compiled` and `sassy:reload` on `document`. `sassy:compiled` carries `{ diagnostics, styles }`. The bridge that used to require reaching through `parent.angular`:
+
+```js
+document.addEventListener('sassy:compiled', e => {
+    const frame = document.querySelector('iframe');
+    if (frame) frame.contentWindow.postMessage({ type: 'sassy:compiled', detail: e.detail }, '*');
+});
+```
+
+Sassy no longer detects builders at all: `CT_VERSION`, `SHOW_CT_BUILDER` and `OXYGEN_IFRAME` are not read anywhere.
+
+### The keybinding is configurable
+
+```php
+add_filter('sassy-keybinding', fn () => ['ctrl+shift+k']);   // rebind
+add_filter('sassy-keybinding', '__return_false');            // disable, button still works
+```
+
+Default `['ctrl+space', 'meta+space']`, preserving 2.x behaviour, which accepted either modifier.
+
+### State words changed
+
+`wp sassy list`'s `state` column and the admin bar glyph now use one vocabulary: `no source`, `not built`, `stale`, `warning`, `current`, plus `error` from a compile that just failed. `wp sassy deps` uses `missing`, `changed`, `current`, lowercased from `MISSING`.

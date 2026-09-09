@@ -113,30 +113,53 @@ function renderDiagnostic (d) {
         onKeyDown (event) {
 
             if (event.repeat) return;
+
+            // Not while typing. The collision with IME and autocomplete has bitten in practice,
+            // which is also why the binding is filterable at all.
             if (event.target && event.target.nodeName !== 'BODY') return;
 
-            let processed = false;
-            const key = (event.key || '').toLowerCase();
+            if (!this.matchesBinding(event)) return;
 
-            switch (key) {
+            this.liveCompile();
 
-                case ' ':
-                    this.liveCompile();
-                    processed = true;
-                    break;
+            event.stopImmediatePropagation();
+            event.preventDefault();
 
-            }
+        },
 
-            if (processed) {
-                event.stopImmediatePropagation();
-                event.preventDefault();
-            }
+        /**
+         * Each binding is "+"-separated modifiers plus a key, e.g. ctrl+space. The server sends
+         * false to disable the binding entirely, leaving the admin bar button as the trigger.
+         */
+        matchesBinding (event) {
+
+            const bindings = this.params.keybinding;
+
+            if (!Array.isArray(bindings) || !bindings.length) return false;
+
+            const key = (event.key === ' ' ? 'space' : (event.key || '').toLowerCase());
+
+            return bindings.some(binding => {
+
+                const parts = String(binding).toLowerCase().split('+').map(p => p.trim()).filter(Boolean);
+                const wants = parts.pop();
+
+                if (wants !== key) return false;
+
+                return parts.every(modifier => ({
+                    ctrl:  event.ctrlKey,
+                    meta:  event.metaKey,
+                    alt:   event.altKey,
+                    shift: event.shiftKey,
+                }[modifier] === true));
+
+            });
 
         },
 
         liveCompile () {
 
-            const url = `${this.params.ajax_url}?action=sassy_compile&nonce=${this.params.sassy_compile_nonce}&sassy-recompile=1`;
+            const url = `${this.params.ajax_url}?action=sassy_compile&nonce=${this.params.sassy_compile_nonce}`;
 
             this.clearErrors();
             this.showNotice('⚡ Compiling\u2026', 'pending');

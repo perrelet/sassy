@@ -84,7 +84,21 @@ $breakpoints: ('page': 1200px, 'tablet': 768px, 'phone': 480px);
 Nested arrays are supported and are converted to nested Sass maps.
 ## Live Compile
 
-Fed up of refreshing the page to see your changes? Us too. Simply press `CTRL + SPACE` to recompile & reload your stylesheets at any time. This also works inside the Oxygen Builder. 🚀
+Fed up of refreshing the page to see your changes? Us too. Simply press `CTRL + SPACE` to recompile and reload your stylesheets at any time. 🚀
+
+The binding is configurable, and `false` disables it while leaving the admin bar button:
+
+```php
+add_filter('sassy-keybinding', fn () => ['ctrl+shift+k']);
+```
+
+Who sees the dev surface at all is one filter. It defaults to `edit_theme_options`, and it is about *who* rather than *where*, so it works the same in production:
+
+```php
+add_filter('sassy-dev', fn () => current_user_can('dev'));
+```
+
+Sassy exposes `window.sassy.compile()` and fires `sassy:before-compile`, `sassy:compiled` and `sassy:reload` on `document`, so driving it from a builder iframe is a listener rather than a reach-in.
 
 When live compile runs, Sassy also:
 

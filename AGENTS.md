@@ -7,11 +7,11 @@
 > the present, this file wins — so **each phase updates this file as part of landing**, or the
 > sentence you are reading becomes a trap.
 >
-> **Phases 1 to 5 have landed**: `Asset`, `Style_Stack`, `Printer`, `Build_Target`, `Compile_Cache`, `Variable_Resolver`, `Diagnostic`, `Compile_Request`, `Extensions`, plus `wp sassy check`. Phases 6 to 9 are still as the plan describes them.
+> **Phases 1 to 6 have landed**, which is all of 3.0.0. Phase 6b (the admin page), 7, 8 and 9 are still as the plan describes them.
 
 ## Overview
 
-**Sassy** is a WordPress plugin (v2.1.0, by Digitalis Web Build Co.) that compiles SCSS files on-demand. The core premise: enqueue `.scss` files exactly as you would `.css` files via `wp_enqueue_style`, and Sassy intercepts the URL, compiles the SCSS to CSS, writes the result to disk, and returns the compiled CSS URL to WordPress instead.
+**Sassy** is a WordPress plugin (v3.0.0, by Digitalis Web Build Co.) that compiles SCSS files on-demand. The core premise: enqueue `.scss` files exactly as you would `.css` files via `wp_enqueue_style`, and Sassy intercepts the URL, compiles the SCSS to CSS, writes the result to disk, and returns the compiled CSS URL to WordPress instead.
 
 ```php
 wp_enqueue_style('my-theme', get_template_directory_uri() . '/style.scss');
@@ -38,6 +38,7 @@ sassy/
 │   │   ├── compile-result.class.php   # What it produced, diagnostics included
 │   │   ├── diagnostic.class.php       # One reportable event, and the canonical rendering
 │   │   ├── extensions.class.php       # The four extension points, and who is extending them
+│   │   ├── policy.class.php           # Is the dev surface active for this request?
 │   │   ├── post-process-context.class.php  # What a post-processor gets besides the CSS
 │   │   ├── scss-map.class.php         # PHP array → SCSS map syntax converter
 │   │   ├── asset.class.php            # One enqueued thing; owns URL → filesystem resolution
@@ -327,6 +328,26 @@ If the extension API ever cannot express one of them, the API is wrong. That is 
 
 ---
 
+## The dev surface
+
+**One gate.** `Policy::active()` answers "is Sassy's dev surface active for this request", defaulting to `current_user_can('edit_theme_options')` and filterable through `sassy-dev`. It gates the assets, the admin bar, the error panel, Clear Cache and the AJAX endpoint. 2.x asked the capability question in four places, so a fifth surface could be added ungated and nothing would notice. `Policy::can_write_source()` is the stricter phase 7 gate and is never implied by `sassy-dev`.
+
+**The endpoint checks it server-side**, in addition to the nonce, and `wp_ajax_nopriv_sassy_compile` is not registered. A nonce is a CSRF token, not an authorization model.
+
+**State has one vocabulary per question.** `Compile_Cache::get_state()` answers for an asset: `no source`, `not built`, `stale`, `warning`, `current`. `Import_Graph::state_of()` answers for one file inside a graph: `missing`, `changed`, `current`. `error` belongs to neither, because a failed compile is never recorded; only `Printer::get_state()`, which just ran, can report it. Before this, the admin bar, `wp sassy list` and `wp sassy deps` each named the same answers differently and `current` meant two things.
+
+**The JS surface is declared, not reached into.** `window.sassy.compile()` and `.reload()`, plus `sassy:before-compile`, `sassy:compiled` and `sassy:reload` on `document`. The Oxygen Angular reach-in is gone, and a builder integration is now a listener that forwards the event into an iframe. `assets/js/sassy.js` renders diagnostics through `renderDiagnostic()`, which mirrors `Diagnostic::render()`.
+
+**Admin bar node ids come from the server.** `UI::node_id($handle)` produces `sassy-<handle>` and the payload carries it as `meta.node`, so the JS never reconstructs the id and the two cannot drift. Errors and printers are keyed by handle rather than a request counter.
+
+**Cache-busting uses the build's content hash**, `meta.hash`, which is exact where `Math.random()` was merely different and is the primitive an opt-in change poll would compare.
+
+**The keybinding is filterable.** `sassy-keybinding` defaults to `['ctrl+space', 'meta+space']`; `false` disables it and leaves the button. The handler ignores repeats and bails unless focus is on `body`, which is what stops it fighting IME and autocomplete.
+
+**Browser behaviour is verified by hand.** `tests/manual.md` is the checklist, walked before a release. The suite is PHP-only and opens no browser.
+
+---
+
 ## Admin UI
 
 `UI` (`include/view/ui.class.php`) adds a **SCSS** item to the WordPress admin bar (visible to users with `edit_theme_options`). Requires at least one active compiler to appear.
@@ -439,6 +460,7 @@ binary is absent.
 | `test-source-maps.php` | Every map source resolves from where the map is served, and line numbers are unshifted |
 | `test-output-style.php` | `sassy-style` accepts the enum and the string, on both engines |
 | `test-printer.php` | `Build_Target` path math and its filters; `Variable_Resolver` defaults, Sass maps, scheme normalization and signatures; `Compile_Cache` currency across a partial edit, a variable change, a missing build file and both cache filters; `Printer` agreeing with all three |
+| `test-policy.php` | The dev gate: the `edit_theme_options` default, `sassy-dev` overriding both ways, and `sassy-write-source` never implied by it |
 | `test-check.php` | `dependents_of()` including non-canonical paths; the audit's three hard failures; orphan scoping against a dotfile, a directory and a real orphan; truncation as a fatal warning; the severity tally |
 | `test-extensions.php` | The registry: four kinds, named providers, re-registration replacing by slug, per-asset timing, and a post-processor's report reaching the `Printer` |
 | `test-fixtures.php` | The retired Bricks, Oxygen and Digitalis integrations rebuilt on the extension API, against stubbed builder APIs |
