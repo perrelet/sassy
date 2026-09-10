@@ -56,6 +56,7 @@
                 logging: (key) => this.logging(key),
                 poll:    () => this.poll(),
                 capture: () => this.capture(),
+                push:    () => this.push(),
             };
 
         },
@@ -69,21 +70,26 @@
             const header  = document.createElement('div');
             const title   = document.createElement('span');
             const actions = document.createElement('span');
+            const push    = document.createElement('button');
             const copy    = document.createElement('button');
             const close   = document.createElement('button');
 
             header.id     = 'sassy-errors-header';
             title.id      = 'sassy-errors-title';
+            push.id       = 'sassy-errors-push';
             copy.id       = 'sassy-errors-copy';
             close.id      = 'sassy-errors-close';
-            copy.type     = close.type = 'button';
+            push.type     = copy.type = close.type = 'button';
+            push.textContent  = 'Push to source';
             copy.textContent  = 'Copy';
             close.textContent = 'Dismiss';
             title.textContent = 'SCSS Error';
 
+            push.addEventListener('click',  () => this.push());
             copy.addEventListener('click',  () => this.copy(this.panelText(), copy));
             close.addEventListener('click', () => this.clearErrors());
 
+            actions.appendChild(push);
             actions.appendChild(copy);
             actions.appendChild(close);
             header.appendChild(title);
@@ -91,8 +97,10 @@
             this.els.errors.prepend(header);
 
             this.els.title = title;
+            this.els.push  = push;
             this.els.copy  = copy;
 
+            push.hidden = true;
             if (!this.canCopy()) copy.hidden = true;
 
         },
@@ -107,6 +115,7 @@
             this.els.title.textContent = title;
             this.els.errors.setAttribute('data-kind', kind);
             this.els.errors.querySelectorAll('.sassy-error').forEach(el => el.remove());
+            if (this.els.push) this.els.push.hidden = true;
 
             for (const block of blocks) {
                 const pre = document.createElement('pre');
@@ -608,6 +617,8 @@
                 const patch  = this.patch(changes, extras, reasons);
 
                 this.panel('Captured styles', [patch], 'capture');
+                this.lastCapture = { changes, extras };
+                if (this.els.push) this.els.push.hidden = !(this.params.write && this.applicable(changes).length);
                 this.showNotice(changes.length || extras.length ? '🖌️ Captured' : '🖌️ Nothing changed', 'success');
                 if (this.logging('capture')) console.log(patch);
                 this.emit('sassy:captured', { patch, changes, extras });
@@ -615,6 +626,88 @@
                 return { patch, changes, extras };
 
             });
+
+        },
+
+        // --- Paintbrush, tier 2: push to source ----------------------------------------------
+
+        /** What the server can be asked to write: located, with an old value. Additions stay copy-only. */
+        applicable (changes) {
+
+            return changes.filter(c => c.location && c.location.source && c.from !== null);
+
+        },
+
+        push () {
+
+            const capture = this.lastCapture;
+            const list    = capture ? this.applicable(capture.changes) : [];
+
+            if (!this.params.write || !list.length) { this.showNotice('Nothing to push', 'warning'); return Promise.resolve(null); }
+
+            const body = new URLSearchParams({
+                action:  'sassy_write',
+                nonce:   this.params.sassy_write_nonce || '',
+                changes: JSON.stringify(list.map(c => ({ handle: c.handle, source: c.location.source, line: c.location.line, prop: c.prop, from: c.from, to: c.to }))),
+            });
+
+            this.showNotice('🖌️ Pushing\u2026', 'pending');
+
+            return fetch(this.params.ajax_url, { method: 'POST', credentials: 'same-origin', body })
+                .then(response => (response.ok ? response.json() : { success: false, data: `HTTP ${response.status}` }))
+                .then(payload => {
+
+                    if (!payload || !payload.success) {
+                        this.showNotice('✗ Push refused', 'error');
+                        this.panel('Push refused', [String(payload && payload.data ? payload.data : 'The write endpoint did not answer.')], 'capture');
+                        return null;
+                    }
+
+                    const results = payload.data.results || [];
+                    const text    = this.pushReport(list, results, capture);
+                    const written = results.filter(r => r && r.written).length;
+
+                    this.panel('Pushed to source', [text], 'capture');
+                    this.showNotice(written ? `✔ Pushed ${written}` : '✗ Nothing written', written ? 'success' : 'warning');
+                    this.emit('sassy:pushed', { results, text });
+
+                    // The dependency check sees the changed partial; the reload re-baselines.
+                    if (written) this.liveCompile(false, null, true);
+
+                    return results;
+
+                })
+                .catch(err => { console.error('Sassy: push failed.', err); this.showNotice('✗ Push failed', 'error'); return null; });
+
+        },
+
+        /**
+         * One line per change, written or refused with the reason and the line the server looked
+         * at, then whatever is left for the copy path in the patch's own format.
+         */
+        pushReport (list, results, capture) {
+
+            const lines   = [];
+            const leftover = [];
+
+            list.forEach((c, i) => {
+                const r     = results[i] || { written: false, reason: 'no answer' };
+                const where = `${c.location.file}:${c.location.line}`;
+                const decl  = c.to === null ? `- ${c.prop}: ${c.from}` : `${c.prop}: ${c.from} → ${c.to}`;
+                if (r.written) lines.push(`✔ written   ${where}  ${c.selector}  ${decl}`);
+                else {
+                    lines.push(`✗ refused   ${where}  ${c.selector}  ${decl}`, `            ${r.reason}${r.text ? `  |  ${r.text.trim()}` : ''}`);
+                    leftover.push(c);
+                }
+            });
+
+            const rest = capture.changes.filter(c => !list.includes(c)).concat(leftover);
+
+            if (rest.length || capture.extras.length) {
+                lines.push('', 'Left for the copy path:', this.patch(rest, capture.extras, {}));
+            }
+
+            return lines.join('\n');
 
         },
 
@@ -812,12 +905,13 @@
          * hooks defaults to the context this page was served in, so Live Compile in wp-admin
          * rebuilds the sheet on screen rather than the frontend's.
          */
-        liveCompile (force = false, hooks = null) {
+        liveCompile (force = false, hooks = null, keepPanel = false) {
 
             const context = hooks || this.params.context || 'frontend';
             const url = `${this.params.ajax_url}?action=sassy_compile&nonce=${this.params.sassy_compile_nonce}&hooks=${encodeURIComponent(context)}${force ? '&force=1' : ''}`;
 
-            this.clearErrors();
+            // After a push the panel holds the result; a compile error replaces it, a success does not.
+            if (!keepPanel) this.clearErrors();
             this.showNotice('⚡ Compiling\u2026', 'pending');
             this.emit('sassy:before-compile');
 

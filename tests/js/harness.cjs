@@ -14,12 +14,18 @@ const { readFileSync } = require('fs');
 const results = {};
 const ok = (label, condition) => { results[label] = !!condition; };
 
+// A promise that never settles ends the process silently with nothing printed. Print what there
+// is, so the last passing label says where it hung.
+let printed = false;
+const flush = () => { if (!printed) { printed = true; process.stdout.write(JSON.stringify(results)); } };
+process.on('beforeExit', () => { if (!printed) { results['the harness ran to completion'] = false; flush(); } });
+
 // A throw should name itself rather than taking the whole run down unexplained: this harness is
 // pointed at older checkouts, where the shipped file may not have the surface being asserted.
 process.on('uncaughtException', error => {
     results['the harness ran to completion'] = false;
     results['error: ' + String(error && error.message).slice(0, 120)] = false;
-    process.stdout.write(JSON.stringify(results));
+    flush();
     process.exit(0);
 });
 
@@ -140,8 +146,9 @@ windowLoad();
 
 const header = panel.children[0];
 ok('the panel grew a header', header && header.id === 'sassy-errors-header');
-const buttons = header.children[1].children;
-ok('with Copy and Dismiss',   buttons.length === 2 && buttons[0].id === 'sassy-errors-copy' && buttons[1].id === 'sassy-errors-close');
+const button  = id => header.children[1].children.find(b => b.id === 'sassy-errors-' + id);
+ok('with Push, Copy and Dismiss', header.children[1].children.length === 3 && button('push') && button('copy') && button('close'));
+ok('Push hidden until there is something to push', button('push').hidden === true);
 ok('it leaves no stray globals behind', typeof global.renderDiagnostic === 'undefined');
 ok('a keydown listener is registered', typeof keydown === 'function');
 
@@ -274,9 +281,9 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
     ok('a compile error shows the panel',   panel.classList.contains('show') && panel.attrs['data-kind'] === 'error');
     ok('titled SCSS Error',                 header.children[0].textContent === 'SCSS Error');
     ok('with the error text in a block',    panel.querySelectorAll('.sassy-error').length === 1 && panel.querySelectorAll('.sassy-error')[0].textContent === 'ERROR  x.scss:1:1  Expected expression.');
-    buttons[0].click();
+    button('copy').click();
     ok('Copy yields the panel text',        copied[copied.length - 1] === 'ERROR  x.scss:1:1  Expected expression.');
-    buttons[1].click();
+    button('close').click();
     ok('Dismiss hides it and empties it',   !panel.classList.contains('show') && panel.querySelectorAll('.sassy-error').length === 0);
 
 
@@ -328,11 +335,12 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
     const map = { version: 3, sources: ['../plugins/d-pace/scss/frontend.scss'], mappings };
     const nomapText = '.n{color:red}';
 
-    global.fetch = url => {
+    const mappingFetch = url => {
         url = String(url);
         if (url.endsWith('.map')) return Promise.resolve({ ok: true, json: () => Promise.resolve(map) });
         return Promise.resolve({ ok: true, arrayBuffer: () => Promise.resolve(new TextEncoder().encode(text).buffer) });
     };
+    global.fetch = mappingFetch;
 
     // Paint: one changed, one added, one shorthand changed, one removed, one in the mapless sheet,
     // a rule created in the inspector, and an inline style.
@@ -376,8 +384,52 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
     ok('the panel text is the patch',                                panel.querySelectorAll('.sassy-error').map(el => el.textContent).join('\n\n') === expected);
     ok('sassy:captured carries it',                                  lastEvent && lastEvent.type === 'sassy:captured' && lastEvent.detail.patch === expected && lastEvent.detail.changes.length === 5);
     ok('a change keeps the engine\'s own source string',             lastEvent.detail.changes[0].location.source === '../plugins/d-pace/scss/frontend.scss');
-    buttons[0].click();
+    button('copy').click();
     ok('Copy yields the patch',                                      copied[copied.length - 1] === expected);
+
+    // --- Tier 2: Push -----------------------------------------------------------------------
+
+    ok('Push stays hidden without sass_params.write', button('push').hidden === true);
+
+    global.window.sass_params.write = true;
+    global.window.sass_params.sassy_write_nonce = 'w';
+    await global.window.sassy.capture();
+    ok('and shows after a capture with an applicable change', button('push').hidden === false);
+
+    let posted = null;
+    global.fetch = (url, opts) => {
+        if (opts && opts.method === 'POST') {
+            posted = { url, body: opts.body };
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true, data: { results: [
+                { written: true,  file: '/srv/x/frontend.scss', line: 2, reason: null, text: '  color: red;' },
+                { written: false, file: '/srv/x/frontend.scss', line: 9, reason: 'the line has `background: $bg`, not `var(--x)`', text: '  background: $bg;' },
+                { written: false, file: '/srv/x/frontend.scss', line: 12, reason: 'the line holds more than that declaration', text: '  padding: 1px; margin: 0;' },
+            ] } }) });
+        }
+        fetched.push(url);
+        return new Promise(() => {});
+    };
+
+    const compilesBefore = fetched.length;
+    const results = await global.window.sassy.push();
+
+    ok('Push POSTs to admin-ajax',            posted && posted.url === '/ajax' && posted.body instanceof URLSearchParams && posted.body.get('action') === 'sassy_write' && posted.body.get('nonce') === 'w');
+    const sent = posted ? JSON.parse(posted.body.get('changes')) : [];
+    // Five changes were captured; the addition and the mapless one are not applicable.
+    ok('with the applicable changes only',   sent.length === 3 && !sent.some(c => c.from === null) && !sent.some(c => c.handle === 'nomap'));
+    ok('each carrying the engine\'s source string and line', sent[0].handle === 'front' && sent[0].source === '../plugins/d-pace/scss/frontend.scss' && sent[0].line === 2 && sent[0].prop === 'color' && sent[0].to === 'blue');
+    ok('the removal is sent with to = null',  sent.some(c => c.prop === 'padding' && c.to === null));
+    ok('results come back',                  Array.isArray(results) && results.length === 3);
+    const report = panel.querySelectorAll('.sassy-error').map(el => el.textContent).join('\n');
+    ok('the panel reports written lines',    header.children[0].textContent === 'Pushed to source' && report.includes('✔ written   plugins/d-pace/scss/frontend.scss:2  .a  color: red → blue'));
+    ok('and refused ones with the reason and the line', report.includes('✗ refused   plugins/d-pace/scss/frontend.scss:9  .c  background: var(--x) → red') && report.includes('the line has `background: $bg`, not `var(--x)`  |  background: $bg;'));
+    ok('and leaves the rest for the copy path', report.includes('Left for the copy path:') && report.includes('  + margin: 0') && report.includes('inspector-stylesheet'));
+    ok('a write triggers a compile',         fetched.length === compilesBefore + 1 && String(fetched[fetched.length - 1]).includes('action=sassy_compile'));
+    ok('which keeps the panel',              panel.classList.contains('show') && header.children[0].textContent === 'Pushed to source');
+    ok('sassy:pushed fires',                 dispatched.includes('sassy:pushed'));
+
+    global.window.sass_params.write = false;
+    global.fetch = mappingFetch;
 
     // scssphp cites a URL; the display reduces it to a path under the origin.
     map.sources[0] = 'http://test.local/wp-content/plugins/d-pace/scss/frontend.scss';
@@ -409,6 +461,6 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
     const quiet = await global.window.sassy.capture();
     ok('after a sheet reloads, the paint is the new baseline', quiet.patch === 'Nothing changed since the last snapshot.' && quiet.changes.length === 0);
 
-    process.stdout.write(JSON.stringify(results));
+    flush();
 
 })();
