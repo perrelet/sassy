@@ -75,6 +75,17 @@ check('a name nothing recorded is unresolved',       Admin_Page::resolve_file('_
 check('no graph resolves nothing',                   Admin_Page::resolve_file('_y.scss', null) === null);
 check('a prefix is not a suffix',                    Admin_Page::resolve_file('y.scss', $graph) === null);
 
+// scssphp cites URLs, Dart cites paths; the rule lives on the graph and takes both.
+check('a URL source reduces to its path',            $graph->find('http://test.local/srv/site/scss/_y.scss') === '/srv/site/scss/_y.scss');
+check('an absolute path not in the graph is null',   $graph->find('/srv/elsewhere/_y.scss') === null);
+
+$REAL = ABSPATH . 'wp-content/themes/t/real';
+fixture("$REAL/parts/_z.scss", ".z { color: red; }\n");
+$loose = new Import_Graph(["$REAL/parts/../parts/_z.scss" => [1, 1]]);
+
+check('a non-canonical recorded path still matches',   $loose->find('_z.scss') === "$REAL/parts/../parts/_z.scss");
+check('and a canonical citation finds the recorded key', $loose->find("$REAL/parts/_z.scss") === "$REAL/parts/../parts/_z.scss");
+
 section('The page renders the model');
 
 $SCSS = ABSPATH . 'wp-content/themes/t';

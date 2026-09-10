@@ -132,24 +132,12 @@ class Admin_Page {
     }
 
     /**
-     * A cited file against the recorded graph, by path suffix. Dart cites bare basenames and
-     * paths relative to its working directory in the same run; exactly one recorded dependency
-     * ending in the cited string resolves it, anything else keeps the engine's text.
+     * A cited file against the recorded graph. One rule for the page and the write endpoint,
+     * and it lives with the graph.
      */
     public static function resolve_file ($cited, $graph) {
 
-        if (!is_string($cited) || $cited === '') return null;
-        if (str_starts_with($cited, '/') && file_exists($cited)) return $cited;
-        if (!$graph || !$graph->deps) return null;
-
-        $suffix  = '/' . ltrim($cited, '/');
-        $matches = [];
-
-        foreach (array_keys($graph->deps) as $path) {
-            if ($path === $cited || str_ends_with($path, $suffix)) $matches[] = $path;
-        }
-
-        return count($matches) === 1 ? $matches[0] : null;
+        return $graph ? $graph->find($cited) : null;
 
     }
 

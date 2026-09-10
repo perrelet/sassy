@@ -86,6 +86,34 @@ class Import_Graph {
 
     }
 
+    /**
+     * The recorded dependency a cited name refers to, or null. Engines cite differently: Dart a
+     * bare basename or a path relative to its working directory, scssphp a URL. Reduce a URL to
+     * its path, match by path suffix with canonical paths on both sides, and answer only when
+     * exactly one dependency fits. Returns the key as recorded, which is what the stamp is under.
+     */
+    public function find ($cited) {
+
+        if (!is_string($cited) || $cited === '' || !$this->deps) return null;
+
+        if (preg_match('~^[a-z][a-z0-9+.\-]*://~i', $cited)) $cited = (string) parse_url($cited, PHP_URL_PATH);
+
+        $cited = preg_replace('~^(\.\./)+~', '', str_replace('\\', '/', $cited));
+        if ($cited === '') return null;
+
+        $canonical = realpath($cited) ?: null;
+        $suffix    = '/' . ltrim($cited, '/');
+        $matches   = [];
+
+        foreach (array_keys($this->deps) as $path) {
+            $real = realpath($path) ?: $path;
+            if ($path === $cited || ($canonical !== null && $real === $canonical) || str_ends_with($path, $suffix) || str_ends_with($real, $suffix)) $matches[$path] = true;
+        }
+
+        return count($matches) === 1 ? array_key_first($matches) : null;
+
+    }
+
     public function has_changed ($entry) {
 
         if (!isset($this->deps[$entry])) return true;

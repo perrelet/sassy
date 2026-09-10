@@ -547,7 +547,15 @@
 
             for (const s of mapping.lines[line] || []) { if (s.col <= col) hit = s; else break; }
 
-            return hit ? { file: String(mapping.sources[hit.src] || '').replace(/^(\.\.\/)+/, ''), line: hit.oline + 1 } : null;
+            if (!hit) return null;
+
+            // Dart cites relative to the map, scssphp cites a URL; show a path either way and
+            // keep the engine's own string for the server.
+            const source = String(mapping.sources[hit.src] || '');
+            let file = source.replace(/^(\.\.\/)+/, '');
+            if (typeof location !== 'undefined' && location.origin && file.startsWith(location.origin + '/')) file = file.slice(location.origin.length + 1);
+
+            return { file, line: hit.oline + 1, source };
 
         },
 

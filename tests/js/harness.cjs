@@ -326,6 +326,7 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
     let prev = [0, 0, 0, 0];
     const mappings = segments.map(seg => { const rel = seg.map((v, i) => v - prev[i]); prev = seg; return rel.map(enc).join(''); }).join(',');
     const map = { version: 3, sources: ['../plugins/d-pace/scss/frontend.scss'], mappings };
+    const nomapText = '.n{color:red}';
 
     global.fetch = url => {
         url = String(url);
@@ -374,8 +375,25 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
     ok('the panel shows it, titled and kinded',                      panel.classList.contains('show') && panel.attrs['data-kind'] === 'capture' && header.children[0].textContent === 'Captured styles');
     ok('the panel text is the patch',                                panel.querySelectorAll('.sassy-error').map(el => el.textContent).join('\n\n') === expected);
     ok('sassy:captured carries it',                                  lastEvent && lastEvent.type === 'sassy:captured' && lastEvent.detail.patch === expected && lastEvent.detail.changes.length === 5);
+    ok('a change keeps the engine\'s own source string',             lastEvent.detail.changes[0].location.source === '../plugins/d-pace/scss/frontend.scss');
     buttons[0].click();
     ok('Copy yields the patch',                                      copied[copied.length - 1] === expected);
+
+    // scssphp cites a URL; the display reduces it to a path under the origin.
+    map.sources[0] = 'http://test.local/wp-content/plugins/d-pace/scss/frontend.scss';
+    links[0].listeners.load();
+    front.cssRules[0].style.cssText = 'color: green;';
+    const urlSource = await global.window.sassy.capture();
+    ok('a URL source displays as a path', urlSource.patch.startsWith('wp-content/plugins/d-pace/scss/frontend.scss:2  .a'));
+    map.sources[0] = '../plugins/d-pace/scss/frontend.scss';
+    links[0].listeners.load();
+    front.cssRules[0].style.cssText = 'color: blue;';
+    front.cssRules[1].cssRules[0].style.cssText = 'gap: 4px;';
+    front.cssRules[2].style.cssText = 'background: var(--x);';
+    front.cssRules[3].style.cssText = 'padding: 1px;';
+    nomap.cssRules[0].style.cssText = 'color: red;';
+    links[0].listeners.load(); links[1].listeners.load();
+    front.cssRules[0].style.cssText = 'color: teal;';
 
     // A rule the text does not have: lines are withheld for that sheet, not invented.
     front.cssRules.push(rule('.e', 'color: pink;'));
