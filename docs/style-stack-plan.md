@@ -865,6 +865,7 @@ Status is ✅ done, **open** for something still to decide or do, and unmarked f
 | 4 ✅ | `Digitalis` integration removed | Confirmed unused (measured: 0 live occurrences — the only hits are two commented-out `@import`s in `scss-template/front.scss`). Note `lattice/load.php` injects the *same two variables* through `sassy-variables`, so removal changes nothing at runtime. That duplicate is dead too, but it is outside this table: **punch-list, not an edit** |
 | 4 ✅ | `Sassy\Dart_Sass_Engine` may move namespace/directory | It did not move: still `Sassy\Dart_Sass_Engine` in `include/engines/`. Nothing to do |
 | 6 ✅ | New: register the dev gate | Bound in `sassy.integration.php` as a `sassy-dev` hook returning `current_user_can('dev')`. Verified 2026-09-09: a holder of `dev` sees the surface, an administrator without it does not, which is the phase 6 acceptance and needed this binding to be testable at all |
+| 7 ✅ | New: register the write gate | Bound in `sassy.integration.php` as a `sassy-write-source` hook returning `current_user_can('dev')`, the same shape as the dev gate. Default is off; a site that never binds it never writes |
 | any ✅ | `wp_tempnam` workaround | Removed. Nothing in Sassy calls `wp_tempnam`: the Dart engine writes its own temp input and Lightning CSS owns a private `temp_file()` |
 | — | Comment claiming source maps resolve | Now accurate. Row kept so nobody "corrects" a correct comment |
 
@@ -948,7 +949,7 @@ anything**:
 git status                       # clean, on style-stack
 php tests/run.php                # 15 files
 wp sassy check                   # exit 0
-wp sassy status                  # version 3.2.0
+wp sassy status                  # version 3.3.0
 ```
 
 That is not ceremony. Documentation in this repo has drifted from the code three times: filters
@@ -962,7 +963,7 @@ Two things about this machine that no document upstream of you will mention:
   yours**, and has had throughout. Two of the modified lines in `sassy.integration.php` are the §4
   dev-gate and `wp_tempnam` changes; everything else in that tree belongs to someone else. Do not
   commit there.
-- 3.2.0 is tagged in the plugin header and none of 3.0.0, 3.1.0 or 3.2.0 is **released**. The digitalis.ca update JSON is not
+- 3.3.0 is tagged in the plugin header and none of 3.0.0 to 3.3.0 is **released**. The digitalis.ca update JSON is not
   yet version-fenced, so publishing would offer a breaking upgrade to every 1.x install polling
   it. That fence is Jamie's and it is not done.
 

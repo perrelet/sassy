@@ -372,3 +372,23 @@ The element keeps its id and gains `data-kind` (`error` or `capture`), a Copy bu
 - **Logging → Capture diffs**, off by default like the other toggles.
 - `tests/fixtures/paintbrush-spike.html`, the page that gated the tier, kept as a fixture.
 
+## Phase 7, tier 2: push to source
+
+Ships as 3.3.0.
+
+### A new endpoint, behind a gate a site has to bind
+
+**Who this affects:** any site that wants the paintbrush to write.
+
+`wp_ajax_sassy_write` applies a captured patch to source. It checks the dev gate, then `sassy-write-source`, then a nonce, then that the request is a POST. `sassy-write-source` defaults to false and is never implied by `sassy-dev`; nothing writes until a site binds it, and the reference install binds it to `current_user_can('dev')`.
+
+### What it will and will not write
+
+A change lands only in a file that is a recorded dependency of the handle it came from, unchanged since the last compile, on the mapped line, where that line declares the property exactly once with the served old value literally before the `;`. Everything else is refused with the line quoted and left for the copy path. Additions are never written. Writes are in place, so the file keeps its owner, mode and inode.
+
+### New surface
+
+- **Push to source** in the panel, `window.sassy.push()`, and `sassy:pushed` on `document` with the results.
+- `sass_params.write` and `sass_params.sassy_write_nonce`.
+- `Import_Graph::find()`, the one rule for resolving a cited file, which `Admin_Page::resolve_file()` now delegates to.
+
