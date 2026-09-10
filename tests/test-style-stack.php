@@ -241,6 +241,35 @@ check('and is what wp_styles() returns again',        wp_styles() === $live);
 check('the admin context set its screen',             in_array('dashboard', $GLOBALS['screens_seen'], true));
 check('and the page\'s screen is handed back',        $GLOBALS['screen'] === 'tools_page_sassy', (string) $GLOBALS['screen']);
 
+section('Scripts are discovered into a second store');
+
+$styles_before = array_keys(Style_Stack::discover()->all());
+
+wp_scripts()->add('app',  $BASE . 'app.js', ['jquery']);
+wp_scripts()->add('base', '/wp-includes/js/base.js');           // a handle a style has too
+wp_scripts()->add('cdn',  'https://ajax.googleapis.com/jquery.js');
+
+$both = Style_Stack::discover();
+
+check('all() with no argument is what it was',        array_keys($both->all()) === $styles_before);
+check('scripts() holds the scripts',                  array_keys($both->scripts()) === ['app', 'base', 'cdn']);
+check('typed as scripts',                             $both->scripts()['app']->type === 'script' && $both->scripts()['app']->extension === 'js');
+check('with their WP deps',                           $both->scripts()['app']->deps === ['jquery']);
+check('handle() answers the style by default',        $both->handle('base')->src === '/wp-admin/css/common.min.css');
+check('and the script when asked',                    $both->handle('base', 'script')->src === '/wp-includes/js/base.js');
+check('all(\'all\') holds both under type:handle',    isset($both->all('all')['style:base']) && isset($both->all('all')['script:base']) && count($both->all('all')) === count($both->styles()) + count($both->scripts()));
+check('styles() is all()',                            $both->styles() === $both->all());
+check('compilable() never holds a script',            !array_filter($both->compilable(), function ($a) { return $a->type === 'script'; }));
+check('a remote script is not local',                 !$both->scripts()['cdn']->is_local());
+
+$extra = new Sassy_Test_Queue();
+$extra->add('extra', $BASE . 'extra.js');
+$GLOBALS['filter_overrides']['sassy-script-queues'] = [wp_scripts(), $extra];
+
+check('sassy-script-queues adds a queue',             Style_Stack::discover()->handle('extra', 'script') instanceof Asset);
+
+unset($GLOBALS['filter_overrides']['sassy-script-queues']);
+
 section('parse_contexts');
 
 check('all expands',            Style_Stack::parse_contexts('all') === Style_Stack::CONTEXTS);

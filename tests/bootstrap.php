@@ -69,9 +69,11 @@ class Sassy_Test_Queue {
 
 }
 
-$GLOBALS['wp_styles'] = new Sassy_Test_Queue();
+$GLOBALS['wp_styles']  = new Sassy_Test_Queue();
+$GLOBALS['wp_scripts'] = new Sassy_Test_Queue();
 
 function wp_styles ()                      { return $GLOBALS['wp_styles']; }
+function wp_scripts ()                     { return $GLOBALS['wp_scripts']; }
 function current_user_can ($capability)    { return in_array($capability, $GLOBALS['capabilities'] ?? [], true); }
 function on_action ($tag, $callback)       { $GLOBALS['action_callbacks'][$tag][] = $callback; }
 function add_action ()                     {}

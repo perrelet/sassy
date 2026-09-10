@@ -3,16 +3,20 @@
 namespace Sassy;
 
 /**
- * Every style WordPress knows about: discovery over the enqueue queues, and queries across them.
+ * Every style and script WordPress knows about: discovery over the enqueue queues, and queries
+ * across them.
  *
- * Nothing outside this class reaches into wp_styles()->registered.
+ * Nothing outside this class reaches into wp_styles()->registered or wp_scripts()->registered.
  */
 class Style_Stack {
 
     /** @var string[] Enqueue hook sets discovery can fire. */
     const CONTEXTS = ['frontend', 'admin', 'editor'];
 
+    // Two stores, both keyed by handle: 48 handles on the reference install name a style and a
+    // script, and every caller of compilable() reads its keys as handles.
     protected $assets  = [];
+    protected $scripts = [];
     protected $context_errors = [];
 
     /**
@@ -67,11 +71,36 @@ class Style_Stack {
     }
 
     /**
-     * @return Asset[] Keyed by handle.
+     * @param string $type 'style' (the default, keyed by handle), 'script' (likewise), or 'all'
+     *                     (both, keyed type:handle, for the two surfaces that list everything).
+     * @return Asset[]
      */
-    public function all () {
+    public function all ($type = 'style') {
+
+        if ($type === 'script') return $this->scripts;
+
+        if ($type === 'all') {
+            $all = [];
+            foreach ($this->assets  as $handle => $asset) $all["style:$handle"]  = $asset;
+            foreach ($this->scripts as $handle => $asset) $all["script:$handle"] = $asset;
+            return $all;
+        }
 
         return $this->assets;
+
+    }
+
+    /** @return Asset[] Keyed by handle. */
+    public function styles () {
+
+        return $this->assets;
+
+    }
+
+    /** @return Asset[] Keyed by handle. */
+    public function scripts () {
+
+        return $this->scripts;
 
     }
 
@@ -86,9 +115,9 @@ class Style_Stack {
 
     }
 
-    public function handle ($handle) {
+    public function handle ($handle, $type = 'style') {
 
-        return $this->assets[$handle] ?? null;
+        return $type === 'script' ? ($this->scripts[$handle] ?? null) : ($this->assets[$handle] ?? null);
 
     }
 
@@ -342,6 +371,16 @@ class Style_Stack {
             // Later queues win, matching the array_merge 2.x used for $digitalis_styles.
             foreach ($queue->registered as $dependency) {
                 $this->assets[$dependency->handle] = Asset::from_dependency($dependency);
+            }
+
+        }
+
+        foreach (apply_filters('sassy-script-queues', [function_exists('wp_scripts') ? wp_scripts() : null]) as $queue) {
+
+            if (!$queue || !isset($queue->registered)) continue;
+
+            foreach ($queue->registered as $dependency) {
+                $this->scripts[$dependency->handle] = Asset::from_dependency($dependency, 'script');
             }
 
         }
