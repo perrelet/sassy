@@ -103,6 +103,7 @@ class Sassy {
 		// Registered before the gate so discovery sees the handle with no user, and wp sassy
 		// compile --hooks=all can prime it; enqueued only for the dev surface.
 		wp_register_style('sassy', SASSY_URI . 'assets/scss/sassy.scss', [], static::asset_version('assets/scss/sassy.scss'));
+		wp_register_script('sassy', SASSY_URI . 'assets/js/sassy.js', [], static::asset_version('assets/js/sassy.js'), true);
 
 		if (!Policy::active()) return;
 
@@ -111,7 +112,7 @@ class Sassy {
 		// The last Oxygen artifact was deciding here whether to load at all, based on which
 		// window the builder had put us in. A builder integration is now a listener on the
 		// sassy:* events, so nothing here needs to know one exists.
-		wp_enqueue_script('sassy', SASSY_URI . 'assets/js/sassy.js', [], static::asset_version('assets/js/sassy.js'), true);
+		wp_enqueue_script('sassy');
 
 		wp_localize_script('sassy', 'sass_params', [
 			'ajax_url'            => admin_url('admin-ajax.php'),
