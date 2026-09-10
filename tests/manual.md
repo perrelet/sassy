@@ -72,7 +72,9 @@ Tools → Sassy, as a dev. Walk it once on a current install and once after brea
 | **Check** with everything current | The green "Everything current" notice, matching `wp sassy check` |
 | Break a partial, run `wp sassy compile`, reload the page | The handle reads `stale` in Stack and Check, and its section shows the error under **Last diagnostics**, with the engine's frame in the dark block. `check` never compiles, so this is the recorded failure, not a fresh one |
 | **Status** against `wp sassy status` | Same rows, same words. `dev surface` reads active for you |
-| **Stack** filters | `all` shows every handle (353 here); `managed`, `compilable`, `third-party` narrow, and the pressed button is outlined |
+| **Stack** filters | `all` shows every handle, styles and scripts (636 here); `managed`, `compilable`, `third-party` and `script` narrow, and the pressed button is outlined |
+| A script row | Kind `script`, no state, and a `surface`: `scope 11` for `sassy`, five categories for `wp-block-editor`; a style row's surface is empty. `d-pace-site-header` is absent, since it is enqueued from a view at render time and no hook registers it |
+| The first load after `wp sassy clear` | Slower once, while every script is read; the next load is not |
 | The page's own footer | No theme stylesheet, no frontend script: discovery ran into copies of the registries |
 | A handle's **Last diagnostics** on `d-pace-frontend` | Ten deprecations folded into one `global-builtin` group; the group opens on click; each has a location like `wp-content/plugins/d-pace/lattice-css/scss/_harness.scss:54:13`, resolved from the bare `_harness.scss` Dart cites |
 | Click a location | A "Copied" notice; the clipboard holds the absolute path with `:line:column` |
