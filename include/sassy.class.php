@@ -68,6 +68,7 @@ class Sassy {
 		require_once(SASSY_PATH . 'include/model/import-scanner.class.php');
 		require_once(SASSY_PATH . 'include/model/source-map.class.php');
 		require_once(SASSY_PATH . 'include/model/source-writer.class.php');
+		require_once(SASSY_PATH . 'include/model/style-surface.class.php');
 		require_once(SASSY_PATH . 'include/engines/compiler-engine.interface.php');
 		require_once(SASSY_PATH . 'include/engines/scssphp-logger.class.php');
 		require_once(SASSY_PATH . 'include/engines/scssphp-engine.compiler-engine.php');

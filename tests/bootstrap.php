@@ -121,6 +121,7 @@ foreach ([
     'include/model/import-scanner.class.php',
     'include/model/source-map.class.php',
     'include/model/source-writer.class.php',
+    'include/model/style-surface.class.php',
     'include/engines/compiler-engine.interface.php',
     'include/engines/scssphp-logger.class.php',
     'include/engines/scssphp-engine.compiler-engine.php',

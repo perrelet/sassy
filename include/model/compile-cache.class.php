@@ -18,6 +18,7 @@ class Compile_Cache {
     const VARS_KEY    = 'sassy-vars-sig-';
     const HANDLES_KEY = 'sassy-handles';
     const DIAGNOSTICS_KEY = 'sassy-diagnostics-';
+    const SURFACES_KEY    = 'sassy-surfaces';
 
     protected $asset;
     protected $target;
@@ -200,6 +201,8 @@ class Compile_Cache {
 
             foreach ($handles as $handle) static::forget_handle($handle);
             delete_transient(static::HANDLES_KEY);
+            // Not a handle, so not in the index; the SQL branch matches it by pattern.
+            delete_transient(static::SURFACES_KEY);
 
             return count($handles);
 
@@ -212,6 +215,26 @@ class Compile_Cache {
              WHERE option_name LIKE '\_transient\_sassy-%'
                 OR option_name LIKE '\_transient\_timeout\_sassy-%'"
         );
+
+    }
+
+    /**
+     * Every profiled script's markers, keyed by path with the stamp it was read at. One record:
+     * 262 files on the reference install, and one key under an external object cache.
+     *
+     * @return array<string, array>
+     */
+    public static function get_surfaces () {
+
+        $recorded = get_transient(static::SURFACES_KEY);
+
+        return is_array($recorded) ? $recorded : [];
+
+    }
+
+    public static function set_surfaces (array $surfaces) {
+
+        set_transient(static::SURFACES_KEY, $surfaces);
 
     }
 
