@@ -216,6 +216,19 @@ class Sassy_CLI_Command extends WP_CLI_Command {
      * [--compilable]
      * : Only styles Sassy can build.
      *
+     * [--type=<type>]
+     * : Styles, scripts, or both. A script row carries its style-mutation surface.
+     * ---
+     * default: style
+     * options:
+     *   - style
+     *   - script
+     *   - all
+     * ---
+     *
+     * [--touches=<attribute>]
+     * : Only scripts whose surface touches this data attribute, e.g. data-theme.
+     *
      * [--hooks=<hooks>]
      * : Which enqueue hooks to fire before looking for styles. Comma-separated, or "all".
      * ---
@@ -239,12 +252,22 @@ class Sassy_CLI_Command extends WP_CLI_Command {
      */
     public function list_ ($args, $assoc_args) {
 
-        $format = $assoc_args['format'] ?? 'table';
-        $stack  = $this->stack($assoc_args);
-        $assets = empty($assoc_args['compilable']) ? $stack->all() : $stack->compilable();
-        $items  = [];
+        $format  = $assoc_args['format'] ?? 'table';
+        $type    = $assoc_args['type'] ?? 'style';
+        $touches = $assoc_args['touches'] ?? null;
+        $stack   = $this->stack($assoc_args);
+        $assets  = empty($assoc_args['compilable']) ? $stack->all($touches ? 'script' : $type) : $stack->compilable();
+        $items   = [];
+
+        $surfaces = ($type !== 'style' || $touches)
+            ? Style_Surface::profile(array_filter($assets, function ($asset) { return $asset->type === 'script'; }))
+            : [];
 
         foreach ($assets as $asset) {
+
+            $surface = ($asset->type === 'script') ? ($surfaces[$asset->handle] ?? null) : null;
+
+            if ($touches && (!$surface || !$surface->touches($touches))) continue;
 
             $item = [
                 'handle'  => $asset->handle,
@@ -257,6 +280,9 @@ class Sassy_CLI_Command extends WP_CLI_Command {
                 'time'    => '',
                 'source'  => $asset->get_source_path() ?? (is_string($asset->src) ? $asset->src : ''),
                 'built'   => '',
+                'surface' => $surface ? (in_array($format, ['json', 'yaml'], true)
+                    ? ['categories' => array_filter($surface->counts), 'markers' => $surface->markers, 'attributes' => $surface->attributes, 'reason' => $surface->reason]
+                    : $surface->summary()) : '',
             ];
 
             if ($asset->is_compilable()) {
@@ -277,9 +303,12 @@ class Sassy_CLI_Command extends WP_CLI_Command {
 
         }
 
-        if (!$items) WP_CLI::warning('No styles found. Try --hooks=all.');
+        if (!$items) WP_CLI::warning($touches ? sprintf('No script touches %s.', Style_Surface::attribute_name($touches)) : 'Nothing found. Try --hooks=all.');
 
-        Utils\format_items($format, $items, ['handle', 'type', 'state', 'deps', 'imports', 'engine', 'time', 'source', 'built']);
+        $columns = ['handle', 'type', 'state', 'deps', 'imports', 'engine', 'time', 'source', 'built'];
+        if ($surfaces || $touches) $columns[] = 'surface';
+
+        Utils\format_items($format, $items, $columns);
 
     }
 

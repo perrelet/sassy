@@ -106,12 +106,24 @@ wp_styles()->add('base',   '/wp-admin/css/common.min.css');
 wp_styles()->add('bundle', false, ['base']);
 wp_styles()->add('evil<b>', 'https://cdn.example.com/x.css');
 
+fixture(ABSPATH . 'wp-content/themes/t/app.js', "el.classList.add('x'); el.getBoundingClientRect();\n");
+wp_scripts()->add('app',  $BASE . 'app.js', ['jquery']);
+wp_scripts()->add('base', '/wp-includes/js/base.js');   // a handle the styles have too
+
 $data = Admin_Page::data(Style_Stack::discover());
 $html = Admin_Page::html($data);
 
-$kinds = array_column($data['stack'], 'kind', 'handle');
+$kinds    = [];
+$surfaces = [];
+foreach ($data['stack'] as $row) { $kinds[$row['type'] . ':' . $row['handle']] = $row['kind']; $surfaces[$row['type'] . ':' . $row['handle']] = $row['surface']; }
+foreach ($data['stack'] as $row) if ($row['type'] === 'style') $kinds[$row['handle']] = $row['kind'];
 
-check('every handle is a row',          count($data['stack']) === 6);
+check('every handle is a row, scripts included', count($data['stack']) === 8);
+check('a script is its own kind',                ($kinds['script:app'] ?? null) === 'script');
+check('with its surface',                        ($surfaces['script:app'] ?? null) === 'scope 1, layout reads 1', (string) ($surfaces['script:app'] ?? ''));
+check('a style has none',                        ($surfaces['style:warned'] ?? '-') === '');
+check('a shared handle is two rows',             isset($kinds['style:base']) && isset($kinds['script:base']));
+check('with a filter button and the column',    str_contains($html, 'data-sassy-filter="script"') && str_contains($html, '<tr data-kind="script">'));
 check('a built handle is managed',      ($kinds['warned'] ?? null) === 'managed');
 check('an unbuilt one is compilable',   ($kinds['never'] ?? null) === 'compilable');
 check('a failed one is compilable',     ($kinds['broken'] ?? null) === 'compilable', $kinds['broken'] ?? 'none');

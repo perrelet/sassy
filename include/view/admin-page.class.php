@@ -61,22 +61,26 @@ class Admin_Page {
      */
     public static function data (Style_Stack $stack = null) {
 
-        $stack   = $stack ?: Style_Stack::discover(Style_Stack::CONTEXTS);
-        $rows    = [];
-        $handles = [];
+        $stack    = $stack ?: Style_Stack::discover(Style_Stack::CONTEXTS);
+        $rows     = [];
+        $handles  = [];
+        // The first load after a deploy pays the full scan, 14 MB on the reference install; after
+        // that only a script whose stamp moved is read again.
+        $surfaces = Style_Surface::profile($stack->scripts());
 
-        foreach ($stack->all() as $asset) {
+        foreach ($stack->all('all') as $asset) {
 
             $row = [
                 'handle'  => $asset->handle,
                 'type'    => $asset->type,
-                'kind'    => 'third-party',
+                'kind'    => $asset->type === 'script' ? 'script' : 'third-party',
                 'state'   => '',
                 'deps'    => $asset->deps,
                 'imports' => '',
                 'engine'  => '',
                 'time'    => null,
                 'source'  => $asset->get_source_path() ?? (is_string($asset->src) ? $asset->src : ''),
+                'surface' => $asset->type === 'script' && isset($surfaces[$asset->handle]) ? $surfaces[$asset->handle]->summary() : '',
             ];
 
             if ($asset->is_compilable()) {
@@ -225,7 +229,7 @@ class Admin_Page {
 
     protected static function stack (array $rows) {
 
-        $counts = ['all' => count($rows), 'managed' => 0, 'compilable' => 0, 'third-party' => 0];
+        $counts = ['all' => count($rows), 'managed' => 0, 'compilable' => 0, 'third-party' => 0, 'script' => 0];
         foreach ($rows as $row) $counts[$row['kind']]++;
 
         $out  = '<h2>' . esc_html__('Stack', 'sassy') . '</h2>';
@@ -237,12 +241,12 @@ class Admin_Page {
 
         $out .= '</div>';
         $out .= '<table class="wp-list-table widefat striped sassy-stack"><thead><tr>';
-        foreach (['handle', 'kind', 'state', 'deps', 'imports', 'engine', 'time', 'source'] as $column) $out .= '<th>' . esc_html($column) . '</th>';
+        foreach (['handle', 'kind', 'state', 'deps', 'imports', 'engine', 'time', 'source', 'surface'] as $column) $out .= '<th>' . esc_html($column) . '</th>';
         $out .= '</tr></thead><tbody>';
 
         foreach ($rows as $row) {
 
-            $handle = ($row['kind'] === 'third-party')
+            $handle = ($row['kind'] === 'third-party' || $row['kind'] === 'script')
                 ? esc_html($row['handle'])
                 : '<a href="#' . esc_attr(static::anchor($row['handle'])) . '">' . esc_html($row['handle']) . '</a>';
 
@@ -255,6 +259,7 @@ class Admin_Page {
             $out .= '<td>' . esc_html(static::engine_label($row['engine'])) . '</td>';
             $out .= '<td>' . esc_html(static::ms($row['time'])) . '</td>';
             $out .= '<td>' . esc_html(static::short($row['source'])) . '</td>';
+            $out .= '<td>' . esc_html($row['surface'] ?? '') . '</td>';
             $out .= '</tr>';
 
         }
