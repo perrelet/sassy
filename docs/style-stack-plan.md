@@ -819,9 +819,15 @@ with separate counts; an earlier draft fused them at 8, which is the `dataset` f
 
 **Acceptance:**
 - `wp sassy list --type=script --format=json` reports each script's surface categories.
-- Every file touching `data-theme` on the reference install is identified (one at time of
-  writing, `d-pace/assets/js/site-header.js` — assert against grep ground truth, never a
-  constant).
+- Every *registered* script touching `data-theme` on the reference install is identified,
+  asserted against grep over the registered files, never a constant. Landed 2026-09-10 with a
+  correction: `d-pace/assets/js/site-header.js`, the file this bullet once named, is enqueued
+  from a view component at render time and is registered on no enqueue hook, so discovery
+  cannot see it, exactly as phase 5 says of a style enqueued on one template. The one registered
+  script that touches the attribute here is core's block-library bundle, and `--touches` names
+  it. Observation reaches what WordPress registers; a render-time enqueue is outside it by
+  construction, and that is a fact about the install to record, not a hole to patch by reading
+  the filesystem.
 - Run over Sassy's own UI, the profiler reports only intended categories — the phase 6b design
   intent, verified here.
 - No JS parsing beyond marker detection.
@@ -949,7 +955,7 @@ anything**:
 git status                       # clean, on style-stack
 php tests/run.php                # 15 files
 wp sassy check                   # exit 0
-wp sassy status                  # version 3.3.0
+wp sassy status                  # version 3.4.0
 ```
 
 That is not ceremony. Documentation in this repo has drifted from the code three times: filters
@@ -963,7 +969,7 @@ Two things about this machine that no document upstream of you will mention:
   yours**, and has had throughout. Two of the modified lines in `sassy.integration.php` are the §4
   dev-gate and `wp_tempnam` changes; everything else in that tree belongs to someone else. Do not
   commit there.
-- 3.3.0 is tagged in the plugin header and none of 3.0.0 to 3.3.0 is **released**. The digitalis.ca update JSON is not
+- 3.4.0 is tagged in the plugin header and none of 3.0.0 to 3.4.0 is **released**. The digitalis.ca update JSON is not
   yet version-fenced, so publishing would offer a breaking upgrade to every 1.x install polling
   it. That fence is Jamie's and it is not done.
 

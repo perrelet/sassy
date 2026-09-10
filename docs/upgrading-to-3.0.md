@@ -392,3 +392,19 @@ A change lands only in a file that is a recorded dependency of the handle it cam
 - `sass_params.write` and `sass_params.sassy_write_nonce`.
 - `Import_Graph::find()`, the one rule for resolving a cited file, which `Admin_Page::resolve_file()` now delegates to.
 
+## Phase 8: script observation
+
+Ships as 3.4.0.
+
+### `Style_Stack` discovers scripts
+
+**Who this affects:** anything iterating `Style_Stack::all()` or binding `sassy-style-queues`.
+
+`all()` with no argument is exactly what it was: styles keyed by handle. Scripts live in a second store, `all('script')` or `scripts()`, and `all('all')` returns both keyed `type:handle`, because 48 handles on the reference install name a style and a script. `handle($h)` answers the style; `handle($h, 'script')` the script. `compilable()` is unchanged. A `sassy-script-queues` filter mirrors `sassy-style-queues`. Discovery already isolated `wp_scripts()`; it now reads the copy.
+
+### New surface
+
+- `wp sassy list --type=style|script|all` (default `style`) and `--touches=<attribute>`; a script row carries `surface`, a summary in the row formats and categories, markers and attributes under `json` and `yaml`.
+- `Style_Surface::of()` and `::profile()`, and a `sassy-surfaces` transient through `Compile_Cache::get_surfaces()` / `set_surfaces()`.
+- The dashboard's Stack gains a `script` kind, its filter, and a `surface` column.
+

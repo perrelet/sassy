@@ -146,6 +146,8 @@ When [WP-CLI](https://wp-cli.org/) is available, Sassy registers a `sassy` comma
 ```bash
 wp sassy status                  # engine, binaries, build path, Lightning CSS state
 wp sassy list                    # discovered styles, cache state, dependency counts
+wp sassy list --type=script      # discovered scripts, with what each does to styles
+wp sassy list --touches=data-theme  # the scripts that set or read that attribute
 wp sassy compile                 # compile everything that is stale
 wp sassy compile --force         # ignore the cache
 wp sassy compile my-theme        # just one handle
@@ -188,6 +190,12 @@ wp sassy watch my-theme --interval=2  # one handle, less often
 
 A compile error prints and the loop keeps going, so you fix and save rather than restarting.
 Handles are discovered once at startup — registering a new one needs a restart.
+
+## What scripts do to your styles
+
+Sassy compiles CSS and observes JS. `wp sassy list --type=script` lists every registered script with its **surface**: which kinds of style mutation its text contains, by marker, counted. Five categories: scope control (`classList`, `dataset`, `data-*` attributes), custom-property writes (`setProperty('--…')`, the intended mechanism rather than pollution), inline layout writes (`el.style.width = …`, a cascade override worth knowing about), layout reads (`getBoundingClientRect`, `ResizeObserver`, `matchMedia`), and CSSOM injection (`insertRule`, `adoptedStyleSheets`, `new CSSStyleSheet`), which is what third parties do to you. Detection only, no semantics: reads do not count as writes, and a marker in a comment counts, because a false positive costs a glance and a miss costs the signal.
+
+`--touches=data-theme` narrows to the scripts that touch an attribute, which is the question to ask before renaming one. The dashboard's Stack lists scripts with the same column. Profiles are cached by file stamp, so only a changed script is read again.
 
 ## Lightning CSS post-processing
 
