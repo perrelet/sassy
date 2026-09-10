@@ -87,6 +87,14 @@ function wp_date ($format, $timestamp)     { return date($format, $timestamp); }
 function wp_nonce_field ($action, $name = '_wpnonce', $referer = true, $echo = true) { return "<input type='hidden' name='$name' value='nonce:$action'>"; }
 function esc_html__ ($text, $domain = null)  { return esc_html($text); }
 function wp_json_encode ($data)            { return json_encode($data); }
+function wp_unslash ($value)               { return $value; }
+function wp_create_nonce ($action)         { return 'nonce:' . $action; }
+function wp_verify_nonce ($nonce, $action) { return $nonce === 'nonce:' . $action; }
+function wp_send_json_success ($data = null)        { $GLOBALS['json'] = ['success' => true,  'data' => $data]; }
+function wp_send_json_error ($data = null, $c = 200) { $GLOBALS['json'] = ['success' => false, 'data' => $data, 'code' => $c]; }
+class Sassy_Test_Exit extends Exception {}
+/** wp_die() ends the request; here it ends the call, and the test reads what was sent. */
+function wp_die ($message = '', $title = '', $args = []) { throw new Sassy_Test_Exit(); }
 
 // --- Plugin ------------------------------------------------------------------
 

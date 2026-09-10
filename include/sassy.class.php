@@ -16,6 +16,7 @@ class Sassy {
 		// No nopriv: a dev is by definition logged in, and a nonce is a CSRF token rather than
 		// an authorization model.
 		add_action('wp_ajax_sassy_compile', [$this, 'compile_all']);
+		add_action('wp_ajax_sassy_write',   [$this, 'write_source']);
 
 	}
 
@@ -114,6 +115,8 @@ class Sassy {
 		wp_localize_script('sassy', 'sass_params', [
 			'ajax_url'            => admin_url('admin-ajax.php'),
 			'sassy_compile_nonce' => wp_create_nonce('sassy_compile'),
+			'sassy_write_nonce'   => wp_create_nonce('sassy_write'),
+			'write'               => Policy::can_write_source(),
 			'keybinding'          => apply_filters('sassy-keybinding', ['ctrl+space', 'meta+space']),
 			// The block editor is an admin screen, and its sheet registers on the editor hook.
 			'context'             => is_admin() ? 'admin,editor' : 'frontend',
@@ -209,6 +212,72 @@ class Sassy {
 		}
 		
 		wp_die(); 
+
+	}
+
+	/**
+	 * Tier 2 of the paintbrush. Two gates, then the nonce, then the method: the write gate is
+	 * its own filter and is never implied by the dev gate.
+	 */
+	public function write_source () {
+
+		if (!Policy::active()) {
+			wp_send_json_error('Sassy. But not sassy enough.', 403);
+			wp_die();
+		}
+
+		if (!Policy::can_write_source()) {
+			wp_send_json_error('Writing to source is off. Bind sassy-write-source to turn it on.', 403);
+			wp_die();
+		}
+
+		if (!wp_verify_nonce($_REQUEST['nonce'] ?? '', 'sassy_write')) {
+			wp_send_json_error('Sassy. But no sassy enough.', 401);
+			wp_die();
+		}
+
+		if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+			wp_send_json_error('POST only.', 405);
+			wp_die();
+		}
+
+		$changes = json_decode((string) wp_unslash($_POST['changes'] ?? ''), true);
+
+		if (!is_array($changes)) {
+			wp_send_json_error('changes must be a JSON list.', 400);
+			wp_die();
+		}
+
+		$results   = [];
+		$by_handle = [];
+
+		foreach (array_values($changes) as $i => $change) {
+			if (!is_array($change) || empty($change['handle']) || !is_string($change['handle'])) {
+				$results[$i] = ['written' => false, 'file' => null, 'line' => 0, 'reason' => 'no handle', 'text' => null];
+				continue;
+			}
+			$by_handle[$change['handle']][$i] = $change;
+		}
+
+		foreach ($by_handle as $handle => $list) {
+
+			$graph = Compile_Cache::get_graph($handle);
+
+			if (!$graph) {
+				foreach ($list as $i => $_) $results[$i] = ['written' => false, 'file' => null, 'line' => 0, 'reason' => 'no import graph recorded for this handle; compile first', 'text' => null];
+				continue;
+			}
+
+			$applied = (new Source_Writer($graph))->apply(array_values($list));
+
+			foreach (array_keys($list) as $k => $i) $results[$i] = $applied[$k];
+
+		}
+
+		ksort($results);
+
+		wp_send_json_success(['results' => array_values($results)]);
+		wp_die();
 
 	}
 
