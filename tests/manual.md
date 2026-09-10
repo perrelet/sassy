@@ -100,6 +100,22 @@ Tier 1 of the paintbrush. Everything here is observation; nothing is written.
 | Turn **Logging → Capture diffs** on, Capture again | The same patch is in the console |
 | `document.addEventListener('sassy:captured', e => console.log(e.detail))` then Capture | `patch` is the panel's text; `changes` has one entry per row |
 
+## Push to source
+
+Tier 2 of the paintbrush. This writes to files in d-pace, whose tree carries work that is not ours: check `git status` there first and revert what you push afterwards.
+
+| Check | Expected |
+|---|---|
+| As a dev, Capture with nothing edited | No **Push to source** button in the panel header |
+| Paint the header's light-theme `background: red`, Capture | The button appears beside Copy |
+| **Push to source** | The panel reads `✔ written   plugins/d-pace/scss/components/_site-header.scss:50  .site-header[data-theme="light"]  background: var(--comp-header-bg) → red`, a compile runs, the page repaints red, and `git diff` in d-pace shows that one line |
+| Capture again straight away | "Nothing changed": the compile re-baselined |
+| Paint a declaration whose source is a `$variable`, Capture, Push | `✗ refused` with `the line has \`gap: $gap\`, not \`4px\`` and the line quoted; it sits under "Left for the copy path" and Copy still yields it |
+| Edit a partial in your editor, save, do not compile; paint something in it and Push | `✗ refused   … changed since the last compile; compile first` |
+| Add a declaration in the styles pane, Capture, Push | It is not sent; the report lists it under the copy path as `+ prop: value` |
+| Revoke `dev` (or `add_filter('sassy-write-source', '__return_false')`), reload, Capture | No Push button; `window.sassy.push()` says "Nothing to push" |
+| Revert the pushed line in d-pace and compile | `wp sassy check` exits zero |
+
 ## Auto-reload
 
 | Check | Expected |
