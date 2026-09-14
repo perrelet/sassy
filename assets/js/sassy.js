@@ -885,7 +885,8 @@
             // which is also why the binding is filterable at all.
             if (event.target && event.target.nodeName !== 'BODY') return;
 
-            if (!this.matchesBinding(event)) return;
+            const action = this.actionFor(event);
+            if (!action) return;
 
             // Claim the combination before the repeat guard: a held ctrl+shift+k should not open
             // the browser's console on the second keydown just because we only compile on the
@@ -895,7 +896,39 @@
 
             if (event.repeat) return;
 
-            this.liveCompile();
+            if (action === 'compile') this.liveCompile();
+            else if (action === 'capture') this.capture();
+            else if (action === 'push') this.push(true);
+
+        },
+
+        /**
+         * The three actions and their chords, from sassy-keybindings; the older sassy-keybinding
+         * value is the compile entry. Push is not even claimed unless the write gate is open.
+         */
+        keybindings () {
+
+            const map = (this.params.keybindings && typeof this.params.keybindings === 'object') ? this.params.keybindings : { compile: this.params.keybinding };
+            const out = {};
+
+            for (const action of ['compile', 'capture', 'push']) {
+                if (action === 'push' && !this.params.write) continue;
+                out[action] = map[action];
+            }
+
+            return out;
+
+        },
+
+        actionFor (event) {
+
+            const map = this.keybindings();
+
+            for (const action in map) {
+                if (this.matchesBinding(event, map[action])) return action;
+            }
+
+            return null;
 
         },
 
@@ -903,9 +936,7 @@
          * Each binding is "+"-separated modifiers plus a key, e.g. ctrl+space. The server sends
          * false to disable the binding entirely, leaving the admin bar button as the trigger.
          */
-        matchesBinding (event) {
-
-            const bindings = this.params.keybinding;
+        matchesBinding (event, bindings) {
 
             if (!Array.isArray(bindings) || !bindings.length) return false;
 

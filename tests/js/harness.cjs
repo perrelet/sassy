@@ -432,6 +432,32 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
     ok('which keeps the panel',              panel.classList.contains('show') && header.children[0].textContent === 'Pushed to source');
     ok('sassy:pushed fires',                 dispatched.includes('sassy:pushed'));
 
+    // --- The keybindings map ------------------------------------------------------------------
+
+    global.window.sass_params.keybindings = { compile: ['ctrl+space', 'meta+space'], capture: ['ctrl+shift+space', 'meta+shift+space'], push: ['ctrl+shift+x', 'meta+shift+x'] };
+
+    let captures = dispatched.filter(t => t === 'sassy:captured').length;
+    const compilesAtStart = fetched.length;
+
+    press({ ctrlKey: true, shiftKey: true });
+    await tick(); await tick(); await tick();
+    ok('ctrl+shift+space captures',            dispatched.filter(t => t === 'sassy:captured').length === captures + 1);
+    ok('and does not compile',                 fetched.length === compilesAtStart);
+
+    posted = null; captures = dispatched.filter(t => t === 'sassy:captured').length;
+    press({ ctrlKey: true, shiftKey: true, key: 'x' });
+    await tick(); await tick(); await tick(); await tick();
+    ok('ctrl+shift+x captures and pushes',     posted !== null && dispatched.filter(t => t === 'sassy:captured').length === captures + 1);
+
+    global.window.sass_params.write = false;
+    posted = null; captures = dispatched.filter(t => t === 'sassy:captured').length;
+    const claimed = press({ ctrlKey: true, shiftKey: true, key: 'x' });
+    await tick(); await tick();
+    ok('with the gate closed, ctrl+shift+x is not even claimed', posted === null && !claimed && dispatched.filter(t => t === 'sassy:captured').length === captures);
+    global.window.sass_params.write = true;
+
+    ok('ctrl+space still compiles',            press({ ctrlKey: true }));
+
     // The bar's Push: capture and push in one click.
     const capturesBefore = dispatched.filter(t => t === 'sassy:captured').length;
     posted = null;

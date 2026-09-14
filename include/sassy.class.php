@@ -119,7 +119,14 @@ class Sassy {
 			'sassy_compile_nonce' => wp_create_nonce('sassy_compile'),
 			'sassy_write_nonce'   => wp_create_nonce('sassy_write'),
 			'write'               => Policy::can_write_source(),
-			'keybinding'          => apply_filters('sassy-keybinding', ['ctrl+space', 'meta+space']),
+			'keybinding'          => $compile = apply_filters('sassy-keybinding', ['ctrl+space', 'meta+space']),
+			// One map for the three actions. Space looks, X commits; push is live only with the
+			// write gate open. Each entry is modifier+key strings, or false to unbind.
+			'keybindings'         => apply_filters('sassy-keybindings', [
+				'compile' => $compile,
+				'capture' => ['ctrl+shift+space', 'meta+shift+space'],
+				'push'    => ['ctrl+shift+x', 'meta+shift+x'],
+			]),
 			// The block editor is an admin screen, and its sheet registers on the editor hook.
 			'context'             => is_admin() ? 'admin,editor' : 'frontend',
 		]);  
