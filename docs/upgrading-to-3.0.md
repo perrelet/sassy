@@ -430,3 +430,7 @@ A rule created with Chrome's per-rule **+** is pushed as one item, `selector` an
 
 A rule created inside a `@media`, `@supports`, `@container` or `@layer` block carries that chain as `ancestors` and is written as `@at-root (without: all) { @media (…) { .x { … } } }`, so the compiled rule sits under exactly what the CSSOM had it under.
 
+## 3.7.2: the review of the paintbrush
+
+Three fixes from a code review of everything since 3.4.0: a declaration is located with a property boundary, so `color:` no longer matches inside `background-color:`; a written push consumes the capture, so a second Push does not resend what was written; and the write endpoint refuses what the CSSOM cannot produce, a property that is not a name or a selector, ancestor or value holding a newline or an unquoted brace.
+
