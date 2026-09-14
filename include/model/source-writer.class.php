@@ -5,8 +5,9 @@ namespace Sassy;
 /**
  * Applies a captured patch to source, and refuses whatever it cannot apply exactly.
  *
- * Textual replace only: the mapped line must declare the property once and carry, literally,
- * the value that was served. Nothing is parsed and nothing else on the line moves.
+ * Textual only: a change needs the mapped line to declare the property once and carry,
+ * literally, the value that was served; an addition needs the mapped line to open the block.
+ * Nothing is parsed and nothing else moves.
  */
 class Source_Writer {
 
@@ -20,7 +21,7 @@ class Source_Writer {
 
     /**
      * @param array $changes Each: source, line, prop, from, to. A null `to` removes the
-     *                       declaration; a null `from` is an addition and is refused.
+     *                       declaration; a null `from` adds one after the block's opening line.
      * @return array One per change, in the order given: written, file, line, reason, text.
      */
     public function apply (array $changes) {
@@ -38,7 +39,7 @@ class Source_Writer {
 
             $results[$i]['file'] = $file;
 
-            if (!isset($change['from']) || !isset($change['prop'])) { $results[$i]['reason'] = 'an addition has no old value to match; copy it instead'; continue; }
+            if (!isset($change['prop']) || (!isset($change['from']) && !isset($change['to']))) { $results[$i]['reason'] = 'neither an old nor a new value'; continue; }
 
             $by_file[$file][$i] = $change;
 
@@ -72,12 +73,27 @@ class Source_Writer {
                 $text = $lines[$n - 1];
                 $results[$i]['text'] = rtrim($text, "\r\n");
 
-                [$replacement, $reason] = static::edit($text, (string) $change['prop'], (string) $change['from'], $change['to'] ?? null);
+                if (!isset($change['from'])) {
 
-                if ($reason !== null) { $results[$i]['reason'] = $reason; continue; }
+                    // An addition arrives only when the compiled rule had no such property, so
+                    // the block has no such line; it goes in first, after the line that opens it.
+                    [$insert, $reason] = static::insertion($lines, $n, (string) $change['prop'], (string) $change['to']);
 
-                if ($replacement === null) unset($lines[$n - 1]);
-                else $lines[$n - 1] = $replacement;
+                    if ($reason !== null) { $results[$i]['reason'] = $reason; continue; }
+
+                    array_splice($lines, $n, 0, [$insert]);
+                    $lines = array_values($lines);
+
+                } else {
+
+                    [$replacement, $reason] = static::edit($text, (string) $change['prop'], (string) $change['from'], $change['to'] ?? null);
+
+                    if ($reason !== null) { $results[$i]['reason'] = $reason; continue; }
+
+                    if ($replacement === null) unset($lines[$n - 1]);
+                    else $lines[$n - 1] = $replacement;
+
+                }
 
                 $results[$i]['written'] = true;
                 $dirty = true;
@@ -93,6 +109,36 @@ class Source_Writer {
         }
 
         return $results;
+
+    }
+
+    /**
+     * The line to insert after line $n, or a reason. The mapped line must open the block, with
+     * the next line's indentation when it has more than the opener, else one level deeper.
+     *
+     * @return array{0: ?string, 1: ?string}
+     */
+    public static function insertion (array $lines, $n, $prop, $to) {
+
+        $opener = $lines[$n - 1];
+        $body   = rtrim(preg_replace('~\s*//.*$~', '', rtrim($opener, "\r\n")));
+
+        if (!str_ends_with($body, '{')) return [null, 'the mapped line does not open the block'];
+
+        $eol    = str_ends_with($opener, "\r\n") ? "\r\n" : "\n";
+        $indent = static::indent($opener);
+        $next   = $lines[$n] ?? '';
+
+        if (trim($next) !== '' && strlen(static::indent($next)) > strlen($indent)) $indent = static::indent($next);
+        else $indent .= '    ';
+
+        return [$indent . $prop . ': ' . $to . ';' . $eol, null];
+
+    }
+
+    protected static function indent ($line) {
+
+        return preg_match('/^[ \t]*/', $line, $m) ? $m[0] : '';
 
     }
 

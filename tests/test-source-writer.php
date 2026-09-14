@@ -80,19 +80,46 @@ $r = (new Source_Writer($graph))->apply([change('_other.scss', 2, 'color', 'red'
 check('a file changed since the compile refuses', !$r[0]['written'] && str_contains($r[0]['reason'], 'changed since the last compile'), (string) $r[0]['reason']);
 check('and is untouched',                          file($other)[1] === "  color: red;\n");
 
-section('Additions refuse; removals apply only to a lone declaration');
+section('Removals apply only to a lone declaration');
 
 $rm = "$DIR/_rm.scss";
 fixture($rm, ".r {\n  color: red;\n  gap: 4px; margin: 0;\n}\n");
 $r = (new Source_Writer(graph_for($rm)))->apply([
-    change('_rm.scss', 2, 'padding', null, '1px'),   // 0: addition
-    change('_rm.scss', 3, 'gap', '4px', null),        // 1: removal from a shared line
-    change('_rm.scss', 2, 'color', 'red', null),      // 2: removal of a lone declaration
+    change('_rm.scss', 3, 'gap', '4px', null),        // 0: removal from a shared line
+    change('_rm.scss', 2, 'color', 'red', null),      // 1: removal of a lone declaration
+    change('_rm.scss', 2, 'color', null, null),       // 2: neither value
 ]);
 
-check('an addition refuses',                        !$r[0]['written'] && str_contains($r[0]['reason'], 'addition'), (string) $r[0]['reason']);
-check('a removal from a shared line refuses',       !$r[1]['written'] && str_contains($r[1]['reason'], 'more than that declaration'), (string) $r[1]['reason']);
-check('a lone declaration is removed',               $r[2]['written'] && file_get_contents($rm) === ".r {\n  gap: 4px; margin: 0;\n}\n", file_get_contents($rm));
+check('a removal from a shared line refuses',       !$r[0]['written'] && str_contains($r[0]['reason'], 'more than that declaration'), (string) $r[0]['reason']);
+check('a lone declaration is removed',               $r[1]['written'] && file_get_contents($rm) === ".r {\n  gap: 4px; margin: 0;\n}\n", file_get_contents($rm));
+check('a change with neither value refuses',        !$r[2]['written'] && str_contains($r[2]['reason'], 'neither'), (string) $r[2]['reason']);
+
+section('Additions go in first, after the line that opens the block');
+
+$add = "$DIR/_add.scss";
+fixture($add, ".a {\n    color: red;\n}\n.b\n{\n    color: red;\n}\n.c {\n}\n.d { // note\n    gap: 1px;\n}\n");
+$r = (new Source_Writer(graph_for($add)))->apply([
+    change('_add.scss', 1, 'margin', null, '0'),        // 0: after `.a {`, indented like the next line
+    change('_add.scss', 2, 'padding', null, '1px'),     // 1: a declaration line does not open a block
+    change('_add.scss', 4, 'padding', null, '1px'),     // 2: `.b` with its brace on the next line
+    change('_add.scss', 8, 'padding', null, '1px'),     // 3: an empty block: one level deeper than the opener
+    change('_add.scss', 10, 'padding', null, '1px'),    // 4: a trailing comment on the opener
+]);
+
+check('an addition lands after the opener',       $r[0]['written'], (string) $r[0]['reason']);
+check('with the block\'s indentation',            str_starts_with(file_get_contents($add), ".a {\n    margin: 0;\n    color: red;\n}\n"), file_get_contents($add));
+check('a declaration line refuses',              !$r[1]['written'] && str_contains($r[1]['reason'], 'does not open'), (string) $r[1]['reason']);
+check('a selector with its brace below refuses', !$r[2]['written'] && str_contains($r[2]['reason'], 'does not open'), (string) $r[2]['reason']);
+check('an empty block gets one level deeper',    $r[3]['written'] && str_contains(file_get_contents($add), ".c {\n    padding: 1px;\n}\n"), file_get_contents($add));
+check('a trailing comment on the opener is fine', $r[4]['written'] && str_contains(file_get_contents($add), ".d { // note\n    padding: 1px;\n    gap: 1px;\n}\n"), file_get_contents($add));
+
+$mixed = "$DIR/_mixed.scss";
+fixture($mixed, ".m {\n  color: red;\n  gap: 4px;\n}\n");
+$r = (new Source_Writer(graph_for($mixed)))->apply([
+    change('_mixed.scss', 1, 'margin', null, '0'),     // an insertion above
+    change('_mixed.scss', 3, 'gap', '4px', '8px'),     // a change below, given the line before the insertion
+]);
+check('an addition and a change in one file, bottom-up', $r[0]['written'] && $r[1]['written'] && file_get_contents($mixed) === ".m {\n  margin: 0;\n  color: red;\n  gap: 8px;\n}\n", file_get_contents($mixed));
 
 section('Two changes in one file apply bottom-up');
 
