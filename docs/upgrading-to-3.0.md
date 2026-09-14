@@ -410,7 +410,7 @@ Ships as 3.4.0.
 
 ## 3.5.0: the push's second walk
 
-- **Additions are written.** A declaration added in the styles pane goes in first inside the rule's block, after the mapped line, which must open the block. It was refused in 3.3.0.
+- **Additions are written.** A declaration added in the styles pane goes in after a sibling declaration of the same rule, or after the block's opener when the rule has none. It was refused in 3.3.0. 3.5.1 moved the anchor from the opener to a sibling: a rule Sass hoists out of an `@supports` keeps its selector's source line, so an addition anchored to the opener landed in the outer rule.
 - **🖌️ Push to source** in the admin bar, present when `sassy-write-source` is open, captures and pushes in one click; `window.sassy.push(true)` does the same.
 - The panel's Push button is styled as the primary action.
 
