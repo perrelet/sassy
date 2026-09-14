@@ -100,7 +100,8 @@ Tier 1 of the paintbrush. Everything here is observation; nothing is written.
 | Open the cited file at that line | It is the `background:` declaration |
 | Click **Copy** on the panel | The clipboard holds exactly the panel's text |
 | Edit a declaration inside a `@media` rule, Capture | It maps to its own line inside the partial that declares it |
-| Add a new rule in the inspector (the `+` in the styles pane), Capture | Listed as `inspector-stylesheet  <selector>  (no source location; try …frontend.scss)` with its declarations |
+| Add a new rule with the styles pane's top `+` (it goes to `inspector-stylesheet`), Capture | Listed as `inspector-stylesheet  <selector>  (no source location; try …frontend.scss)` with its declarations |
+| Hover `.site-header-inner` and press its own `+` (the rule goes into `frontend.css` after it), add `color: pink`, Capture | `new rule  .site-header-inner  (no source location; belongs after .site-header-inner at plugins/d-pace/scss/components/_site-header.scss:64)` over `+ color: pink`; every other change in the sheet keeps its line, and nothing says "did not align". Chrome's own label on that rule (`_nice-select.scss`) is Chrome's nearest guess and is ignored |
 | Set a style on an element directly (`element.style` in the styles pane), Capture | Listed as `element.style on <tag#id.class>  (no stylesheet)` |
 | Live Compile, then Capture | "Nothing changed": the reload re-baselined, so the compile is not a paint |
 | Turn **Logging → Capture diffs** on, Capture again | The same patch is in the console |
