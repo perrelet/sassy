@@ -400,8 +400,10 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
     global.fetch = (url, opts) => {
         if (opts && opts.method === 'POST') {
             posted = { url, body: opts.body };
+            // In capture order: .a changed, .b added, .c changed, .d removed.
             return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true, data: { results: [
                 { written: true,  file: '/srv/x/frontend.scss', line: 2, reason: null, text: '  color: red;' },
+                { written: true,  file: '/srv/x/frontend.scss', line: 5, reason: null, text: '.b{' },
                 { written: false, file: '/srv/x/frontend.scss', line: 9, reason: 'the line has `background: $bg`, not `var(--x)`', text: '  background: $bg;' },
                 { written: false, file: '/srv/x/frontend.scss', line: 12, reason: 'the line holds more than that declaration', text: '  padding: 1px; margin: 0;' },
             ] } }) });
@@ -415,18 +417,27 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
 
     ok('Push POSTs to admin-ajax',            posted && posted.url === '/ajax' && posted.body instanceof URLSearchParams && posted.body.get('action') === 'sassy_write' && posted.body.get('nonce') === 'w');
     const sent = posted ? JSON.parse(posted.body.get('changes')) : [];
-    // Five changes were captured; the addition and the mapless one are not applicable.
-    ok('with the applicable changes only',   sent.length === 3 && !sent.some(c => c.from === null) && !sent.some(c => c.handle === 'nomap'));
+    // Five changes were captured; the mapless one is not applicable, the addition now is.
+    ok('with the applicable changes only',   sent.length === 4 && !sent.some(c => c.handle === 'nomap'));
+    ok('an addition is sent with from = null', sent.some(c => c.prop === 'margin' && c.from === null && c.to === '0' && c.line === 5));
     ok('each carrying the engine\'s source string and line', sent[0].handle === 'front' && sent[0].source === '../plugins/d-pace/scss/frontend.scss' && sent[0].line === 2 && sent[0].prop === 'color' && sent[0].to === 'blue');
     ok('the removal is sent with to = null',  sent.some(c => c.prop === 'padding' && c.to === null));
-    ok('results come back',                  Array.isArray(results) && results.length === 3);
+    ok('results come back',                  Array.isArray(results) && results.length === 4);
     const report = panel.querySelectorAll('.sassy-error').map(el => el.textContent).join('\n');
     ok('the panel reports written lines',    header.children[0].textContent === 'Pushed to source' && report.includes('✔ written   plugins/d-pace/scss/frontend.scss:2  .a  color: red → blue'));
     ok('and refused ones with the reason and the line', report.includes('✗ refused   plugins/d-pace/scss/frontend.scss:9  .c  background: var(--x) → red') && report.includes('the line has `background: $bg`, not `var(--x)`  |  background: $bg;'));
-    ok('and leaves the rest for the copy path', report.includes('Left for the copy path:') && report.includes('  + margin: 0') && report.includes('inspector-stylesheet'));
+    ok('an addition reports as written',      report.includes('✔ written   plugins/d-pace/scss/frontend.scss:5  .b  + margin: 0'));
+    ok('and leaves the rest for the copy path', report.includes('Left for the copy path:') && report.includes('nomap (nomap.css)  .n') && report.includes('inspector-stylesheet'));
     ok('a write triggers a compile',         fetched.length === compilesBefore + 1 && String(fetched[fetched.length - 1]).includes('action=sassy_compile'));
     ok('which keeps the panel',              panel.classList.contains('show') && header.children[0].textContent === 'Pushed to source');
     ok('sassy:pushed fires',                 dispatched.includes('sassy:pushed'));
+
+    // The bar's Push: capture and push in one click.
+    const capturesBefore = dispatched.filter(t => t === 'sassy:captured').length;
+    posted = null;
+    await global.window.sassy.push(true);
+    ok('push(true) captures first',           dispatched.filter(t => t === 'sassy:captured').length === capturesBefore + 1);
+    ok('then posts',                          posted !== null);
 
     global.window.sass_params.write = false;
     global.fetch = mappingFetch;

@@ -45,6 +45,17 @@ class UI {
 			'href'   => '#',
 		]);
 
+		// Capture and push in one click. The safety is the server's refusals, not a review of
+		// the patch first, so nothing is lost; Capture stays for looking without writing.
+		if (Policy::can_write_source()) {
+			$admin_bar->add_menu([
+				'id'     => 'sassy-push',
+				'parent' => 'sassy',
+				'title'  => __('🖌️ Push to source', 'sassy'),
+				'href'   => '#',
+			]);
+		}
+
 		$admin_bar->add_menu([
 			'id'     => 'sassy-logging',
 			'parent' => 'sassy',

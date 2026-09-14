@@ -56,7 +56,7 @@
                 logging: (key) => this.logging(key),
                 poll:    () => this.poll(),
                 capture: () => this.capture(),
-                push:    () => this.push(),
+                push:    (fresh) => this.push(fresh === true),
             };
 
         },
@@ -631,14 +631,17 @@
 
         // --- Paintbrush, tier 2: push to source ----------------------------------------------
 
-        /** What the server can be asked to write: located, with an old value. Additions stay copy-only. */
+        /** What the server can be asked to write: anything located. The server refuses the rest. */
         applicable (changes) {
 
-            return changes.filter(c => c.location && c.location.source && c.from !== null);
+            return changes.filter(c => c.location && c.location.source);
 
         },
 
-        push () {
+        /** fresh captures first, which is what the bar's Push does: one click. */
+        push (fresh = false) {
+
+            if (fresh) return this.capture().then(() => this.push(false));
 
             const capture = this.lastCapture;
             const list    = capture ? this.applicable(capture.changes) : [];
@@ -693,7 +696,7 @@
             list.forEach((c, i) => {
                 const r     = results[i] || { written: false, reason: 'no answer' };
                 const where = `${c.location.file}:${c.location.line}`;
-                const decl  = c.to === null ? `- ${c.prop}: ${c.from}` : `${c.prop}: ${c.from} → ${c.to}`;
+                const decl  = c.to === null ? `- ${c.prop}: ${c.from}` : (c.from === null ? `+ ${c.prop}: ${c.to}` : `${c.prop}: ${c.from} → ${c.to}`);
                 if (r.written) lines.push(`✔ written   ${where}  ${c.selector}  ${decl}`);
                 else {
                     lines.push(`✗ refused   ${where}  ${c.selector}  ${decl}`, `            ${r.reason}${r.text ? `  |  ${r.text.trim()}` : ''}`);
@@ -842,6 +845,11 @@
             const captureButton = document.getElementById('wp-admin-bar-sassy-capture');
             if (captureButton) {
                 captureButton.addEventListener('click', () => this.capture());
+            }
+
+            const pushButton = document.getElementById('wp-admin-bar-sassy-push');
+            if (pushButton) {
+                pushButton.addEventListener('click', () => this.push(true));
             }
 
             document.addEventListener('keydown', this.onKeyDown.bind(this));
