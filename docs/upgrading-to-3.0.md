@@ -414,3 +414,7 @@ Ships as 3.4.0.
 - **🖌️ Push to source** in the admin bar, present when `sassy-write-source` is open, captures and pushes in one click; `window.sassy.push(true)` does the same.
 - The panel's Push button is styled as the primary action.
 
+## 3.6.0: the keybindings map
+
+`sassy-keybindings` filters a map of `compile`, `capture` and `push` to their chords. `sassy-keybinding` keeps working and sets the `compile` entry. New defaults: `ctrl+shift+space` / `meta+shift+space` captures, `ctrl+shift+x` / `meta+shift+x` captures and pushes, the latter only while `sassy-write-source` is open. The JS reads `sass_params.keybindings`, falling back to `sass_params.keybinding`.
+

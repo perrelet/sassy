@@ -88,11 +88,21 @@ Nested arrays are supported and are converted to nested Sass maps.
 
 Fed up of refreshing the page to see your changes? Us too. Simply press `CTRL + SPACE` to recompile and reload your stylesheets at any time. 🚀
 
-The binding is configurable, and `false` disables it while leaving the admin bar button:
+Three chords, one hand each. Space looks, X commits:
+
+| Action | Default | |
+|---|---|---|
+| Live Compile | `ctrl+space`, `meta+space` | check the cache and reload |
+| Capture | `ctrl+shift+space`, `meta+shift+space` | diff the paint, show the patch |
+| Push to source | `ctrl+shift+x`, `meta+shift+x` | capture and write, only with the write gate open |
+
+All three are one filter over a map of action to `modifier+key` strings, with `false` unbinding an action while leaving its button; `sassy-keybinding` (singular) still sets the compile entry alone:
 
 ```php
-add_filter('sassy-keybinding', fn () => ['ctrl+shift+k']);
+add_filter('sassy-keybindings', fn ($bindings) => ['push' => false] + $bindings);
 ```
+
+They are ignored while focus is in a field, ignored on key repeat, and matched exactly, so a chord with an extra modifier does nothing. Note that `meta+space` is Spotlight on macOS and never reaches the browser; Mac users are on `ctrl+space`.
 
 Who sees the dev surface at all is one filter. It defaults to `edit_theme_options`, and it is about *who* rather than *where*, so it works the same in production:
 

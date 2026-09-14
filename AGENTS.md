@@ -7,13 +7,13 @@
 > the present, this file wins — so **each phase updates this file as part of landing**, or the
 > sentence you are reading becomes a trap.
 >
-> **Phases 1 to 8 have landed**: phases 1 to 6 are 3.0.0, 6b (the admin page) is 3.1.0, 7's capture-and-copy is 3.2.0, 7's push-to-source is 3.3.0, 8's script observation is 3.4.0 and 3.5.x is the push's second walk: additions written, a one-click Push in the bar. Phase 9 is still as the plan describes it.
+> **Phases 1 to 8 have landed**: phases 1 to 6 are 3.0.0, 6b (the admin page) is 3.1.0, 7's capture-and-copy is 3.2.0, 7's push-to-source is 3.3.0, 8's script observation is 3.4.0 3.5.x is the push's second walk (additions written, a one-click Push in the bar) and 3.6.0 the keybindings map. Phase 9 is still as the plan describes it.
 >
 > **Starting fresh?** Plan §8 opens with what to read and the four commands to run before touching anything. Run them: this file has been wrong about the present three times, and each time the code was right.
 
 ## Overview
 
-**Sassy** is a WordPress plugin (v3.5.1, by Digitalis Web Build Co.) that compiles SCSS files on-demand. The core premise: enqueue `.scss` files exactly as you would `.css` files via `wp_enqueue_style`, and Sassy intercepts the URL, compiles the SCSS to CSS, writes the result to disk, and returns the compiled CSS URL to WordPress instead.
+**Sassy** is a WordPress plugin (v3.6.0, by Digitalis Web Build Co.) that compiles SCSS files on-demand. The core premise: enqueue `.scss` files exactly as you would `.css` files via `wp_enqueue_style`, and Sassy intercepts the URL, compiles the SCSS to CSS, writes the result to disk, and returns the compiled CSS URL to WordPress instead.
 
 ```php
 wp_enqueue_style('my-theme', get_template_directory_uri() . '/style.scss');
@@ -363,7 +363,7 @@ If the extension API ever cannot express one of them, the API is wrong. That is 
 
 **The paintbrush, tier 2.** Push sends the applicable changes (located, with an old value) to `wp_ajax_sassy_write`, which checks `Policy::active()`, then `Policy::can_write_source()`, then the nonce, then that it is a POST. `Source_Writer` resolves each change's source through `Import_Graph::find()` on that handle's recorded graph, refuses a file that is not a recorded dependency, one whose stamp no longer matches the compile ("changed since the last compile; compile first", which a write itself triggers until the next compile), and any line that does not declare the property exactly once with, literally, the served old value before the `;`. An addition goes in after the mapped line, which the JS anchors to a sibling declaration of the same compiled rule where there is one, because a rule Sass hoists out of an `@supports` keeps its selector's source line, the outer rule's, while its declarations map into the block that holds it; with no sibling the anchor is the opener (ending in `{`, a trailing comment allowed), and the new line takes the sibling's indentation or, after an opener, the next line's when deeper and one level deeper otherwise; a removal applies only to a line that is that declaration alone. Writes are in place with `LOCK_EX`, keeping owner, mode and inode, applied bottom-up within a file. The panel reports each change written or refused with the line the server looked at, leaves the rest for the copy path, and a write is followed by a Live Compile that keeps the panel. The bar's 🖌️ **Push to source**, present when the write gate is open, captures and pushes in one click (`window.sassy.push(true)`): the safety is the server's refusals, so nothing is lost, and Capture stays for looking without writing. `sassy-write-source` defaults to false and is never implied by `sassy-dev`; the reference install binds it to `dev`.
 
-**The keybinding is filterable.** `sassy-keybinding` defaults to `['ctrl+space', 'meta+space']`; `false` disables it and leaves the button. The handler ignores repeats and bails unless focus is on `body`, which is what stops it fighting IME and autocomplete.
+**The keybindings are filterable.** `sassy-keybindings` is a map of action to chords: `compile` (`ctrl+space`, `meta+space`, still settable alone through `sassy-keybinding`), `capture` (`ctrl+shift+space`, `meta+shift+space`) and `push` (`ctrl+shift+x`, `meta+shift+x`), the last claimed only with the write gate open. Space looks, X commits, and X because every other left-hand letter under ctrl+shift already belongs to a browser: C, I, J, K, R, T, W, E, S, M, U. `false` unbinds an action and leaves its button. The handler ignores repeats and bails unless focus is on `body`, which is what stops it fighting IME and autocomplete.
 
 **Browser behaviour is verified by hand.** `tests/manual.md` is the checklist, walked before a release. The suite is PHP-only and opens no browser.
 
@@ -500,7 +500,7 @@ binary is absent.
 | `test-source-maps.php` | Every map source resolves from where the map is served, line numbers are unshifted, the map moves with `url()` rewriting under compressed output, and `file` names the built sheet |
 | `test-output-style.php` | `sassy-style` accepts the enum and the string, on both engines |
 | `test-printer.php` | `Build_Target` path math and its filters; `Variable_Resolver` defaults, Sass maps, scheme normalization and signatures; `Compile_Cache` currency across a partial edit, a variable change, a missing build file and both cache filters; `Printer` agreeing with all three |
-| `test-js.php` | Boots the shipped `assets/js/sassy.js` under a minimal DOM in node and exercises it through `window.sassy`: the canonical rendering, the log toggles, the keybinding including exact modifier matching, `reload()`, the context and `hooks` on the endpoint URL, the page's copy, filter and Compile all attributes, the poll across three answers, errors through the panel with Copy, the paintbrush against a fake CSSOM and a map encoded in the test, and Push: what is sent, what is reported, and the compile after. Skips when node is absent |
+| `test-js.php` | Boots the shipped `assets/js/sassy.js` under a minimal DOM in node and exercises it through `window.sassy`: the canonical rendering, the log toggles, the keybindings map including exact modifier matching and push staying unclaimed with the gate closed, `reload()`, the context and `hooks` on the endpoint URL, the page's copy, filter and Compile all attributes, the poll across three answers, errors through the panel with Copy, the paintbrush against a fake CSSOM and a map encoded in the test, and Push: what is sent, what is reported, and the compile after. Skips when node is absent |
 | `test-policy.php` | The dev gate: the `edit_theme_options` default, `sassy-dev` overriding both ways, and `sassy-write-source` never implied by it |
 | `test-check.php` | `dependents_of()` including non-canonical paths; the audit's three hard failures; orphan scoping against a dotfile, a directory and a real orphan; truncation as a fatal warning; the severity tally |
 | `test-extensions.php` | The registry: four kinds, named providers, re-registration replacing by slug, per-asset timing, and a post-processor's report reaching the `Printer` |
@@ -552,7 +552,8 @@ there as needing both.
 | `sassy-print-errors` | `true` | Whether to render compile errors to the page footer |
 | `sassy-dev` | `current_user_can('edit_theme_options')` | Whether the dev surface is active for this request. See [The dev surface](#the-dev-surface) |
 | `sassy-write-source` | `false` | The gate for the paintbrush's push to source. Never implied by `sassy-dev`; the reference install binds it to `dev` |
-| `sassy-keybinding` | `['ctrl+space', 'meta+space']` | Live Compile key combinations. `false` disables the key and leaves the button |
+| `sassy-keybinding` | `['ctrl+space', 'meta+space']` | Live Compile key combinations. `false` disables the key and leaves the button. Feeds the `compile` entry of the map below |
+| `sassy-keybindings` | `compile`, `capture` `['ctrl+shift+space', 'meta+shift+space']`, `push` `['ctrl+shift+x', 'meta+shift+x']` | One map of action to chords. Push is never claimed unless the write gate is open |
 
 Per-compile filters receive `($value, $src, $handle, $asset)`, except `sassy-compile`, which receives `($value, $src, $handle)`. The fourth argument was the `SCSS_Compiler` before 3.0; it is now the `Asset`, which is available before a compile starts and carries no build state.
 
@@ -583,7 +584,7 @@ Per-compile filters receive `($value, $src, $handle, $asset)`, except `sassy-com
 
 | Constant | Set in | Value |
 |---|---|---|
-| `SASSY_VERSION` | `sassy.php` | `'3.5.1'` — kept identical to the plugin header |
+| `SASSY_VERSION` | `sassy.php` | `'3.6.0'` — kept identical to the plugin header |
 | `SASSY_PATH` | `sassy.php` | Absolute path to plugin directory (trailing slash) |
 | `SASSY_URI` | `sassy.php` | URL to plugin directory (trailing slash) |
 | `SASSY_ROOT_FILE` | `sassy.php` | `__FILE__` of sassy.php |
