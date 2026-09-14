@@ -391,14 +391,73 @@
 
         },
 
+        /**
+         * Keyed by selector and occurrence rather than index: Chrome's per-rule "+" inserts a
+         * new rule into the same sheet after the one it was pressed under, which would shift
+         * every later index and report the whole tail of the sheet as painted.
+         */
         snapshot (handle) {
 
             const sheet = this.managed()[handle];
             if (!sheet) return 0;
 
-            sheet.baseline = this.rulesOf(sheet).map(rule => this.declarations(rule));
+            sheet.baseline = this.keyed(this.rulesOf(sheet));
 
-            return sheet.baseline.length;
+            return sheet.baseline.size;
+
+        },
+
+        keyed (rules) {
+
+            const seen = {};
+            const out  = new Map();
+
+            for (const rule of rules) {
+                const key = this.ruleKey(this.rulePrelude(rule));
+                seen[key] = (seen[key] || 0) + 1;
+                out.set(key + '#' + seen[key], { rule, declarations: this.declarations(rule) });
+            }
+
+            return out;
+
+        },
+
+        rulePrelude (rule) {
+
+            if (rule.selectorText) return rule.selectorText;
+
+            const text  = String(rule.cssText || '');
+            const brace = text.indexOf('{');
+
+            return brace > -1 ? text.slice(0, brace) : text;
+
+        },
+
+        /** What differs between the CSSOM's serialisation and compressed text: space, quotes, one colon or two. */
+        ruleKey (text) {
+
+            return String(text || '').replace(/["']/g, '').replace(/\s+/g, '').replace(/::/g, ':').toLowerCase();
+
+        },
+
+        /**
+         * Which block in the text each rule is, or null for a rule the text does not have. Pair
+         * by key walking both lists; a block the CSSOM dropped is skipped, a rule the text lacks
+         * is new. A count is not an alignment.
+         */
+        align (rules, blocks) {
+
+            const map = new Array(rules.length).fill(null);
+            let j = 0;
+
+            for (let i = 0; i < rules.length; i++) {
+                const key = this.ruleKey(this.rulePrelude(rules[i]));
+                for (let k = j; k < Math.min(blocks.length, j + 4); k++) {
+                    if (this.ruleKey(blocks[k].prelude) === key) { map[i] = k; j = k + 1; break; }
+                }
+            }
+
+            return map;
 
         },
 
@@ -586,12 +645,12 @@
          * selector's source position, which is the outer rule's line. A sibling declaration maps
          * into the block that actually holds the rule, so anchor there when there is one.
          */
-        changeOffset (mapping, change, was) {
+        changeOffset (mapping, blockIndex, change, was) {
 
-            if (change.from !== null) return this.declarationOffset(mapping, change.index, change.prop);
+            if (change.from !== null) return this.declarationOffset(mapping, blockIndex, change.prop);
 
-            const block = mapping.blocks[change.index];
-            const next  = mapping.blocks[change.index + 1];
+            const block = mapping.blocks[blockIndex];
+            const next  = mapping.blocks[blockIndex + 1];
             const end   = next ? next.start : mapping.text.length;
 
             for (const prop of Object.keys(was)) {
@@ -610,26 +669,45 @@
             const reasons = {};
             const counts  = {};
 
+            const rulesByHandle = {};
+
             for (const handle in sheets) {
                 const sheet = sheets[handle];
                 if (!sheet.baseline) this.snapshot(handle);
                 const rules = this.rulesOf(sheet);
+                rulesByHandle[handle] = rules;
                 counts[handle] = rules.length;
-                rules.forEach((rule, index) => {
-                    const now = this.declarations(rule), was = sheet.baseline[index] || {};
-                    const selector = rule.selectorText || String(rule.cssText || '').split('{')[0].trim();
-                    for (const change of this.diff(was, now)) changes.push(Object.assign({ handle, index, selector, location: null, was }, change));
-                });
+                let index = 0;
+                for (const [key, entry] of this.keyed(rules)) {
+                    const was      = sheet.baseline.has(key) ? sheet.baseline.get(key).declarations : {};
+                    const isNew    = !sheet.baseline.has(key);
+                    const selector = this.rulePrelude(entry.rule).trim();
+                    for (const change of this.diff(was, entry.declarations)) changes.push(Object.assign({ handle, index, selector, location: null, was, isNew }, change));
+                    index++;
+                }
             }
 
             const located = Promise.all(Object.keys(sheets).filter(h => changes.some(c => c.handle === h)).map(handle => {
                 const sheet = sheets[handle];
                 return this.mapping(sheet).then(mapping => {
                     if (!mapping) { reasons[handle] = 'no source map for this sheet, so no lines; a post-processor may have removed its link.'; return; }
-                    if (mapping.blocks.length !== counts[handle]) { reasons[handle] = `its text and its rules did not align (${mapping.blocks.length} blocks, ${counts[handle]} rules), so lines are withheld rather than wrong.`; return; }
+                    const rules = rulesByHandle[handle];
+                    const align = this.align(rules, mapping.blocks);
+                    const paired = align.filter(b => b !== null).length;
+                    if (paired < Math.min(rules.length, mapping.blocks.length) * 0.9) { reasons[handle] = `its text and its rules did not align (${mapping.blocks.length} blocks, ${rules.length} rules, ${paired} paired), so lines are withheld rather than wrong.`; return; }
                     for (const change of changes) {
                         if (change.handle !== handle) continue;
-                        change.location = this.locate(mapping, this.changeOffset(mapping, change, change.was));
+                        const block = align[change.index];
+                        if (block === null) {
+                            // A rule the text does not have: Chrome's per-rule "+". The rule it was
+                            // pressed under says where it belongs.
+                            let prev = change.index - 1;
+                            while (prev >= 0 && align[prev] === null) prev--;
+                            change.newRule   = true;
+                            change.neighbour = prev >= 0 ? { selector: this.rulePrelude(rules[prev]).trim(), location: this.locate(mapping, mapping.blocks[align[prev]].start) } : null;
+                            continue;
+                        }
+                        change.location = this.locate(mapping, this.changeOffset(mapping, block, change, change.was));
                     }
                 });
             }));
@@ -748,9 +826,14 @@
 
             for (const c of changes) {
                 const sheet = this.managed()[c.handle];
-                const where = c.location ? `${c.location.file}:${c.location.line}` : `${c.handle} (${String(sheet.href).split('/').pop().split('?')[0]})`;
+                let where = c.location ? `${c.location.file}:${c.location.line}` : `${c.handle} (${String(sheet.href).split('/').pop().split('?')[0]})`;
+                if (c.newRule) {
+                    const n = c.neighbour;
+                    where = 'new rule';
+                    var tail = n ? `  (no source location; belongs after ${n.selector}${n.location ? ' at ' + n.location.file + ':' + n.location.line : ''})` : '  (no source location)';
+                }
                 const key   = `${c.handle}:${c.index}:${where}`;
-                if (!groups.has(key)) groups.set(key, [`${where}  ${c.selector}`]);
+                if (!groups.has(key)) groups.set(key, [`${where}  ${c.selector}${c.newRule ? tail : ''}`]);
                 const rows = groups.get(key);
                 if (c.from === null)    rows.push(`  + ${c.prop}: ${c.to}`);
                 else if (c.to === null) rows.push(`  - ${c.prop}: ${c.from}`);

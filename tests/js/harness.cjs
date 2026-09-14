@@ -484,11 +484,22 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
     links[0].listeners.load(); links[1].listeners.load();
     front.cssRules[0].style.cssText = 'color: teal;';
 
-    // A rule the text does not have: lines are withheld for that sheet, not invented.
-    front.cssRules.push(rule('.e', 'color: pink;'));
+    // Chrome's per-rule "+" inserts a new rule into the same sheet after the one it was pressed
+    // under. Every later index shifts; nothing else may move.
+    front.cssRules.splice(1, 0, rule('.a', 'color: pink;'));
+    const inserted = await global.window.sassy.capture();
+    ok('a new rule mid-sheet is reported as new, after its neighbour', inserted.patch.includes('new rule  .a  (no source location; belongs after .a at plugins/d-pace/scss/frontend.scss:1)') && inserted.patch.includes('  + color: pink'));
+    ok('and the rules after it keep their lines',                       inserted.patch.includes('plugins/d-pace/scss/frontend.scss:2  .a') && !inserted.patch.includes('did not align'));
+    ok('and it is not pushable',                                        !inserted.changes.filter(c => c.newRule).some(c => c.location));
+    front.cssRules.splice(1, 1);
+
+    // A sheet whose rules mostly fail to pair still withholds lines rather than invent them.
+    const saved = front.cssRules.slice();
+    front.cssRules.length = 0;
+    front.cssRules.push(rule('.x1', 'a: 1;'), rule('.x2', 'a: 1;'), rule('.x3', 'a: 1;'), rule('.x4', 'a: 1;'), rule('.x5', 'a: 1;'), rule('.x6', 'a: 1;'));
     const misaligned = await global.window.sassy.capture();
-    ok('a misaligned sheet withholds lines',  misaligned.patch.includes('front: its text and its rules did not align (5 blocks, 6 rules)'));
-    ok('and names the sheet instead',         misaligned.patch.includes('front (frontend.css)  .e') && misaligned.patch.includes('front (frontend.css)  .a'));
+    ok('a misaligned sheet withholds lines',  misaligned.patch.includes('did not align (5 blocks, 6 rules, 0 paired)'));
+    front.cssRules.length = 0; front.cssRules.push(...saved);
 
     // A reload re-baselines: what was painted is now the sheet, so nothing is a change.
     front.cssRules.pop();
