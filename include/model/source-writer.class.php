@@ -76,7 +76,9 @@ class Source_Writer {
                 if (!isset($change['from'])) {
 
                     // An addition arrives only when the compiled rule had no such property, so
-                    // the block has no such line; it goes in first, after the line that opens it.
+                    // the block has no such line. It goes after the mapped line: a sibling
+                    // declaration where the rule has one, since a hoisted rule's opener is the
+                    // outer rule's, else the opener itself.
                     [$insert, $reason] = static::insertion($lines, $n, (string) $change['prop'], (string) $change['to']);
 
                     if ($reason !== null) { $results[$i]['reason'] = $reason; continue; }
@@ -113,21 +115,26 @@ class Source_Writer {
     }
 
     /**
-     * The line to insert after line $n, or a reason. The mapped line must open the block, with
-     * the next line's indentation when it has more than the opener, else one level deeper.
+     * The line to insert after line $n, or a reason. After a sibling declaration, with its
+     * indentation; or after the line that opens the block, with the next line's indentation
+     * when it has more than the opener, else one level deeper. Anything else refuses.
      *
      * @return array{0: ?string, 1: ?string}
      */
     public static function insertion (array $lines, $n, $prop, $to) {
 
-        $opener = $lines[$n - 1];
-        $body   = rtrim(preg_replace('~\s*//.*$~', '', rtrim($opener, "\r\n")));
+        $anchor = $lines[$n - 1];
+        $body   = rtrim(preg_replace('~\s*//.*$~', '', rtrim($anchor, "\r\n")));
+        $eol    = str_ends_with($anchor, "\r\n") ? "\r\n" : "\n";
+        $indent = static::indent($anchor);
 
-        if (!str_ends_with($body, '{')) return [null, 'the mapped line does not open the block'];
+        if (preg_match('/^\s*[-\w]+\s*:.*;$/', $body)) {
+            return [$indent . $prop . ': ' . $to . ';' . $eol, null];
+        }
 
-        $eol    = str_ends_with($opener, "\r\n") ? "\r\n" : "\n";
-        $indent = static::indent($opener);
-        $next   = $lines[$n] ?? '';
+        if (!str_ends_with($body, '{')) return [null, 'the mapped line neither holds a declaration nor opens the block'];
+
+        $next = $lines[$n] ?? '';
 
         if (trim($next) !== '' && strlen(static::indent($next)) > strlen($indent)) $indent = static::indent($next);
         else $indent .= '    ';

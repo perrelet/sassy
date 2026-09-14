@@ -359,7 +359,7 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
     const expected = [
         'plugins/d-pace/scss/frontend.scss:2  .a',
         '  color: red → blue',
-        'plugins/d-pace/scss/frontend.scss:5  .b',
+        'plugins/d-pace/scss/frontend.scss:6  .b',
         '  + margin: 0',
         'plugins/d-pace/scss/frontend.scss:9  .c',
         '  background: var(--x) → red',
@@ -377,7 +377,7 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
     ok('the patch is exactly the plan\'s format', result.patch === expected);
     if (result.patch !== expected) results['got: ' + result.patch.replace(/\n/g, ' | ')] = false;
     ok('a changed declaration maps to its own line, not the rule\'s', result.patch.includes(':2  .a'));
-    ok('an added declaration maps to the rule\'s line',             result.patch.includes(':5  .b'));
+    ok('an added declaration anchors to a sibling\'s line',        result.patch.includes(':6  .b'));
     ok('a shorthand stays a shorthand',                              result.patch.split('\n').filter(l => l.includes('background')).length === 1);
     ok('an empty style attribute is not listed',                    !result.patch.includes('<header>'));
     ok('the panel shows it, titled and kinded',                      panel.classList.contains('show') && panel.attrs['data-kind'] === 'capture' && header.children[0].textContent === 'Captured styles');
@@ -403,7 +403,7 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
             // In capture order: .a changed, .b added, .c changed, .d removed.
             return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true, data: { results: [
                 { written: true,  file: '/srv/x/frontend.scss', line: 2, reason: null, text: '  color: red;' },
-                { written: true,  file: '/srv/x/frontend.scss', line: 5, reason: null, text: '.b{' },
+                { written: true,  file: '/srv/x/frontend.scss', line: 6, reason: null, text: '  gap: 4px;' },
                 { written: false, file: '/srv/x/frontend.scss', line: 9, reason: 'the line has `background: $bg`, not `var(--x)`', text: '  background: $bg;' },
                 { written: false, file: '/srv/x/frontend.scss', line: 12, reason: 'the line holds more than that declaration', text: '  padding: 1px; margin: 0;' },
             ] } }) });
@@ -419,14 +419,14 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
     const sent = posted ? JSON.parse(posted.body.get('changes')) : [];
     // Five changes were captured; the mapless one is not applicable, the addition now is.
     ok('with the applicable changes only',   sent.length === 4 && !sent.some(c => c.handle === 'nomap'));
-    ok('an addition is sent with from = null', sent.some(c => c.prop === 'margin' && c.from === null && c.to === '0' && c.line === 5));
+    ok('an addition is sent with from = null', sent.some(c => c.prop === 'margin' && c.from === null && c.to === '0' && c.line === 6));
     ok('each carrying the engine\'s source string and line', sent[0].handle === 'front' && sent[0].source === '../plugins/d-pace/scss/frontend.scss' && sent[0].line === 2 && sent[0].prop === 'color' && sent[0].to === 'blue');
     ok('the removal is sent with to = null',  sent.some(c => c.prop === 'padding' && c.to === null));
     ok('results come back',                  Array.isArray(results) && results.length === 4);
     const report = panel.querySelectorAll('.sassy-error').map(el => el.textContent).join('\n');
     ok('the panel reports written lines',    header.children[0].textContent === 'Pushed to source' && report.includes('✔ written   plugins/d-pace/scss/frontend.scss:2  .a  color: red → blue'));
     ok('and refused ones with the reason and the line', report.includes('✗ refused   plugins/d-pace/scss/frontend.scss:9  .c  background: var(--x) → red') && report.includes('the line has `background: $bg`, not `var(--x)`  |  background: $bg;'));
-    ok('an addition reports as written',      report.includes('✔ written   plugins/d-pace/scss/frontend.scss:5  .b  + margin: 0'));
+    ok('an addition reports as written',      report.includes('✔ written   plugins/d-pace/scss/frontend.scss:6  .b  + margin: 0'));
     ok('and leaves the rest for the copy path', report.includes('Left for the copy path:') && report.includes('nomap (nomap.css)  .n') && report.includes('inspector-stylesheet'));
     ok('a write triggers a compile',         fetched.length === compilesBefore + 1 && String(fetched[fetched.length - 1]).includes('action=sassy_compile'));
     ok('which keeps the panel',              panel.classList.contains('show') && header.children[0].textContent === 'Pushed to source');

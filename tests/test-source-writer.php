@@ -107,9 +107,9 @@ $r = (new Source_Writer(graph_for($add)))->apply([
 ]);
 
 check('an addition lands after the opener',       $r[0]['written'], (string) $r[0]['reason']);
-check('with the block\'s indentation',            str_starts_with(file_get_contents($add), ".a {\n    margin: 0;\n    color: red;\n}\n"), file_get_contents($add));
-check('a declaration line refuses',              !$r[1]['written'] && str_contains($r[1]['reason'], 'does not open'), (string) $r[1]['reason']);
-check('a selector with its brace below refuses', !$r[2]['written'] && str_contains($r[2]['reason'], 'does not open'), (string) $r[2]['reason']);
+check('with the block\'s indentation',            str_starts_with(file_get_contents($add), ".a {\n    margin: 0;\n    color: red;\n    padding: 1px;\n}\n"), file_get_contents($add));
+check('a declaration line anchors it after itself', $r[1]['written'] && str_contains(file_get_contents($add), "    color: red;\n    padding: 1px;\n}\n.b"), file_get_contents($add));
+check('a selector with its brace below refuses',    !$r[2]['written'] && str_contains($r[2]['reason'], 'neither'), (string) $r[2]['reason']);
 check('an empty block gets one level deeper',    $r[3]['written'] && str_contains(file_get_contents($add), ".c {\n    padding: 1px;\n}\n"), file_get_contents($add));
 check('a trailing comment on the opener is fine', $r[4]['written'] && str_contains(file_get_contents($add), ".d { // note\n    padding: 1px;\n    gap: 1px;\n}\n"), file_get_contents($add));
 
@@ -120,6 +120,17 @@ $r = (new Source_Writer(graph_for($mixed)))->apply([
     change('_mixed.scss', 3, 'gap', '4px', '8px'),     // a change below, given the line before the insertion
 ]);
 check('an addition and a change in one file, bottom-up', $r[0]['written'] && $r[1]['written'] && file_get_contents($mixed) === ".m {\n  margin: 0;\n  color: red;\n  gap: 8px;\n}\n", file_get_contents($mixed));
+
+// A rule hoisted out of an @supports keeps its selector's source line, which is the outer rule's;
+// anchored to a sibling declaration inside the at-rule, the addition lands in the right block.
+$hoisted = "$DIR/_hoisted.scss";
+fixture($hoisted, ".h {\n    color: red;\n\n    @supports (a: b) {\n        background: blue;\n    }\n}\n");
+$r = (new Source_Writer(graph_for($hoisted)))->apply([
+    change('_hoisted.scss', 5, 'outline', null, '1px solid'),   // the sibling inside @supports
+    change('_hoisted.scss', 6, 'gap', null, '1px'),              // a closing brace: no anchor
+]);
+check('anchored to a sibling, it lands in the at-rule block', $r[0]['written'] && str_contains(file_get_contents($hoisted), "        background: blue;\n        outline: 1px solid;\n    }\n"), file_get_contents($hoisted));
+check('a closing brace refuses',                            !$r[1]['written'] && str_contains($r[1]['reason'], 'neither'), (string) $r[1]['reason']);
 
 section('Two changes in one file apply bottom-up');
 

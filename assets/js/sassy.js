@@ -580,6 +580,29 @@
 
         },
 
+        /**
+         * Where a change maps from. An addition has no text of its own, and the block's opener
+         * is ambiguous under Sass nesting: a rule hoisted out of an @supports keeps its
+         * selector's source position, which is the outer rule's line. A sibling declaration maps
+         * into the block that actually holds the rule, so anchor there when there is one.
+         */
+        changeOffset (mapping, change, was) {
+
+            if (change.from !== null) return this.declarationOffset(mapping, change.index, change.prop);
+
+            const block = mapping.blocks[change.index];
+            const next  = mapping.blocks[change.index + 1];
+            const end   = next ? next.start : mapping.text.length;
+
+            for (const prop of Object.keys(was)) {
+                const at = mapping.text.indexOf(prop + ':', block.start);
+                if (at > -1 && at < end) return at;
+            }
+
+            return block.start;
+
+        },
+
         capture () {
 
             const sheets  = this.managed();
@@ -595,7 +618,7 @@
                 rules.forEach((rule, index) => {
                     const now = this.declarations(rule), was = sheet.baseline[index] || {};
                     const selector = rule.selectorText || String(rule.cssText || '').split('{')[0].trim();
-                    for (const change of this.diff(was, now)) changes.push(Object.assign({ handle, index, selector, location: null }, change));
+                    for (const change of this.diff(was, now)) changes.push(Object.assign({ handle, index, selector, location: null, was }, change));
                 });
             }
 
@@ -606,7 +629,7 @@
                     if (mapping.blocks.length !== counts[handle]) { reasons[handle] = `its text and its rules did not align (${mapping.blocks.length} blocks, ${counts[handle]} rules), so lines are withheld rather than wrong.`; return; }
                     for (const change of changes) {
                         if (change.handle !== handle) continue;
-                        change.location = this.locate(mapping, this.declarationOffset(mapping, change.index, change.prop));
+                        change.location = this.locate(mapping, this.changeOffset(mapping, change, change.was));
                     }
                 });
             }));
