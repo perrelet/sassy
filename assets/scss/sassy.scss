@@ -122,9 +122,34 @@ $notice:  #2271b1;
     &:hover { background: rgba(255, 255, 255, 0.85); }
 }
 
-#wpadminbar {
-    .sassy-log-toggle a:before { content: "☐ "; }
-    .sassy-log-toggle a[data-on="1"]:before { content: "☑ "; }
+#wpadminbar .sassy-log-toggle {
+    .sassy-toggle-box {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        margin: 0 8px 0 0;
+        border: 1px solid currentColor;
+        border-radius: 2px;
+        vertical-align: -1px;
+        box-sizing: border-box;
+        position: relative;
+    }
+
+    a[data-on="1"] .sassy-toggle-box {
+        background: currentColor;
+
+        &:after {
+            content: "";
+            position: absolute;
+            left: 3px;
+            top: 0;
+            width: 3px;
+            height: 7px;
+            border: solid #1d2327;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+    }
 }
 
 // --- The admin page ---------------------------------------------------------

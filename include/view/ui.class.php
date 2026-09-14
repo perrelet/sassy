@@ -51,7 +51,7 @@ class UI {
 			$admin_bar->add_menu([
 				'id'     => 'sassy-push',
 				'parent' => 'sassy',
-				'title'  => __('🖌️ Push to source', 'sassy'),
+				'title'  => __('📤 Push to source', 'sassy'),
 				'href'   => '#',
 			]);
 		}
@@ -68,7 +68,9 @@ class UI {
 			$admin_bar->add_menu([
 				'id'     => "sassy-logging-{$key}",
 				'parent' => 'sassy-logging',
-				'title'  => $label,
+				// A real box rather than a ☐ in a ::before: WordPress styles .ab-item::before for
+				// its icon font, and the character came out as a blue glyph.
+				'title'  => '<span class="sassy-toggle-box" aria-hidden="true"></span>' . $label,
 				'href'   => '#',
 				// class lands on the li, rel on the anchor: the JS reads the key off the anchor.
 				'meta'   => ['class' => 'sassy-log-toggle', 'rel' => $key],
