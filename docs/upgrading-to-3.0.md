@@ -418,3 +418,7 @@ Ships as 3.4.0.
 
 `sassy-keybindings` filters a map of `compile`, `capture` and `push` to their chords. `sassy-keybinding` keeps working and sets the `compile` entry. New defaults: `ctrl+shift+space` / `meta+shift+space` captures, `ctrl+shift+x` / `meta+shift+x` captures and pushes, the latter only while `sassy-write-source` is open. The JS reads `sass_params.keybindings`, falling back to `sass_params.keybinding`.
 
+## 3.6.1: a new rule in the sheet
+
+Chrome's per-rule **+** inserts a new rule into the same stylesheet, after the one it was pressed under, rather than into `inspector-stylesheet`. Capture aligned rules to text by count and index, so one added rule withheld every location in the sheet. It now aligns by selector and keeps its baseline by selector occurrence; a new rule reports as `new rule  <selector>  (no source location; belongs after <neighbour> at <file:line>)`, copy-only.
+

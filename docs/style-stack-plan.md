@@ -770,7 +770,13 @@ attempted. Textual replace only; no SCSS parsing. `watch` recompiles; the browse
 loop closes without leaving the inspector.
 
 **Sharp edges, named:** new rules created in the inspector live in `inspector-stylesheet` with no
-source location — offered copy-only, with the matched sheet's entry file suggested.
+source location — offered copy-only, with the matched sheet's entry file suggested. *Corrected
+2026-09-14 from Jamie's walk:* Chrome's per-rule **+** puts the new rule into the *same sheet*,
+after the rule it was pressed under, so a count is not an alignment and a baseline by index
+shifts every later rule. Tier 1 aligns text blocks to CSSOM rules by selector key and keeps its
+baseline by selector occurrence; the new rule reports as new, copy-only, with the rule above it
+and that rule's source line as where it belongs, which is more than the `inspector-stylesheet`
+case can say. Chrome's own label for such a rule is the map's nearest segment and means nothing.
 `element.style` edits map to no stylesheet — captured and offered copy-only. Compressed vs
 expanded output is irrelevant: the diff is CSSOM-shaped, not text-shaped.
 
@@ -955,7 +961,7 @@ anything**:
 git status                       # clean, on style-stack
 php tests/run.php                # 15 files
 wp sassy check                   # exit 0
-wp sassy status                  # version 3.6.0
+wp sassy status                  # version 3.6.1
 ```
 
 That is not ceremony. Documentation in this repo has drifted from the code three times: filters
@@ -969,7 +975,7 @@ Two things about this machine that no document upstream of you will mention:
   yours**, and has had throughout. Two of the modified lines in `sassy.integration.php` are the §4
   dev-gate and `wp_tempnam` changes; everything else in that tree belongs to someone else. Do not
   commit there.
-- 3.6.0 is tagged in the plugin header and none of 3.0.0 to 3.6.0 is **released**. The digitalis.ca update JSON is not
+- 3.6.1 is tagged in the plugin header and none of 3.0.0 to 3.6.1 is **released**. The digitalis.ca update JSON is not
   yet version-fenced, so publishing would offer a breaking upgrade to every 1.x install polling
   it. That fence is Jamie's and it is not done.
 
