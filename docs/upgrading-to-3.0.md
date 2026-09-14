@@ -426,3 +426,7 @@ Chrome's per-rule **+** inserts a new rule into the same stylesheet, after the o
 
 A rule created with Chrome's per-rule **+** is pushed as one item, `selector` and `declarations`, and written after its neighbour's block as `@at-root <selector> { … }`. The end of the neighbour's block comes from a depth scan over the SCSS that skips strings, comments and interpolation; an unbalanced block refuses. `Source_Writer::rule()` and `::block_end()` are new.
 
+## 3.7.1: a new rule keeps its media query
+
+A rule created inside a `@media`, `@supports`, `@container` or `@layer` block carries that chain as `ancestors` and is written as `@at-root (without: all) { @media (…) { .x { … } } }`, so the compiled rule sits under exactly what the CSSOM had it under.
+
