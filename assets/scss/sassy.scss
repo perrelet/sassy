@@ -97,6 +97,7 @@ $notice:  #2271b1;
     #sassy-errors-header { background: #7b4ea3; }
 }
 
+#sassy-errors-push,
 #sassy-errors-copy,
 #sassy-errors-close {
     background: none;
@@ -109,6 +110,16 @@ $notice:  #2271b1;
     padding: 0.2rem 0.5rem;
 
     &:hover { background: rgba(255, 255, 255, 0.15); }
+}
+
+// The one that changes something.
+#sassy-errors-push {
+    background: #fff;
+    border-color: #fff;
+    color: #7b4ea3;
+    font-weight: 600;
+
+    &:hover { background: rgba(255, 255, 255, 0.85); }
 }
 
 #wpadminbar {
