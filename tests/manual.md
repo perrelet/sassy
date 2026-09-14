@@ -109,12 +109,13 @@ Tier 2 of the paintbrush. This writes to files in d-pace, whose tree carries wor
 | Check | Expected |
 |---|---|
 | As a dev, Capture with nothing edited | No **Push to source** button in the panel header |
-| Paint the header's light-theme `background: red`, Capture | The button appears beside Copy |
+| Paint the header's light-theme `background: red`, Capture | The button appears beside Copy, filled white, the one that looks like an action |
 | **Push to source** | The panel reads `✔ written   plugins/d-pace/scss/components/_site-header.scss:50  .site-header[data-theme="light"]  background: var(--comp-header-bg) → red`, a compile runs, the page repaints red, and `git diff` in d-pace shows that one line |
 | Capture again straight away | "Nothing changed": the compile re-baselined |
 | Paint a declaration whose source is a `$variable`, Capture, Push | `✗ refused` with `the line has \`gap: $gap\`, not \`4px\`` and the line quoted; it sits under "Left for the copy path" and Copy still yields it |
 | Edit a partial in your editor, save, do not compile; paint something in it and Push | `✗ refused   … changed since the last compile; compile first` |
-| Add a declaration in the styles pane, Capture, Push | It is not sent; the report lists it under the copy path as `+ prop: value` |
+| Add a declaration in the styles pane (`outline: 2px solid lime` on the header), Capture, Push | `✔ written   …_site-header.scss:23  .site-header  + outline: 2px solid lime`; the file has it as the first line inside `.site-header {`, indented like its neighbours |
+| With the gate open, press 🖌️ **Push to source** in the bar after painting | One click: the capture happens, the push follows, the report shows. Without the gate the bar item is absent |
 | Revoke `dev` (or `add_filter('sassy-write-source', '__return_false')`), reload, Capture | No Push button; `window.sassy.push()` says "Nothing to push" |
 | Revert the pushed line in d-pace and compile | `wp sassy check` exits zero |
 
