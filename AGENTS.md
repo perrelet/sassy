@@ -733,6 +733,8 @@ need the filter or they stop being discovered — see
 ## Development Notes
 
 - Sassy's own stylesheet is `assets/scss/sassy.scss` and Sassy compiles it; there is no checked-in CSS. See [Admin UI](#admin-ui).
+- **Proving an endpoint from the CLI.** Both AJAX endpoints can be called under `wp eval` as a dev, which is how every push was proved before a browser saw it: `wp_set_current_user(1); $_SERVER['REQUEST_METHOD'] = 'POST'; $_REQUEST['nonce'] = wp_create_nonce('sassy_write'); $_POST['changes'] = json_encode([...]); SASSY()->write_source();` prints the JSON (`wp_send_json_*` exits, so put it last). For `compile_all()` the nonce action is `sassy_compile` and `$_REQUEST['hooks']` picks the contexts. Check `git status` in d-pace first, write only what you can recognise afterwards, and revert only when the diff contains your own marker: that tree carries work that is not ours, and a blanket `git checkout` once discarded one of Jamie's browser tests.
+- Staging sits behind HTTP auth. `curl` answers 401 to everything, including the maps; a logged-in browser is fine, and `wp` commands run on the box do not go through it.
 - The `Scssphp_Engine` is the only engine that needs no external binaries — safe default for all environments.
 - When adding a new per-compile filter, keep the signature consistent: `($value, $src, $handle, $asset)`.
 
