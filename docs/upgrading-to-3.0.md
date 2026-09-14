@@ -422,3 +422,7 @@ Ships as 3.4.0.
 
 Chrome's per-rule **+** inserts a new rule into the same stylesheet, after the one it was pressed under, rather than into `inspector-stylesheet`. Capture aligned rules to text by count and index, so one added rule withheld every location in the sheet. It now aligns by selector and keeps its baseline by selector occurrence; a new rule reports as `new rule  <selector>  (no source location; belongs after <neighbour> at <file:line>)`, copy-only.
 
+## 3.7.0: new rules are written
+
+A rule created with Chrome's per-rule **+** is pushed as one item, `selector` and `declarations`, and written after its neighbour's block as `@at-root <selector> { … }`. The end of the neighbour's block comes from a depth scan over the SCSS that skips strings, comments and interpolation; an unbalanced block refuses. `Source_Writer::rule()` and `::block_end()` are new.
+
