@@ -51,12 +51,16 @@ Untested surface is named rather than implied covered. If you add browser behavi
 | Hold CTRL+SPACE down | Fires once, not repeatedly |
 | `add_filter('sassy-keybinding', '__return_false')`, reload | The key does nothing; the admin bar button still works |
 | `add_filter('sassy-keybinding', fn () => ['ctrl+shift+k'])`, reload | That combination compiles; CTRL+SPACE no longer does |
+| Press CTRL+SHIFT+SPACE with focus on the page | Capture runs: the panel opens with the patch or "Nothing changed", and no compile happens |
+| With the write gate open, paint something and press CTRL+SHIFT+X | Capture then push, one chord: the report appears and the compile follows |
+| With the write gate closed (revoke `dev`, or `add_filter('sassy-write-source', '__return_false')`), press CTRL+SHIFT+X | Nothing at all: the chord is not even claimed, so the browser gets it |
+| `add_filter('sassy-keybindings', fn ($b) => ['push' => false] + $b)`, reload | CTRL+SHIFT+X does nothing; the bar's Push still works |
 
 ## Admin bar
 
 | Check | Expected |
 |---|---|
-| Open the **SCSS** menu | Live Compile, Force Compile, Capture, Logging, Dashboard. Nothing per handle: that detail is on the page |
+| Open the **SCSS** menu | Live Compile, Force Compile, 🖌️ Capture, 📤 Push to source (with the gate open), Logging with square boxes that fill with a tick when on, Dashboard. Nothing per handle: that detail is on the page |
 | Click **🤖 Force Compile** with nothing changed | Handles recompile anyway. Live Compile in the same state should report cached instead: that difference is the reason both exist |
 | Confirm what is absent | No **Log Variables**, no **Clear Cache**, no per-handle entries: `wp sassy vars`, the Logging menu and the page replace them |
 | On a wp-admin screen, edit `admin.scss` and click **⚡ Live Compile** | The admin sheet on screen updates. Before 6b the endpoint only ever discovered the frontend |
