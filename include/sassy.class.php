@@ -114,12 +114,14 @@ class Sassy {
 		// sassy:* events, so nothing here needs to know one exists.
 		wp_enqueue_script('sassy');
 
+		$compile = apply_filters('sassy-keybinding', ['ctrl+space', 'meta+space']);
+
 		wp_localize_script('sassy', 'sass_params', [
 			'ajax_url'            => admin_url('admin-ajax.php'),
 			'sassy_compile_nonce' => wp_create_nonce('sassy_compile'),
 			'sassy_write_nonce'   => wp_create_nonce('sassy_write'),
 			'write'               => Policy::can_write_source(),
-			'keybinding'          => $compile = apply_filters('sassy-keybinding', ['ctrl+space', 'meta+space']),
+			'keybinding'          => $compile,
 			// One map for the three actions. Space looks, X commits; push is live only with the
 			// write gate open. Each entry is modifier+key strings, or false to unbind.
 			'keybindings'         => apply_filters('sassy-keybindings', [

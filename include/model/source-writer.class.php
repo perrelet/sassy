@@ -45,6 +45,9 @@ class Source_Writer {
 
             if (!$is_rule && (!isset($change['prop']) || (!isset($change['from']) && !isset($change['to'])))) { $results[$i]['reason'] = 'neither an old nor a new value'; continue; }
 
+            // The CSSOM cannot produce these, but this is the one place that writes a file.
+            if ($reason = static::malformed($change)) { $results[$i]['reason'] = $reason; continue; }
+
             $by_file[$file][$i] = $change;
 
         }
@@ -234,6 +237,46 @@ class Source_Writer {
         }
 
         return null;
+
+    }
+
+    /**
+     * Why a change may not be written as text: a property that is not a name, or a selector,
+     * ancestor or value holding a newline or a brace.
+     */
+    public static function malformed (array $change) {
+
+        $names  = isset($change['selector']) ? array_keys((array) ($change['declarations'] ?? [])) : [$change['prop'] ?? ''];
+        $values = isset($change['selector']) ? array_values((array) ($change['declarations'] ?? [])) : [$change['from'] ?? '', $change['to'] ?? ''];
+        $texts  = array_merge($values, [$change['selector'] ?? ''], (array) ($change['ancestors'] ?? []));
+
+        foreach ($names as $name) {
+            if (!is_string($name) || !preg_match('/^[-\w]+$/', $name)) return 'not a property name: `' . (is_string($name) ? $name : gettype($name)) . '`';
+        }
+
+        foreach ($texts as $text) {
+            if ($text === null) continue;
+            if (!is_string($text)) return 'a value is not text';
+            if (preg_match('/[\r\n]/', $text)) return 'a value may not hold a newline';
+            if (static::brace_outside_quotes($text)) return 'a value may not hold a brace outside quotes';
+        }
+
+        return null;
+
+    }
+
+    protected static function brace_outside_quotes ($text) {
+
+        $quote = null;
+
+        for ($i = 0, $len = strlen($text); $i < $len; $i++) {
+            $c = $text[$i];
+            if ($quote)   { if ($c === '\\') $i++; else if ($c === $quote) $quote = null; continue; }
+            if ($c === '"' || $c === "'") { $quote = $c; continue; }
+            if ($c === '{' || $c === '}') return true;
+        }
+
+        return false;
 
     }
 

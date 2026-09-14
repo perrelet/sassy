@@ -91,6 +91,7 @@ const front = { href: 'http://test.local/wp-content/scss/frontend.css', ownerNod
     { constructor: { name: 'CSSMediaRule' }, cssText: '@media (min-width: 1px)', cssRules: [rule('.b', 'gap: 4px;')] },
     rule('.c', 'background: var(--x);'),
     rule('.d', 'padding: 1px;'),
+    rule('.k', 'background-color: red; color: blue;'),
 ] };
 const nomap = { href: 'http://test.local/wp-content/scss/nomap.css', ownerNode: {}, cssRules: [rule('.n', 'color: red;')] };
 const links = [
@@ -320,13 +321,16 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
     ok('the baseline was taken at load', global.window.sassy.capture !== undefined && links[0].listeners.load !== undefined);
 
     // The sheet's text, and a map for it encoded here rather than trusted from the code under test.
-    const text = '.a{color:red}@media (min-width:1px){.b{gap:4px}}.c{background:var(--x)}.d{padding:1px}';
+    const text = '.a{color:red}@media (min-width:1px){.b{gap:4px}}.c{background:var(--x)}.d{padding:1px}.k{background-color:red;color:blue}';
     const off  = s => text.indexOf(s);
     const segments = [
         [off('.a{'), 0, 0, 0], [off('color:'), 0, 1, 2],
         [off('@media'), 0, 3, 0], [off('.b{'), 0, 4, 2], [off('gap:'), 0, 5, 4],
         [off('.c{'), 0, 7, 0], [off('background:'), 0, 8, 2],
         [off('.d{'), 0, 10, 0], [off('padding:'), 0, 11, 2],
+        // Lines 14, 15 and 16 (olines are zero-based). The third segment is the real color:, after
+        // the ;, not the color: inside background-color:, or the bug and the fix land on one segment.
+        [off('.k{'), 0, 13, 0], [off('background-color:'), 0, 14, 2], [text.indexOf(';color:', off('.k{')) + 1, 0, 15, 2],
     ];
     const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
     const enc = n => { let v = n < 0 ? ((-n) << 1) | 1 : n << 1, out = ''; do { let d = v & 31; v >>= 5; if (v > 0) d |= 32; out += B64[d]; } while (v > 0); return out; };
@@ -429,6 +433,8 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
     ok('an addition reports as written',      report.includes('✔ written   plugins/d-pace/scss/frontend.scss:6  .b  + margin: 0'));
     ok('and leaves the rest for the copy path', report.includes('Left for the copy path:') && report.includes('nomap (nomap.css)  .n') && report.includes('inspector-stylesheet'));
     ok('a write triggers a compile',         fetched.length === compilesBefore + 1 && String(fetched[fetched.length - 1]).includes('action=sassy_compile'));
+    ok('and consumes the capture',           button('push').hidden === true);
+    ok('so a second Push has nothing to send', (await global.window.sassy.push()) === null);
     ok('which keeps the panel',              panel.classList.contains('show') && header.children[0].textContent === 'Pushed to source');
     ok('sassy:pushed fires',                 dispatched.includes('sassy:pushed'));
 
@@ -520,8 +526,15 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
     front.cssRules.length = 0;
     front.cssRules.push(rule('.x1', 'a: 1;'), rule('.x2', 'a: 1;'), rule('.x3', 'a: 1;'), rule('.x4', 'a: 1;'), rule('.x5', 'a: 1;'), rule('.x6', 'a: 1;'));
     const misaligned = await global.window.sassy.capture();
-    ok('a misaligned sheet withholds lines',  misaligned.patch.includes('did not align (5 blocks, 6 rules, 0 paired)'));
+    ok('a misaligned sheet withholds lines',  misaligned.patch.includes('did not align (6 blocks, 6 rules, 0 paired)'));
     front.cssRules.length = 0; front.cssRules.push(...saved);
+
+    // color: inside background-color: is not the declaration. Mapped by plain indexOf, this
+    // change landed on background-color's line 15 and the server refused it.
+    front.cssRules[4].style.cssText = 'background-color: red; color: green;';
+    const bounded = await global.window.sassy.capture();
+    ok('a property is found with a boundary before it', bounded.patch.includes('plugins/d-pace/scss/frontend.scss:16  .k') && bounded.patch.includes('color: blue → green') && !bounded.patch.includes(':15  .k'));
+    front.cssRules[4].style.cssText = 'background-color: red; color: blue;';
 
     // A reload re-baselines: what was painted is now the sheet, so nothing is a change.
     front.cssRules.pop();

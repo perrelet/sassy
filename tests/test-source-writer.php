@@ -169,6 +169,25 @@ check('a string, a comment and interpolation do not count', Source_Writer::block
 check('an unbalanced block is null',                        Source_Writer::block_end([".v {\n", "    color: red;\n"], 1) === null);
 check('a one-line block closes on its own line',            Source_Writer::block_end([".w { color: red; }\n"], 1) === 1);
 
+section('What the CSSOM cannot produce is refused before any file is read');
+
+$safe = "$DIR/_safe.scss";
+fixture($safe, ".s {\n    color: red;\n}\n");
+$r = (new Source_Writer(graph_for($safe)))->apply([
+    change('_safe.scss', 2, 'color', 'red', "blue;\n}\n.evil { x: y; }"),                                          // 0: newline
+    change('_safe.scss', 2, 'color', 'red', 'red } .evil { x: y'),                                                   // 1: brace outside quotes
+    change('_safe.scss', 2, 'color', 'red', '"}"'),                                                                  // 2: brace inside quotes is a value
+    change('_safe.scss', 2, 'col or', 'red', 'blue'),                                                                // 3: not a property name
+    ['source' => '_safe.scss', 'line' => 1, 'selector' => '.z } .evil {', 'declarations' => ['a' => 'b']],          // 4: a selector with braces
+    ['source' => '_safe.scss', 'line' => 1, 'selector' => '.z', 'declarations' => ['a b' => 'c']],                  // 5: a bad name in a rule
+]);
+check('a newline refuses',                    !$r[0]['written'] && str_contains($r[0]['reason'], 'newline'), (string) $r[0]['reason']);
+check('a brace outside quotes refuses',       !$r[1]['written'] && str_contains($r[1]['reason'], 'brace'), (string) $r[1]['reason']);
+check('a brace inside quotes is a value',      $r[2]['written'] && file($safe)[1] === "    color: \"}\";\n", file($safe)[1]);
+check('a property that is not a name refuses',!$r[3]['written'] && str_contains($r[3]['reason'], 'not a property name'), (string) $r[3]['reason']);
+check('a selector with braces refuses',       !$r[4]['written'] && str_contains($r[4]['reason'], 'brace'), (string) $r[4]['reason']);
+check('a bad name in a rule refuses',         !$r[5]['written'] && str_contains($r[5]['reason'], 'not a property name'), (string) $r[5]['reason']);
+
 section('edit() alone');
 
 check('keeps the spacing around the value',   Source_Writer::edit("    gap:   4px ;  // note\n", 'gap', '4px', '12px') === ["    gap:   12px ;  // note\n", null]);

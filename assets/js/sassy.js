@@ -641,15 +641,34 @@
 
         },
 
+        /**
+         * The offset of `prop:` inside [start, end) with a property boundary before it, or -1:
+         * color: must not match inside background-color:, as the writer also insists.
+         */
+        findDeclaration (text, prop, start, end) {
+
+            const re = new RegExp('(^|[{;\\s])' + String(prop).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*:', 'g');
+            re.lastIndex = Math.max(0, start - 1);
+
+            let m;
+            while ((m = re.exec(text)) && m.index < end) {
+                const at = m.index + m[1].length;
+                if (at >= start && at < end) return at;
+            }
+
+            return -1;
+
+        },
+
         /** The declaration's own position where the block's text has it, else the block's. */
         declarationOffset (mapping, index, prop) {
 
             const block = mapping.blocks[index];
             const next  = mapping.blocks[index + 1];
             const end   = next ? next.start : mapping.text.length;
-            const at    = mapping.text.indexOf(prop + ':', block.start);
+            const at    = this.findDeclaration(mapping.text, prop, block.start, end);
 
-            return at > -1 && at < end ? at : block.start;
+            return at > -1 ? at : block.start;
 
         },
 
@@ -668,8 +687,8 @@
             const end   = next ? next.start : mapping.text.length;
 
             for (const prop of Object.keys(was)) {
-                const at = mapping.text.indexOf(prop + ':', block.start);
-                if (at > -1 && at < end) return at;
+                const at = this.findDeclaration(mapping.text, prop, block.start, end);
+                if (at > -1) return at;
             }
 
             return block.start;
@@ -681,8 +700,6 @@
             const sheets  = this.managed();
             const changes = [];
             const reasons = {};
-            const counts  = {};
-
             const rulesByHandle = {};
 
             for (const handle in sheets) {
@@ -690,7 +707,6 @@
                 if (!sheet.baseline) this.snapshot(handle);
                 const rules = this.rulesOf(sheet);
                 rulesByHandle[handle] = rules;
-                counts[handle] = rules.length;
                 let index = 0;
                 for (const [key, entry] of this.keyed(rules)) {
                     const was      = sheet.baseline.has(key) ? sheet.baseline.get(key).declarations : {};
@@ -818,8 +834,13 @@
                     this.showNotice(written ? `✔ Pushed ${written}` : '✗ Nothing written', written ? 'success' : 'warning');
                     this.emit('sassy:pushed', { results, text });
 
-                    // The dependency check sees the changed partial; the reload re-baselines.
-                    if (written) this.liveCompile(false, null, true);
+                    // What was written is no longer a paint: a second Push would resend it and be
+                    // refused line by line. The compile that follows re-baselines.
+                    if (written) {
+                        this.lastCapture = null;
+                        if (this.els.push) this.els.push.hidden = true;
+                        this.liveCompile(false, null, true);
+                    }
 
                     return results;
 
@@ -879,13 +900,14 @@
             for (const c of changes) {
                 const sheet = this.managed()[c.handle];
                 let where = c.location ? `${c.location.file}:${c.location.line}` : `${c.handle} (${String(sheet.href).split('/').pop().split('?')[0]})`;
+                let tail  = '';
                 if (c.newRule) {
                     const n = c.neighbour;
                     where = 'new rule';
-                    var tail = n ? `  (no source location; belongs after ${n.selector}${n.location ? ' at ' + n.location.file + ':' + n.location.line : ''})` : '  (no source location)';
+                    tail  = n ? `  (no source location; belongs after ${n.selector}${n.location ? ' at ' + n.location.file + ':' + n.location.line : ''})` : '  (no source location)';
                 }
                 const key   = `${c.handle}:${c.index}:${where}`;
-                if (!groups.has(key)) groups.set(key, [`${where}  ${c.selector}${c.newRule ? tail : ''}`]);
+                if (!groups.has(key)) groups.set(key, [`${where}  ${c.selector}${tail}`]);
                 const rows = groups.get(key);
                 if (c.from === null)    rows.push(`  + ${c.prop}: ${c.to}`);
                 else if (c.to === null) rows.push(`  - ${c.prop}: ${c.from}`);
@@ -1227,7 +1249,7 @@
 
             }
 
-            return hadWarnings ? 'warning' : false;
+            return hadWarnings;
 
         },
 
