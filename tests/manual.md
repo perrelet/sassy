@@ -114,7 +114,8 @@ Tier 2 of the paintbrush. This writes to files in d-pace, whose tree carries wor
 | Capture again straight away | "Nothing changed": the compile re-baselined |
 | Paint a declaration whose source is a `$variable`, Capture, Push | `✗ refused` with `the line has \`gap: $gap\`, not \`4px\`` and the line quoted; it sits under "Left for the copy path" and Copy still yields it |
 | Edit a partial in your editor, save, do not compile; paint something in it and Push | `✗ refused   … changed since the last compile; compile first` |
-| Add a declaration in the styles pane (`outline: 2px solid lime` on the header), Capture, Push | `✔ written   …_site-header.scss:23  .site-header  + outline: 2px solid lime`; the file has it as the first line inside `.site-header {`, indented like its neighbours |
+| Add a declaration in the styles pane (`outline: 2px solid lime` on the header), Capture, Push | `✔ written   …_site-header.scss:28  .site-header  + outline: 2px solid lime`, line 28 being the rule's first existing declaration; the file has it right after that line, indented like it |
+| Add `color: pink` to the light-theme rule *inside* `@supports (backdrop-filter: blur(1px))`, Capture, Push | It lands inside that `@supports` block beside `background: var(--comp-header-bg);` (line 50), not in the outer rule at line 44 |
 | With the gate open, press 🖌️ **Push to source** in the bar after painting | One click: the capture happens, the push follows, the report shows. Without the gate the bar item is absent |
 | Revoke `dev` (or `add_filter('sassy-write-source', '__return_false')`), reload, Capture | No Push button; `window.sassy.push()` says "Nothing to push" |
 | Revert the pushed line in d-pace and compile | `wp sassy check` exits zero |
