@@ -732,10 +732,38 @@
 
         // --- Paintbrush, tier 2: push to source ----------------------------------------------
 
-        /** What the server can be asked to write: anything located. The server refuses the rest. */
+        /** What the server can be asked to write: anything located, and a new rule with a located neighbour. */
         applicable (changes) {
 
-            return changes.filter(c => c.location && c.location.source);
+            return changes.filter(c => (c.location && c.location.source) || (c.newRule && c.neighbour && c.neighbour.location && c.neighbour.location.source));
+
+        },
+
+        /**
+         * What goes over the wire: one item per declaration change, and one per new rule with
+         * its declarations together, placed after its neighbour's block.
+         */
+        items (changes) {
+
+            const items = [];
+            const rules = new Map();
+
+            for (const c of changes) {
+                if (!c.newRule) {
+                    items.push({ change: c, changes: [c], item: { handle: c.handle, source: c.location.source, line: c.location.line, prop: c.prop, from: c.from, to: c.to } });
+                    continue;
+                }
+                const key = c.handle + ':' + c.index;
+                if (!rules.has(key)) {
+                    const entry = { change: c, changes: [], item: { handle: c.handle, source: c.neighbour.location.source, line: c.neighbour.location.line, selector: c.selector, declarations: {} } };
+                    rules.set(key, entry);
+                    items.push(entry);
+                }
+                rules.get(key).changes.push(c);
+                rules.get(key).item.declarations[c.prop] = c.to;
+            }
+
+            return items;
 
         },
 
@@ -745,14 +773,14 @@
             if (fresh) return this.capture().then(() => this.push(false));
 
             const capture = this.lastCapture;
-            const list    = capture ? this.applicable(capture.changes) : [];
+            const list    = capture ? this.items(this.applicable(capture.changes)) : [];
 
             if (!this.params.write || !list.length) { this.showNotice('Nothing to push', 'warning'); return Promise.resolve(null); }
 
             const body = new URLSearchParams({
                 action:  'sassy_write',
                 nonce:   this.params.sassy_write_nonce || '',
-                changes: JSON.stringify(list.map(c => ({ handle: c.handle, source: c.location.source, line: c.location.line, prop: c.prop, from: c.from, to: c.to }))),
+                changes: JSON.stringify(list.map(entry => entry.item)),
             });
 
             this.showNotice('🖌️ Pushing\u2026', 'pending');
@@ -794,18 +822,27 @@
             const lines   = [];
             const leftover = [];
 
-            list.forEach((c, i) => {
+            const sent = [];
+
+            list.forEach((entry, i) => {
+                const c     = entry.change;
                 const r     = results[i] || { written: false, reason: 'no answer' };
-                const where = `${c.location.file}:${c.location.line}`;
-                const decl  = c.to === null ? `- ${c.prop}: ${c.from}` : (c.from === null ? `+ ${c.prop}: ${c.to}` : `${c.prop}: ${c.from} → ${c.to}`);
-                if (r.written) lines.push(`✔ written   ${where}  ${c.selector}  ${decl}`);
+                const isRule = !!entry.item.selector;
+                const where = isRule
+                    ? `${c.neighbour.location.file}:${r.line || c.neighbour.location.line}`
+                    : `${c.location.file}:${c.location.line}`;
+                const decl  = isRule
+                    ? `@at-root ${c.selector} { ${Object.entries(entry.item.declarations).map(([p, v]) => `${p}: ${v};`).join(' ')} }`
+                    : (c.to === null ? `- ${c.prop}: ${c.from}` : (c.from === null ? `+ ${c.prop}: ${c.to}` : `${c.prop}: ${c.from} → ${c.to}`));
+                sent.push(...entry.changes);
+                if (r.written) lines.push(`✔ written   ${where}  ${isRule ? decl : c.selector + '  ' + decl}`);
                 else {
-                    lines.push(`✗ refused   ${where}  ${c.selector}  ${decl}`, `            ${r.reason}${r.text ? `  |  ${r.text.trim()}` : ''}`);
-                    leftover.push(c);
+                    lines.push(`✗ refused   ${where}  ${isRule ? decl : c.selector + '  ' + decl}`, `            ${r.reason}${r.text ? `  |  ${r.text.trim()}` : ''}`);
+                    leftover.push(...entry.changes);
                 }
             });
 
-            const rest = capture.changes.filter(c => !list.includes(c)).concat(leftover);
+            const rest = capture.changes.filter(c => !sent.includes(c)).concat(leftover);
 
             if (rest.length || capture.extras.length) {
                 lines.push('', 'Left for the copy path:', this.patch(rest, capture.extras, {}));

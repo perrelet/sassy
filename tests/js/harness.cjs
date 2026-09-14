@@ -490,8 +490,28 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
     const inserted = await global.window.sassy.capture();
     ok('a new rule mid-sheet is reported as new, after its neighbour', inserted.patch.includes('new rule  .a  (no source location; belongs after .a at plugins/d-pace/scss/frontend.scss:1)') && inserted.patch.includes('  + color: pink'));
     ok('and the rules after it keep their lines',                       inserted.patch.includes('plugins/d-pace/scss/frontend.scss:2  .a') && !inserted.patch.includes('did not align'));
-    ok('and it is not pushable',                                        !inserted.changes.filter(c => c.newRule).some(c => c.location));
+    ok('and has no location of its own',                                !inserted.changes.filter(c => c.newRule).some(c => c.location));
+
+    // Pushed, it goes as one item with its declarations, placed after its neighbour.
+    global.window.sass_params.write = true;
+    let rulePost = null;
+    global.fetch = (url, opts) => {
+        if (opts && opts.method === 'POST') {
+            rulePost = JSON.parse(opts.body.get('changes'));
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true, data: { results: rulePost.map(item => ({ written: true, file: '/srv/x/frontend.scss', line: item.selector ? 3 : item.line, reason: null, text: item.selector ? '}' : '' })) } }) });
+        }
+        return mappingFetch(url);
+    };
+    await global.window.sassy.push();
+    const ruleItem = rulePost ? rulePost.find(i => i.selector) : null;
+    ok('a new rule is sent as one item',        ruleItem && ruleItem.selector === '.a' && ruleItem.line === 1 && ruleItem.source === '../plugins/d-pace/scss/frontend.scss');
+    ok('with its declarations together',        ruleItem && JSON.stringify(ruleItem.declarations) === '{"color":"pink"}');
+    const ruleReport = panel.querySelectorAll('.sassy-error').map(el => el.textContent).join('\n');
+    ok('and reports as an @at-root block',      ruleReport.includes('✔ written   plugins/d-pace/scss/frontend.scss:3  @at-root .a { color: pink; }'));
+    global.window.sass_params.write = false;
+    global.fetch = mappingFetch;
     front.cssRules.splice(1, 1);
+    links[0].listeners.load();
 
     // A sheet whose rules mostly fail to pair still withholds lines rather than invent them.
     const saved = front.cssRules.slice();

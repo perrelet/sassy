@@ -22,6 +22,8 @@ class Source_Writer {
     /**
      * @param array $changes Each: source, line, prop, from, to. A null `to` removes the
      *                       declaration; a null `from` adds one after the block's opening line.
+     *                       A change with `selector` and `declarations` instead of `prop` is a
+     *                       new rule, written as @at-root after the block the line opens.
      * @return array One per change, in the order given: written, file, line, reason, text.
      */
     public function apply (array $changes) {
@@ -39,7 +41,9 @@ class Source_Writer {
 
             $results[$i]['file'] = $file;
 
-            if (!isset($change['prop']) || (!isset($change['from']) && !isset($change['to']))) { $results[$i]['reason'] = 'neither an old nor a new value'; continue; }
+            $is_rule = isset($change['selector']) && is_array($change['declarations'] ?? null);
+
+            if (!$is_rule && (!isset($change['prop']) || (!isset($change['from']) && !isset($change['to'])))) { $results[$i]['reason'] = 'neither an old nor a new value'; continue; }
 
             $by_file[$file][$i] = $change;
 
@@ -73,7 +77,20 @@ class Source_Writer {
                 $text = $lines[$n - 1];
                 $results[$i]['text'] = rtrim($text, "\r\n");
 
-                if (!isset($change['from'])) {
+                if (isset($change['selector']) && is_array($change['declarations'] ?? null)) {
+
+                    // A new rule goes after the block its neighbour opens, as @at-root so it
+                    // compiles at the root wherever the neighbour is nested.
+                    [$block, $reason] = static::rule($lines, $n, (string) $change['selector'], $change['declarations']);
+
+                    if ($reason !== null) { $results[$i]['reason'] = $reason; continue; }
+
+                    [$after, $insert] = $block;
+                    array_splice($lines, $after, 0, $insert);
+                    $lines = array_values($lines);
+                    $results[$i]['line'] = $after + 1;
+
+                } else if (!isset($change['from'])) {
 
                     // An addition arrives only when the compiled rule had no such property, so
                     // the block has no such line. It goes after the mapped line: a sibling
@@ -140,6 +157,70 @@ class Source_Writer {
         else $indent .= '    ';
 
         return [$indent . $prop . ': ' . $to . ';' . $eol, null];
+
+    }
+
+    /**
+     * The lines of an @at-root block to insert after the block line $n opens, or a reason.
+     *
+     * @return array{0: ?array{0: int, 1: string[]}, 1: ?string} [[line to insert after, lines], null]
+     */
+    public static function rule (array $lines, $n, $selector, array $declarations) {
+
+        $opener = $lines[$n - 1];
+        $body   = rtrim(preg_replace('~\s*//.*$~', '', rtrim($opener, "\r\n")));
+
+        if (!str_ends_with($body, '{')) return [null, 'the neighbour\'s line does not open a block'];
+        if ($selector === '' || !$declarations)  return [null, 'a rule needs a selector and at least one declaration'];
+
+        $end = static::block_end($lines, $n);
+        if ($end === null) return [null, 'the neighbour\'s block does not close'];
+
+        $eol    = str_ends_with($opener, "\r\n") ? "\r\n" : "\n";
+        $indent = static::indent($opener);
+        $inner  = $indent . '    ';
+        $next   = $lines[$n] ?? '';
+        if (trim($next) !== '' && strlen(static::indent($next)) > strlen($indent)) $inner = static::indent($next);
+
+        $out = [$eol, $indent . '@at-root ' . $selector . ' {' . $eol];
+        foreach ($declarations as $prop => $value) $out[] = $inner . $prop . ': ' . $value . ';' . $eol;
+        $out[] = $indent . '}' . $eol;
+
+        return [[$end, $out], null];
+
+    }
+
+    /**
+     * The 1-based line of the brace that closes the block line $n opens, by depth, skipping
+     * strings and comments. Interpolation braces balance on their own. Null when unbalanced.
+     */
+    public static function block_end (array $lines, $n) {
+
+        $depth = 0; $quote = null; $comment = false;
+
+        for ($i = $n - 1, $count = count($lines); $i < $count; $i++) {
+
+            $line = $lines[$i];
+
+            for ($j = 0, $len = strlen($line); $j < $len; $j++) {
+
+                $c = $line[$j];
+
+                if ($comment) { if ($c === '*' && ($line[$j + 1] ?? '') === '/') { $comment = false; $j++; } continue; }
+                if ($quote)   { if ($c === '\\') $j++; else if ($c === $quote) $quote = null; continue; }
+
+                if ($c === '"' || $c === "'") { $quote = $c; continue; }
+                if ($c === '/' && ($line[$j + 1] ?? '') === '*') { $comment = true; $j++; continue; }
+                if ($c === '/' && ($line[$j + 1] ?? '') === '/') break;
+
+                if ($c === '{') $depth++;
+                else if ($c === '}') { $depth--; if ($depth === 0) return $i + 1; }
+
+            }
+
+        }
+
+        return null;
 
     }
 

@@ -144,6 +144,30 @@ $r = (new Source_Writer(graph_for($two)))->apply([
 check('both written',            $r[0]['written'] && $r[1]['written'], var_export($r, true));
 check('the change landed where the map said', file_get_contents($two) === ".t {\n  gap: 4px;\n  margin: 1em;\n}\n", file_get_contents($two));
 
+section('A new rule goes after its neighbour\'s block, as @at-root');
+
+$nr = "$DIR/_new-rule.scss";
+fixture($nr, ".a {\n    color: red;\n}\n.p {\n    color: red;\n    &-inner {\n        gap: 1px;\n    }\n}\n");
+$r = (new Source_Writer(graph_for($nr)))->apply([
+    ['source' => '_new-rule.scss', 'line' => 1, 'selector' => 'header.x.a', 'declarations' => ['color' => 'pink', 'gap' => '0']],
+    ['source' => '_new-rule.scss', 'line' => 6, 'selector' => '.q', 'declarations' => ['margin' => '0']],   // after a nested block
+    ['source' => '_new-rule.scss', 'line' => 2, 'selector' => '.z', 'declarations' => ['margin' => '0']],   // a declaration line
+    ['source' => '_new-rule.scss', 'line' => 1, 'selector' => '.z', 'declarations' => []],                  // nothing to write
+]);
+
+check('written after the block, blank line first', $r[0]['written'] && str_contains(file_get_contents($nr), ".a {\n    color: red;\n}\n\n@at-root header.x.a {\n    color: pink;\n    gap: 0;\n}\n.p {"), file_get_contents($nr));
+check('naming the line it went after',              $r[0]['line'] === 4);
+check('after a nested block, at its indentation',   $r[1]['written'] && str_contains(file_get_contents($nr), "        gap: 1px;\n    }\n\n    @at-root .q {\n        margin: 0;\n    }\n}\n"), file_get_contents($nr));
+check('a declaration line refuses',                 !$r[2]['written'] && str_contains($r[2]['reason'], 'does not open'), (string) $r[2]['reason']);
+check('no declarations refuses',                    !$r[3]['written'] && str_contains($r[3]['reason'], 'at least one'), (string) $r[3]['reason']);
+
+section('block_end() by depth, skipping what is not structure');
+
+$tricky = [".t {\n", "    content: \"}\";  // }\n", "    /* { */\n", "    width: calc(#{\$a} + 1px);\n", "    &:hover { color: red; }\n", "}\n", ".u {\n"];
+check('a string, a comment and interpolation do not count', Source_Writer::block_end($tricky, 1) === 6);
+check('an unbalanced block is null',                        Source_Writer::block_end([".v {\n", "    color: red;\n"], 1) === null);
+check('a one-line block closes on its own line',            Source_Writer::block_end([".w { color: red; }\n"], 1) === 1);
+
 section('edit() alone');
 
 check('keeps the spacing around the value',   Source_Writer::edit("    gap:   4px ;  // note\n", 'gap', '4px', '12px') === ["    gap:   12px ;  // note\n", null]);
