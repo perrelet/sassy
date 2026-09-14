@@ -1,5 +1,7 @@
 # Upgrading to Sassy 3.0
 
+Everything on the `style-stack` branch is 3.0.0. The sections below are in the order the work landed; the minor numbers they carried at the time were collapsed into 3.0.0 on 2026-09-14, nothing having been released between.
+
 What changes for a site running Sassy, and what to do about it.
 
 **3.0.0 is complete.** It ships phases 1-6 of [style-stack-plan.md](style-stack-plan.md), and each phase adds its breaks here as it lands. Anything not listed below has not changed yet. Landed so far: **phases 1 to 6**, which is all of 3.0.0.
@@ -310,8 +312,6 @@ Default `['ctrl+space', 'meta+space']`, preserving 2.x behaviour, which accepted
 
 ## Phase 6b: the admin page
 
-Ships as 3.1.0.
-
 ### The admin bar loses what the page now carries
 
 **Who this affects:** anyone clicking the per-handle entries or Clear Cache in the bar, or linking to `?sassy-clear-cache=1`.
@@ -352,8 +352,6 @@ It reported the map URL. `Printer::get_map_url()` has since phase 2.
 
 ## Phase 7, tier 1: the paintbrush
 
-Ships as 3.2.0.
-
 ### Source maps are exact under compressed output
 
 **Who this affects:** anyone reading Sassy's maps, DevTools included.
@@ -374,8 +372,6 @@ The element keeps its id and gains `data-kind` (`error` or `capture`), a Copy bu
 
 ## Phase 7, tier 2: push to source
 
-Ships as 3.3.0.
-
 ### A new endpoint, behind a gate a site has to bind
 
 **Who this affects:** any site that wants the paintbrush to write.
@@ -394,8 +390,6 @@ A change lands only in a file that is a recorded dependency of the handle it cam
 
 ## Phase 8: script observation
 
-Ships as 3.4.0.
-
 ### `Style_Stack` discovers scripts
 
 **Who this affects:** anything iterating `Style_Stack::all()` or binding `sassy-style-queues`.
@@ -408,29 +402,29 @@ Ships as 3.4.0.
 - `Style_Surface::of()` and `::profile()`, and a `sassy-surfaces` transient through `Compile_Cache::get_surfaces()` / `set_surfaces()`.
 - The dashboard's Stack gains a `script` kind, its filter, and a `surface` column.
 
-## 3.5.0: the push's second walk
+## The push's second walk: additions written, a one-click Push
 
-- **Additions are written.** A declaration added in the styles pane goes in after a sibling declaration of the same rule, or after the block's opener when the rule has none. It was refused in 3.3.0. 3.5.1 moved the anchor from the opener to a sibling: a rule Sass hoists out of an `@supports` keeps its selector's source line, so an addition anchored to the opener landed in the outer rule.
+- **Additions are written.** A declaration added in the styles pane goes in after a sibling declaration of the same rule, or after the block's opener when the rule has none. It was refused when tier 2 first landed. A later walk moved the anchor from the opener to a sibling: a rule Sass hoists out of an `@supports` keeps its selector's source line, so an addition anchored to the opener landed in the outer rule.
 - **🖌️ Push to source** in the admin bar, present when `sassy-write-source` is open, captures and pushes in one click; `window.sassy.push(true)` does the same.
 - The panel's Push button is styled as the primary action.
 
-## 3.6.0: the keybindings map
+## The keybindings map
 
 `sassy-keybindings` filters a map of `compile`, `capture` and `push` to their chords. `sassy-keybinding` keeps working and sets the `compile` entry. New defaults: `ctrl+shift+space` / `meta+shift+space` captures, `ctrl+shift+x` / `meta+shift+x` captures and pushes, the latter only while `sassy-write-source` is open. The JS reads `sass_params.keybindings`, falling back to `sass_params.keybinding`.
 
-## 3.6.1: a new rule in the sheet
+## A new rule in the sheet
 
 Chrome's per-rule **+** inserts a new rule into the same stylesheet, after the one it was pressed under, rather than into `inspector-stylesheet`. Capture aligned rules to text by count and index, so one added rule withheld every location in the sheet. It now aligns by selector and keeps its baseline by selector occurrence; a new rule reports as `new rule  <selector>  (no source location; belongs after <neighbour> at <file:line>)`, copy-only.
 
-## 3.7.0: new rules are written
+## New rules are written
 
 A rule created with Chrome's per-rule **+** is pushed as one item, `selector` and `declarations`, and written after its neighbour's block as `@at-root <selector> { … }`. The end of the neighbour's block comes from a depth scan over the SCSS that skips strings, comments and interpolation; an unbalanced block refuses. `Source_Writer::rule()` and `::block_end()` are new.
 
-## 3.7.1: a new rule keeps its media query
+## A new rule keeps its media query
 
 A rule created inside a `@media`, `@supports`, `@container` or `@layer` block carries that chain as `ancestors` and is written as `@at-root (without: all) { @media (…) { .x { … } } }`, so the compiled rule sits under exactly what the CSSOM had it under.
 
-## 3.7.2: the review of the paintbrush
+## The review of the paintbrush
 
-Three fixes from a code review of everything since 3.4.0: a declaration is located with a property boundary, so `color:` no longer matches inside `background-color:`; a written push consumes the capture, so a second Push does not resend what was written; and the write endpoint refuses what the CSSOM cannot produce, a property that is not a name or a selector, ancestor or value holding a newline or an unquoted brace.
+Three fixes from a code review of everything since phase 8: a declaration is located with a property boundary, so `color:` no longer matches inside `background-color:`; a written push consumes the capture, so a second Push does not resend what was written; and the write endpoint refuses what the CSSOM cannot produce, a property that is not a name or a selector, ancestor or value holding a newline or an unquoted brace.
 

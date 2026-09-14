@@ -7,13 +7,13 @@
 > the present, this file wins — so **each phase updates this file as part of landing**, or the
 > sentence you are reading becomes a trap.
 >
-> **Phases 1 to 8 have landed**: phases 1 to 6 are 3.0.0, 6b (the admin page) is 3.1.0, 7's capture-and-copy is 3.2.0, 7's push-to-source is 3.3.0, 8's script observation is 3.4.0 3.5.x is the push's second walk (additions written, a one-click Push in the bar) and 3.6.0 the keybindings map. Phase 9 is still as the plan describes it.
+> **Phases 1 to 8 have landed, and all of it is 3.0.0.** The minors 3.1 to 3.7 they carried as they landed were collapsed into the one number on 2026-09-14, nothing having been released between. Phase 9 is still as the plan describes it.
 >
 > **Starting fresh?** Plan §8 opens with what to read and the four commands to run before touching anything. Run them: this file has been wrong about the present three times, and each time the code was right.
 
 ## Overview
 
-**Sassy** is a WordPress plugin (v3.7.2, by Digitalis Web Build Co.) that compiles SCSS files on-demand. The core premise: enqueue `.scss` files exactly as you would `.css` files via `wp_enqueue_style`, and Sassy intercepts the URL, compiles the SCSS to CSS, writes the result to disk, and returns the compiled CSS URL to WordPress instead.
+**Sassy** is a WordPress plugin (v3.0.0, by Digitalis Web Build Co.) that compiles SCSS files on-demand. The core premise: enqueue `.scss` files exactly as you would `.css` files via `wp_enqueue_style`, and Sassy intercepts the URL, compiles the SCSS to CSS, writes the result to disk, and returns the compiled CSS URL to WordPress instead.
 
 ```php
 wp_enqueue_style('my-theme', get_template_directory_uri() . '/style.scss');
@@ -584,7 +584,7 @@ Per-compile filters receive `($value, $src, $handle, $asset)`, except `sassy-com
 
 | Constant | Set in | Value |
 |---|---|---|
-| `SASSY_VERSION` | `sassy.php` | `'3.7.2'` — kept identical to the plugin header |
+| `SASSY_VERSION` | `sassy.php` | `'3.0.0'` — kept identical to the plugin header |
 | `SASSY_PATH` | `sassy.php` | Absolute path to plugin directory (trailing slash) |
 | `SASSY_URI` | `sassy.php` | URL to plugin directory (trailing slash) |
 | `SASSY_ROOT_FILE` | `sassy.php` | `__FILE__` of sassy.php |

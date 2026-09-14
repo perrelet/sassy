@@ -63,8 +63,7 @@ does not know a Sass import tree. Only the intersection does, and that intersect
 Breaking: renamed classes, changed engine contract, changed filter surface, integrations removed.
 **3.0.0.** Branch: `style-stack`.
 
-**3.0.0 ships phases 1–6.** Phase 6b (the admin page), 7 and 8 land as 3.x minors; phase 9 is
-unversioned.
+**3.0.0 ships phases 1 to 8.** They were numbered 3.1 to 3.7 as they landed and collapsed into 3.0.0 on 2026-09-14, nothing having been released between; the upgrade notes keep the phase order without the numbers. Phase 9 is unversioned.
 
 Two release preconditions, named here because neither belongs to a phase's acceptance and both
 were drifting unowned:
@@ -775,7 +774,7 @@ source location — offered copy-only, with the matched sheet's entry file sugge
 after the rule it was pressed under, so a count is not an alignment and a baseline by index
 shifts every later rule. Tier 1 aligns text blocks to CSSOM rules by selector key and keeps its
 baseline by selector occurrence; the new rule reports as new with the rule above it and that rule's source line as where it
-belongs, and since 3.7.0 tier 2 writes it there as an `@at-root` block, the block's end found by
+belongs, and since the push's second walk tier 2 writes it there as an `@at-root` block, the block's end found by
 a depth scan rather than a parse; the `inspector-stylesheet` case stays copy-only. Chrome's own label for such a rule is the map's nearest segment and means nothing.
 `element.style` edits map to no stylesheet — captured and offered copy-only. Compressed vs
 expanded output is irrelevant: the diff is CSSOM-shaped, not text-shaped.
@@ -961,7 +960,7 @@ anything**:
 git status                       # clean, on style-stack
 php tests/run.php                # 15 files
 wp sassy check                   # exit 0
-wp sassy status                  # version 3.7.2
+wp sassy status                  # version 3.0.0
 ```
 
 That is not ceremony. Documentation in this repo has drifted from the code three times: filters
@@ -975,7 +974,7 @@ Two things about this machine that no document upstream of you will mention:
   yours**, and has had throughout. Two of the modified lines in `sassy.integration.php` are the §4
   dev-gate and `wp_tempnam` changes; everything else in that tree belongs to someone else. Do not
   commit there.
-- 3.7.2 is tagged in the plugin header and none of 3.0.0 to 3.7.2 is **released**. The digitalis.ca update JSON is not
+- 3.0.0 is tagged in the plugin header and is **not released**. The digitalis.ca update JSON is not
   yet version-fenced, so publishing would offer a breaking upgrade to every 1.x install polling
   it. That fence is Jamie's and it is not done.
 
