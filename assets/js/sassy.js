@@ -422,6 +422,20 @@
 
         },
 
+        /** The at-rules a rule sits inside, outermost first, as the CSSOM has them: what a new rule must be written under. */
+        ancestorsOf (rule) {
+
+            const out = [];
+
+            for (let parent = rule && rule.parentRule; parent; parent = parent.parentRule) {
+                const prelude = this.rulePrelude(parent).trim();
+                if (prelude.startsWith('@')) out.unshift(prelude);
+            }
+
+            return out;
+
+        },
+
         rulePrelude (rule) {
 
             if (rule.selectorText) return rule.selectorText;
@@ -682,7 +696,8 @@
                     const was      = sheet.baseline.has(key) ? sheet.baseline.get(key).declarations : {};
                     const isNew    = !sheet.baseline.has(key);
                     const selector = this.rulePrelude(entry.rule).trim();
-                    for (const change of this.diff(was, entry.declarations)) changes.push(Object.assign({ handle, index, selector, location: null, was, isNew }, change));
+                    const ancestors = isNew ? this.ancestorsOf(entry.rule) : [];
+                    for (const change of this.diff(was, entry.declarations)) changes.push(Object.assign({ handle, index, selector, location: null, was, isNew, ancestors }, change));
                     index++;
                 }
             }
@@ -755,7 +770,7 @@
                 }
                 const key = c.handle + ':' + c.index;
                 if (!rules.has(key)) {
-                    const entry = { change: c, changes: [], item: { handle: c.handle, source: c.neighbour.location.source, line: c.neighbour.location.line, selector: c.selector, declarations: {} } };
+                    const entry = { change: c, changes: [], item: { handle: c.handle, source: c.neighbour.location.source, line: c.neighbour.location.line, selector: c.selector, ancestors: c.ancestors || [], declarations: {} } };
                     rules.set(key, entry);
                     items.push(entry);
                 }
@@ -832,7 +847,7 @@
                     ? `${c.neighbour.location.file}:${r.line || c.neighbour.location.line}`
                     : `${c.location.file}:${c.location.line}`;
                 const decl  = isRule
-                    ? `@at-root ${c.selector} { ${Object.entries(entry.item.declarations).map(([p, v]) => `${p}: ${v};`).join(' ')} }`
+                    ? `@at-root ${c.selector} { ${Object.entries(entry.item.declarations).map(([p, v]) => `${p}: ${v};`).join(' ')} }${entry.item.ancestors.length ? '  in ' + entry.item.ancestors.join(' ') : ''}`
                     : (c.to === null ? `- ${c.prop}: ${c.from}` : (c.from === null ? `+ ${c.prop}: ${c.to}` : `${c.prop}: ${c.from} → ${c.to}`));
                 sent.push(...entry.changes);
                 if (r.written) lines.push(`✔ written   ${where}  ${isRule ? decl : c.selector + '  ' + decl}`);

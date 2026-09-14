@@ -150,14 +150,15 @@ $nr = "$DIR/_new-rule.scss";
 fixture($nr, ".a {\n    color: red;\n}\n.p {\n    color: red;\n    &-inner {\n        gap: 1px;\n    }\n}\n");
 $r = (new Source_Writer(graph_for($nr)))->apply([
     ['source' => '_new-rule.scss', 'line' => 1, 'selector' => 'header.x.a', 'declarations' => ['color' => 'pink', 'gap' => '0']],
-    ['source' => '_new-rule.scss', 'line' => 6, 'selector' => '.q', 'declarations' => ['margin' => '0']],   // after a nested block
+    ['source' => '_new-rule.scss', 'line' => 6, 'selector' => '.q', 'declarations' => ['margin' => '0'], 'ancestors' => ['@media (min-width: 440px)', '@supports (a: b)']],   // after a nested block, inside two at-rules
     ['source' => '_new-rule.scss', 'line' => 2, 'selector' => '.z', 'declarations' => ['margin' => '0']],   // a declaration line
     ['source' => '_new-rule.scss', 'line' => 1, 'selector' => '.z', 'declarations' => []],                  // nothing to write
 ]);
 
-check('written after the block, blank line first', $r[0]['written'] && str_contains(file_get_contents($nr), ".a {\n    color: red;\n}\n\n@at-root header.x.a {\n    color: pink;\n    gap: 0;\n}\n.p {"), file_get_contents($nr));
+check('written after the block, blank line first', $r[0]['written'] && str_contains(file_get_contents($nr), ".a {\n    color: red;\n}\n\n@at-root (without: all) {\n    header.x.a {\n        color: pink;\n        gap: 0;\n    }\n}\n.p {"), file_get_contents($nr));
 check('naming the line it went after',              $r[0]['line'] === 4);
-check('after a nested block, at its indentation',   $r[1]['written'] && str_contains(file_get_contents($nr), "        gap: 1px;\n    }\n\n    @at-root .q {\n        margin: 0;\n    }\n}\n"), file_get_contents($nr));
+check('after a nested block, under its at-rules',   $r[1]['written'] && str_contains(file_get_contents($nr), "        gap: 1px;\n    }\n\n    @at-root (without: all) {\n        @media (min-width: 440px) {\n            @supports (a: b) {\n                .q {\n                    margin: 0;\n                }\n            }\n        }\n    }\n}\n"), file_get_contents($nr));
+check('a malformed ancestor refuses',                (new Source_Writer(graph_for($nr)))->apply([['source' => '_new-rule.scss', 'line' => 1, 'selector' => '.z', 'declarations' => ['a' => 'b'], 'ancestors' => ['@media { x']]])[0]['reason'] !== null);
 check('a declaration line refuses',                 !$r[2]['written'] && str_contains($r[2]['reason'], 'does not open'), (string) $r[2]['reason']);
 check('no declarations refuses',                    !$r[3]['written'] && str_contains($r[3]['reason'], 'at least one'), (string) $r[3]['reason']);
 

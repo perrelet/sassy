@@ -81,7 +81,7 @@ class Source_Writer {
 
                     // A new rule goes after the block its neighbour opens, as @at-root so it
                     // compiles at the root wherever the neighbour is nested.
-                    [$block, $reason] = static::rule($lines, $n, (string) $change['selector'], $change['declarations']);
+                    [$block, $reason] = static::rule($lines, $n, (string) $change['selector'], $change['declarations'], is_array($change['ancestors'] ?? null) ? $change['ancestors'] : []);
 
                     if ($reason !== null) { $results[$i]['reason'] = $reason; continue; }
 
@@ -161,11 +161,13 @@ class Source_Writer {
     }
 
     /**
-     * The lines of an @at-root block to insert after the block line $n opens, or a reason.
+     * The lines of a new rule to insert after the block line $n opens, or a reason. Written as
+     * @at-root (without: all) so it compiles at the root whatever the neighbour sits inside, with
+     * exactly the at-rules the CSSOM had it under, outermost first.
      *
      * @return array{0: ?array{0: int, 1: string[]}, 1: ?string} [[line to insert after, lines], null]
      */
-    public static function rule (array $lines, $n, $selector, array $declarations) {
+    public static function rule (array $lines, $n, $selector, array $declarations, array $ancestors = []) {
 
         $opener = $lines[$n - 1];
         $body   = rtrim(preg_replace('~\s*//.*$~', '', rtrim($opener, "\r\n")));
@@ -173,18 +175,29 @@ class Source_Writer {
         if (!str_ends_with($body, '{')) return [null, 'the neighbour\'s line does not open a block'];
         if ($selector === '' || !$declarations)  return [null, 'a rule needs a selector and at least one declaration'];
 
+        foreach ($ancestors as $ancestor) {
+            if (!is_string($ancestor) || !preg_match('/^@[a-z-]+[^{}\r\n]*$/i', $ancestor)) return [null, 'an ancestor is not an at-rule prelude'];
+        }
+
         $end = static::block_end($lines, $n);
         if ($end === null) return [null, 'the neighbour\'s block does not close'];
 
         $eol    = str_ends_with($opener, "\r\n") ? "\r\n" : "\n";
         $indent = static::indent($opener);
-        $inner  = $indent . '    ';
+        $step   = '    ';
         $next   = $lines[$n] ?? '';
-        if (trim($next) !== '' && strlen(static::indent($next)) > strlen($indent)) $inner = static::indent($next);
+        if (trim($next) !== '' && strlen(static::indent($next)) > strlen($indent)) $step = substr(static::indent($next), strlen($indent));
 
-        $out = [$eol, $indent . '@at-root ' . $selector . ' {' . $eol];
-        foreach ($declarations as $prop => $value) $out[] = $inner . $prop . ': ' . $value . ';' . $eol;
-        $out[] = $indent . '}' . $eol;
+        $out   = [$eol, $indent . '@at-root (without: all) {' . $eol];
+        $depth = 1;
+
+        foreach ($ancestors as $ancestor) { $out[] = $indent . str_repeat($step, $depth) . trim($ancestor) . ' {' . $eol; $depth++; }
+
+        $out[] = $indent . str_repeat($step, $depth) . $selector . ' {' . $eol;
+        foreach ($declarations as $prop => $value) $out[] = $indent . str_repeat($step, $depth + 1) . $prop . ': ' . $value . ';' . $eol;
+        $out[] = $indent . str_repeat($step, $depth) . '}' . $eol;
+
+        while (--$depth >= 0) $out[] = $indent . str_repeat($step, $depth) . '}' . $eol;
 
         return [[$end, $out], null];
 

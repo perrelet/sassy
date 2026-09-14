@@ -486,7 +486,8 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
 
     // Chrome's per-rule "+" inserts a new rule into the same sheet after the one it was pressed
     // under. Every later index shifts; nothing else may move.
-    front.cssRules.splice(1, 0, rule('.a', 'color: pink;'));
+    // Chrome put it inside the @media block: the CSSOM says so through parentRule.
+    front.cssRules.splice(1, 0, Object.assign(rule('.a', 'color: pink;'), { parentRule: front.cssRules[1] }));
     const inserted = await global.window.sassy.capture();
     ok('a new rule mid-sheet is reported as new, after its neighbour', inserted.patch.includes('new rule  .a  (no source location; belongs after .a at plugins/d-pace/scss/frontend.scss:1)') && inserted.patch.includes('  + color: pink'));
     ok('and the rules after it keep their lines',                       inserted.patch.includes('plugins/d-pace/scss/frontend.scss:2  .a') && !inserted.patch.includes('did not align'));
@@ -506,8 +507,9 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
     const ruleItem = rulePost ? rulePost.find(i => i.selector) : null;
     ok('a new rule is sent as one item',        ruleItem && ruleItem.selector === '.a' && ruleItem.line === 1 && ruleItem.source === '../plugins/d-pace/scss/frontend.scss');
     ok('with its declarations together',        ruleItem && JSON.stringify(ruleItem.declarations) === '{"color":"pink"}');
+    ok('and the at-rules it sits inside',       ruleItem && JSON.stringify(ruleItem.ancestors) === '["@media (min-width: 1px)"]');
     const ruleReport = panel.querySelectorAll('.sassy-error').map(el => el.textContent).join('\n');
-    ok('and reports as an @at-root block',      ruleReport.includes('✔ written   plugins/d-pace/scss/frontend.scss:3  @at-root .a { color: pink; }'));
+    ok('and reports as an @at-root block',      ruleReport.includes('✔ written   plugins/d-pace/scss/frontend.scss:3  @at-root .a { color: pink; }  in @media (min-width: 1px)'));
     global.window.sass_params.write = false;
     global.fetch = mappingFetch;
     front.cssRules.splice(1, 1);
