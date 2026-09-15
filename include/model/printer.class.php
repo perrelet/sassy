@@ -249,11 +249,11 @@ class Printer {
     }
 
     /**
-     * Build the args array passed to the compiler engine.
+     * What the engine is asked to build. No key here is any engine's option name.
      *
-     * @param string $src_path  Path to the main SCSS file.
+     * @param string $src_path  Path to the entry file.
      * @param array  $variables Sass variables (key => string expression).
-     * @return array
+     * @return Compile_Request
      */
     protected function build_request ($src_path, array $variables) {
 
@@ -272,11 +272,7 @@ class Printer {
 
     }
     
-    /**
-     * Record an error message for this compile run.
-     *
-     * @param string $e Error message.
-     */
+    /** Record what stopped this compile run. */
     protected function fail (Diagnostic $diagnostic) {
 
         $this->diagnostics[] = $diagnostic;
@@ -339,7 +335,7 @@ class Printer {
     }
 
     /**
-     * Everything that did not stop the compile: warnings, deprecations and notices. Phase 5
+     * Everything that did not stop the compile: warnings, deprecations and notices. `check`
      * splits them by severity for --strict.
      *
      * @return Diagnostic[]

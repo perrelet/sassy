@@ -54,9 +54,6 @@ class Updater {
 
 	public function info ($res, $action, $args) {
 
-		// print_r( $action );
-		// print_r( $args );
-
 		// do nothing if you're not getting plugin information right now
 		if ('plugin_information' !== $action) return $res;
 
@@ -69,10 +66,6 @@ class Updater {
 
 		if (property_exists($remote, 'sections')) $remote->sections = json_decode(json_encode($remote->sections), true); 	// obj -> array
 		if (property_exists($remote, 'banners')) $remote->banners = json_decode(json_encode($remote->banners), true);		// obj -> array
-
-		/* echo "<pre>";
-		var_dump($remote);
-		exit;  */
 
 		return $remote;
 

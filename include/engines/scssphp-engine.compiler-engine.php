@@ -9,10 +9,8 @@ use ScssPhp\ScssPhp\Exception\SassException;
 use Exception;
 
 /**
- * Compiler engine using the ScssPhp (scssphp) library.
- *
- * Accepts $args['variables'] as key => string (Sass expression, e.g. quoted URLs);
- * parses them to Value instances for the compiler.
+ * The pure-PHP engine, scssphp v2. Boots with nothing installed and compiles `@import` Sass;
+ * modules are Dart's. Request variables arrive as Sass expressions and are parsed to Values.
  */
 class Scssphp_Engine implements Compiler_Engine {
 
