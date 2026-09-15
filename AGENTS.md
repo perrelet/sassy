@@ -29,6 +29,7 @@ The plugin is **not** in the WordPress repository — it updates itself by polli
 ```
 sassy/
 ├── sassy.php                          # Plugin entry point — constants, global SASSY() helper, WP-CLI registration
+├── uninstall.php                      # Drops every Sassy transient on every site; leaves the build directory
 ├── include/
 │   ├── sassy.class.php                # Main plugin class (Sassy\Sassy)
 │   ├── model/
@@ -736,5 +737,7 @@ need the filter or they stop being discovered — see
 - **Proving an endpoint from the CLI.** Both AJAX endpoints can be called under `wp eval` as a dev, which is how every push was proved before a browser saw it: `wp_set_current_user(1); $_SERVER['REQUEST_METHOD'] = 'POST'; $_REQUEST['nonce'] = wp_create_nonce('sassy_write'); $_POST['changes'] = json_encode([...]); SASSY()->write_source();` prints the JSON (`wp_send_json_*` exits, so put it last). For `compile_all()` the nonce action is `sassy_compile` and `$_REQUEST['hooks']` picks the contexts. Check `git status` in d-pace first, write only what you can recognise afterwards, and revert only when the diff contains your own marker: that tree carries work that is not ours, and a blanket `git checkout` once discarded one of Jamie's browser tests.
 - Staging sits behind HTTP auth. `curl` answers 401 to everything, including the maps; a logged-in browser is fine, and `wp` commands run on the box do not go through it.
 - The `Scssphp_Engine` is the only engine that needs no external binaries — safe default for all environments.
+- **The zip is `git archive HEAD`.** `.gitattributes` marks `tests/`, `docs/`, `CLAUDE.md` and the dotfiles `export-ignore`; `vendor/` is committed so the archive needs no `composer install`. `AGENTS.md` ships deliberately, since an agent working on a site that runs Sassy is exactly who it is for.
+- `uninstall.php` loads `Compile_Cache` alone and calls `forget_all()` per site, plus the updater's transient. It does not delete the build directory: the site's enqueues point at that CSS, and where output goes is filtered by code that has not run when uninstall does.
 - When adding a new per-compile filter, keep the signature consistent: `($value, $src, $handle, $asset)`.
 
