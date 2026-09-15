@@ -2,12 +2,14 @@
 
 /**
  * Plugin Name:       Sassy
- * Plugin URI:        http://digitalis.ca/
+ * Plugin URI:        https://digitalis.ca/
  * Description:       “So ripeness climbs the bells of Digitalis, flower by flower, undistracted by a Mind, or a Design, or by desire.
  * Version:           3.0.0
+ * Requires at least: 6.0
+ * Requires PHP:      8.1
  * Author:            Digitalis Web Build Co.
- * Author URI:        http://digitalis.ca/
- * Text Domain:       digitalis
+ * Author URI:        https://digitalis.ca/
+ * Text Domain:       sassy
  */
 
 if (!defined('WPINC')) die;
