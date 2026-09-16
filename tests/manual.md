@@ -73,6 +73,8 @@ Tools → Sassy, as a dev. Walk it once on a current install and once after brea
 | Check | Expected |
 |---|---|
 | Log in as an administrator without `dev` | No **Sassy** under Tools, and `tools.php?page=sassy` is refused |
+| The top of the page | The dark banner with Cascade, no plain "Sassy" heading beside it, and a dismissible admin notice (clear the cache, for one) lands *below* the banner rather than above it |
+| The foot of the page | The Digitalis logo, faded, full strength on hover, linking to digitalis.ca |
 | **Check** with everything current | The green "Everything current" notice, matching `wp sassy check` |
 | Break a partial, run `wp sassy compile`, reload the page | The handle reads `stale` in Stack and Check, and its section shows the error under **Last diagnostics**, with the engine's frame in the dark block. `check` never compiles, so this is the recorded failure, not a fresh one |
 | **Status** against `wp sassy status` | Same rows, same words. `dev surface` reads active for you |
