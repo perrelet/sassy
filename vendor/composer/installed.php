@@ -1,24 +1,15 @@
 <?php return array(
     'root' => array(
-        'name' => '__root__',
+        'name' => 'perrelet/sassy',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => '7f0a5bc6352c2f5e805238b72c2522daabc292df',
-        'type' => 'library',
+        'reference' => '624ca38ac34963e6a70632d4e34c503e662b0ade',
+        'type' => 'wordpress-plugin',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
         'dev' => true,
     ),
     'versions' => array(
-        '__root__' => array(
-            'pretty_version' => 'dev-main',
-            'version' => 'dev-main',
-            'reference' => '7f0a5bc6352c2f5e805238b72c2522daabc292df',
-            'type' => 'library',
-            'install_path' => __DIR__ . '/../../',
-            'aliases' => array(),
-            'dev_requirement' => false,
-        ),
         'league/uri' => array(
             'pretty_version' => '7.8.0',
             'version' => '7.8.0.0',
@@ -34,6 +25,15 @@
             'reference' => 'c5c5cd056110fc8afaba29fa6b72a43ced42acd4',
             'type' => 'library',
             'install_path' => __DIR__ . '/../league/uri-interfaces',
+            'aliases' => array(),
+            'dev_requirement' => false,
+        ),
+        'perrelet/sassy' => array(
+            'pretty_version' => 'dev-main',
+            'version' => 'dev-main',
+            'reference' => '624ca38ac34963e6a70632d4e34c503e662b0ade',
+            'type' => 'wordpress-plugin',
+            'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
             'dev_requirement' => false,
         ),
