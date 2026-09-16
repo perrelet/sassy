@@ -30,6 +30,14 @@ The first line is the partial and line the rule was compiled from. The second is
 
 Sassy is not in the WordPress plugin directory. Put the folder in `wp-content/plugins` and activate it. Updates come from digitalis.ca.
 
+Or let Composer put it there:
+
+```bash
+composer require digitalisweb/sassy
+```
+
+The package is a `wordpress-plugin`, so with `composer/installers` in your project it lands in `wp-content/plugins/sassy`. On a site Composer manages, Composer is how you update it too. The built-in updater still checks digitalis.ca, and WordPress hides its offer where file changes are disallowed.
+
 Enqueue your Sass as if it were CSS:
 
 ```php
