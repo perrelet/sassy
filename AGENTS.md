@@ -70,7 +70,8 @@ sassy/
 │       └── sassy-cli-command.class.php  # WP-CLI: status, list, compile, watch, vars, deps, clear
 ├── assets/
 │   ├── scss/sassy.scss               # Sassy's own stylesheet, compiled by Sassy; authored for scssphp
-│   └── js/sassy.js                   # Dev surface: Live Compile, logging toggles, keybinding, the page, window.sassy
+│   ├── js/sassy.js                   # Dev surface: Live Compile, logging toggles, keybinding, the page, window.sassy
+│   └── img/                          # Cascade (portrait in the readme, full figure reserved for the dashboard), the Digitalis logo in light and dark
 ├── docs/
 │   ├── style-stack-plan.md           # The 3.0 spec of record on this branch
 │   ├── upgrading-to-3.0.md           # What breaks for third parties, appended per phase

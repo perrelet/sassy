@@ -1,31 +1,27 @@
-<p align="center">
-  <img src="https://digitalis.ca/wp-content/plugins/digitalis-co/assets/svg/logo/digitalis.current.svg" width="140" alt="Digitalis">
-</p>
+<img align="right" width="230" src="assets/img/cascade.portrait.800.webp" alt="Cascade, a fox in a foxglove hat, holding a paintbrush">
 
 # Sassy
 
 **Sassy compiles your SCSS on the server, knows every stylesheet WordPress enqueued and pushes a DevTools edit back into the partial it came from.**
 
-Enqueue a `.scss` file the way you would a `.css` file. Sassy intercepts the URL, compiles it, watches every partial it pulls in and serves the CSS. For a long time that was the whole plugin. It is now the smallest part of it.
+Nothing else can do the middle part. A Node build does not know WordPress's enqueue graph and WordPress does not know a Sass import tree. Sassy sits at the intersection, and everything below follows from that.
 
-- **Every stylesheet on the site is modelled**, not only the ones Sassy compiles: which hook enqueued it, where it lives on disk, what it depends on and whether it is current. Nothing else can build that model. A Node build does not know WordPress's enqueue graph and WordPress does not know a Sass import tree.
-- **The browser is an editor.** Paint in the styles pane, press 🖌️ Capture and Sassy maps each change through the source map to a file and a line. Press Push and it writes the change into that partial, exactly or not at all.
-- **Machines are first-class readers.** Every CLI command speaks JSON, every diagnostic names a file an agent can open and `wp sassy check` answers one question with one exit code.
+- **Every stylesheet on the site is modelled**, not only the ones Sassy compiles: which hook enqueued it, where it lives on disk, what it depends on and whether it is current.
+- **The browser is an editor.** Paint in the styles pane, press 🖌️ Capture and each change is mapped through the source map to a file and a line. Press Push and it is written into that partial, exactly or not at all.
+- **Machines are first-class readers.** Every command speaks JSON, every diagnostic names a file that exists and `wp sassy check` answers one question with one exit code.
 
-## Who it is for
+<br clear="all">
 
-Teams building custom WordPress themes in SCSS, on servers they control, who would rather not run a Node build to see a change land. Sassy is comfortable in production. The dev surface is gated by *who* you are, never by *where* you are, so the same site serves visitors and developers at once.
+## Thirty seconds
 
-It is not for shared hosting. The engine you want is Dart Sass, and Dart Sass is a binary on the box.
+Open a page you are working on. Change a colour in the DevTools styles pane. Press `ctrl+shift+space`.
 
-## Requirements
+```
+plugins/d-pace/scss/components/_site-header.scss:33  .site-header
+  background: var(--material-bg, var(--surface-dark)) → red
+```
 
-| | |
-|---|---|
-| PHP | 8.1 or later |
-| WordPress | 6.0 or later |
-| [Dart Sass](https://sass-lang.com/dart-sass/) | Any recent release. Needed for modern Sass: `@use`, `@forward`, the module system |
-| [Lightning CSS](https://lightningcss.dev/) | Optional, for minification and transforms after Sass |
+That is the partial and the line the rule came from, with the old value and the new. **Copy** puts it on your clipboard. **Push to source** writes it into `_site-header.scss`, recompiles and reloads the sheet. The page you are looking at now matches the file on disk, and you never left the browser.
 
 ## Quick start
 
@@ -44,30 +40,41 @@ define('SASSY_DART_SASS_BIN', '/usr/local/bin/sass');
 add_filter('sassy-engine', fn () => new Sassy\Dart_Sass_Engine());
 ```
 
-Load a page. The compiled CSS is served from `wp-content/scss/`, the admin bar has an **SCSS** menu, and `wp sassy status` tells you what it found.
+Load a page. The compiled CSS is served from `wp-content/scss/`, the admin bar has an **SCSS** menu and `wp sassy status` tells you what it found.
 
-## Engines
+| Requirement | |
+|---|---|
+| PHP | 8.1 or later |
+| WordPress | 6.0 or later |
+| [Dart Sass](https://sass-lang.com/dart-sass/) | Any recent release. Needed for modern Sass: `@use`, `@forward`, the module system |
+| [Lightning CSS](https://lightningcss.dev/) | Optional, for minification and transforms after Sass |
 
-Two, and the choice matters.
+Sassy is for teams building custom themes in SCSS on servers they control. It is comfortable in production: the dev surface is gated by *who* you are, never by *where* you are, so one site serves visitors and developers at once. It is not for shared hosting, because the engine you want is a binary on the box.
 
-| | Dart Sass | scssphp |
-|---|---|---|
-| Needs | a binary and `exec()` | nothing |
-| Sass modules (`@use`, `@forward`) | yes | **no**, `@import` only |
-| Source maps | yes | yes |
-| Warnings and deprecations | yes, as diagnostics | yes, as diagnostics |
+## If you are an agent
 
-**Dart Sass is the engine.** It is the reference implementation, it compiles the Sass you write today, and Sassy runs it with variable injection, exact source maps and its own temp files, so nothing lands in your source tree.
+You are probably here because a site you are working on runs Sassy. Four commands tell you what you need:
 
-**scssphp is what boots when nothing is installed.** It is pure PHP and needs no binary, which makes it the default. It cannot compile `@use` or `@forward`. If your Sass is modern, or you plan for it to be, configure Dart Sass before you write a line.
+```bash
+wp sassy status --format=json    # engine, binaries, build path, whether the gates are open
+wp sassy list --format=json      # every registered style, whether Sassy builds it, its state
+wp sassy check                   # exit 0: every style is current, unbroken and accounted for
+wp sassy compile --hooks=all     # the remedy for anything check names
+```
 
-Either way the contract is the same: an engine takes a request and returns CSS with diagnostics. Your own engine is a class and a filter. See [Extending Sassy](#extending-sassy).
+Things you can rely on:
+
+- Every diagnostic names a `file:line:column` that exists on disk. A path you cannot open is a bug, not a convention.
+- `check` never compiles. When it fails it lists what is wrong and the fix is always `compile`. A compile that failed is never recorded as current, so it surfaces as stale rather than hiding.
+- `wp sassy deps --file=_mixins.scss` names every handle that recompiles when that file changes. Ask it before editing something shared.
+- A patch a human hands you from 🖌️ Capture is `path:line  selector`, then `property: old → new`, one change per pair of lines. Each path is a file in the project.
+- [AGENTS.md](AGENTS.md) describes the code as it stands and is kept accurate on every landing. Where it and the code disagree, the code is right and the document gets fixed.
 
 ## When Sassy compiles
 
 A source is compiled on the request that needs it, when any of these is true:
 
-1. The entry file, or any partial it pulls in through `@use`, `@forward` or `@import` at any depth, has changed since the last build.
+1. The entry file, or any partial it pulls in through `@use`, `@forward` or `@import` at any depth, changed since the last build.
 2. A directory on the import path gained or lost a Sass file, which is exactly when a new file could shadow the one in use.
 3. A variable was added, removed or changed value.
 4. Compilation was forced: the `sassy-force-compile` filter, `wp sassy compile --force` or a keypress in the browser.
@@ -97,7 +104,7 @@ add_filter('sassy-keybindings', fn ($bindings) => ['push' => false] + $bindings)
 
 Chords are ignored while focus is in a field, ignored on key repeat and matched exactly, so a chord with an extra modifier does nothing. `meta+space` is Spotlight on macOS and never reaches the browser, so Mac users are on `ctrl+space`.
 
-Who sees the dev surface at all is one filter. It defaults to `edit_theme_options`, and it is about *who* rather than *where*, so it works the same in production:
+Who sees the dev surface at all is one filter. It defaults to `edit_theme_options`:
 
 ```php
 add_filter('sassy-dev', fn () => current_user_can('dev'));
@@ -118,14 +125,7 @@ Two ways to work from DevTools, both on the dev surface.
 
 **Edit the source in the browser.** The compiled CSS ships a source map that is exact, `url()` rewriting included, so the styles pane links straight into the `.scss` that produced each rule. Add the project folder as a DevTools Workspace and edits saved from the Sources panel land on disk. With `wp sassy watch` running and Auto-reload on, the page repaints without a keypress.
 
-**Paint, then capture.** Edit declarations in the styles pane as usual, then press 🖌️ **Capture** in the admin bar, or call `window.sassy.capture()`. Sassy diffs the page's live CSSOM against the snapshot it took when the sheets loaded, maps each change through the source map and shows the patch in the panel:
-
-```
-plugins/d-pace/scss/components/_site-header.scss:33  .site-header
-  background: var(--material-bg, var(--surface-dark)) → red
-```
-
-**Copy** yields exactly that text, which is the handoff: paste it to an agent or a colleague with "integrate this properly".
+**Paint, then capture.** Edit declarations in the styles pane as usual, then press 🖌️ **Capture** in the admin bar, or call `window.sassy.capture()`. Sassy diffs the page's live CSSOM against the snapshot it took when the sheets loaded, maps each change through the source map and shows the patch in the panel. Nothing is written. Capture observes.
 
 **Push to source** appears beside it when the site has opted in, and writes each change into the `.scss` it maps to, then recompiles:
 
@@ -133,9 +133,11 @@ plugins/d-pace/scss/components/_site-header.scss:33  .site-header
 add_filter('sassy-write-source', fn () => current_user_can('dev'));
 ```
 
-It writes only where it can do so exactly. The file must be a recorded dependency of that handle, unchanged since the last compile, and the mapped line must carry `prop: <the served value>;` literally. `gap: $gap` when `4px` was served is refused and comes back for the copy path with the line quoted. So does anything the CSSOM serialises differently from the source, and a removal from a line holding more than that declaration. A declaration you added goes in beside the rule's existing declarations. A rule you created with the styles pane's per-rule **+** goes in after its neighbour's block as an `@at-root` block, which compiles at the root wherever the neighbour is nested. A rule created in the inspector stylesheet and an `element.style` edit have no source location and are listed as copy-only, the first with a suggested file.
+It writes only where it can do so exactly. The file must be a recorded dependency of that handle, unchanged since the last compile, and the mapped line must carry `property: <the served value>;` literally. `gap: $gap` when `4px` was served is refused and comes back for the copy path with the line quoted. So does anything the CSSOM serialises differently from the source, and a removal from a line holding more than that declaration. A declaration you added goes in beside the rule's existing declarations. A rule you created with the styles pane's per-rule **+** goes in after its neighbour's block as an `@at-root` block, which compiles at the root wherever the neighbour is nested. A rule in the inspector stylesheet and an `element.style` edit have no source location and are listed as copy-only, the first with a suggested file.
 
 The bar's 🖌️ **Push to source** does capture and push in one click. The safety is the server's refusals, so nothing is lost, and Capture stays for looking without writing. `sassy-write-source` defaults to `false` and is never implied by `sassy-dev`.
+
+**The handoff.** Not every change belongs in the file as painted. `gap: 4px` painted over `gap: $gap` is a token decision, not a line edit, and Push refuses it for exactly that reason. **Copy** is the other path: the patch names the file, the line, the selector and both values, so it pastes to a colleague or an agent with one instruction, "integrate this properly", and they have everything they need to do it right.
 
 ## The dashboard
 
@@ -172,7 +174,7 @@ wp sassy clear                      # drop compile caches
 wp sassy watch                      # recompile as you edit, until Ctrl-C
 ```
 
-Data commands accept `--format=table|csv|json|yaml`, so tooling reads them as easily as people do.
+Data commands accept `--format=table|csv|json|yaml`.
 
 ### Finding admin and editor styles
 
@@ -211,8 +213,6 @@ It never compiles anything. A handle that fails to compile is never recorded as 
 
 Two deliberate asymmetries. A **truncated import graph** is reported as a warning but fails anyway, because it makes the answer unknowable rather than untidy. An **orphaned output**, a built file no registered handle claims, is a warning that fails only under `--strict`, because a style enqueued on one template is indistinguishable from one that was deleted.
 
-`wp sassy deps --file=<path>` answers the reverse of `deps <handle>`: given a partial, which handles recompile when it changes. Ask it before editing something shared. It is the reason the import graph is recorded at all.
-
 ## What scripts do to your styles
 
 Sassy compiles CSS and observes JS. `wp sassy list --type=script` lists every registered script with its **surface**: which kinds of style mutation its text contains, by marker, counted. Five categories:
@@ -224,6 +224,21 @@ Sassy compiles CSS and observes JS. `wp sassy list --type=script` lists every re
 - **CSSOM injection**: `insertRule`, `adoptedStyleSheets`, `new CSSStyleSheet`. What third parties do to you.
 
 Detection only, no semantics. Reads do not count as writes, and a marker in a comment counts, because a false positive costs a glance and a miss costs the signal. `--touches=data-theme` narrows to the scripts that touch an attribute, which is the question to ask before renaming one. Profiles are cached by file stamp, so only a changed script is read again.
+
+## Engines
+
+| | Dart Sass | scssphp |
+|---|---|---|
+| Needs | a binary and `exec()` | nothing |
+| Sass modules (`@use`, `@forward`) | yes | **no**, `@import` only |
+| Source maps | yes | yes |
+| Warnings and deprecations | yes, as diagnostics | yes, as diagnostics |
+
+**Dart Sass is the engine.** It is the reference implementation, it compiles the Sass you write today, and Sassy runs it with variable injection, exact source maps and its own temp files, so nothing lands in your source tree.
+
+**scssphp is what boots when nothing is installed.** It is pure PHP and needs no binary, which makes it the default. It cannot compile `@use` or `@forward`. If your Sass is modern, or you plan for it to be, configure Dart Sass before you write a line.
+
+Either way the contract is the same: an engine takes a request and returns CSS with diagnostics. Your own engine is a class and a filter. See [Extending Sassy](#extending-sassy).
 
 ## Variables
 
@@ -356,10 +371,19 @@ They live on as worked examples: `tests/fixtures/` holds each of them rebuilt on
 
 ## Development
 
-`php tests/run.php` runs the suite. It stubs WordPress, opens no browser and needs no PHPUnit. Browser behaviour is walked by hand against `tests/manual.md` before a release. [AGENTS.md](AGENTS.md) describes the codebase as it stands and is kept accurate on every landing. It is written for people and for agents alike, and so is the plugin.
+`php tests/run.php` runs the suite. It stubs WordPress, opens no browser and needs no PHPUnit. Browser behaviour is walked by hand against `tests/manual.md` before a release. [AGENTS.md](AGENTS.md) describes the codebase as it stands and is written for people and agents alike. So is the plugin.
 
 ## History
 
 Sassy started in 2021 because the SCSS plugins in the WordPress directory could not do what one project needed. Juan Echeverry's [SCSS-Library](https://wordpress.org/plugins/scss-library/) showed the shape, enqueue `.scss` and get `.css`, and none of that code remains but the shape does. Everything since has been a question of how much of the page's styling one plugin can be made to understand.
 
-© Jamie Perrelet 2021 to 2026, [Digitalis Web Build Co.](https://digitalis.ca/)
+Cascade, the fox in the hat, is one of the three designers of Digit++ at Foxglove Farm, Dartmoor. Her portrait was drafted years ago and never finished. It is now.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/img/digitalis.dark.svg">
+    <img src="assets/img/digitalis.light.svg" width="220" alt="Digitalis">
+  </picture>
+  <br>
+  © Jamie Perrelet 2021 to 2026, <a href="https://digitalis.ca/">Digitalis Web Build Co.</a>
+</p>
