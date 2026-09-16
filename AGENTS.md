@@ -20,7 +20,7 @@ wp_enqueue_style('my-theme', get_template_directory_uri() . '/style.scss');
 // Sassy transparently serves wp-content/scss/style.css
 ```
 
-The plugin is **not** in the WordPress repository — it updates itself by polling `https://digitalis.ca/plugins/update/sassy/info`.
+The plugin is **not** in the WordPress repository — it updates itself by polling `https://digitalis.ca/plugins/update/sassy-v3/info?version=<installed>`. One route per major: the feed resolves the newest `v3.*` tag on GitHub, and answers 404 to a caller reporting another major. The 1.x line polls `/plugins/update/sassy/` and stays there forever, since the 1.x client sends no version. Release = merge to `main`, then a `vX.Y.Z` tag whose number matches the header exactly; the feed builds from the tag and refuses a mismatch.
 
 ---
 

@@ -6,7 +6,9 @@ use stdClass;
 
 class Updater {
 	
-	protected $remote_json 		= 'https://digitalis.ca/plugins/update/sassy/info';
+	// One route per major. The feed treats ?version= as an assertion and answers 404 to a caller
+	// reporting another major, so a 1.x install is never offered 3.0 and this one is never offered 1.x.
+	protected $remote_json 		= 'https://digitalis.ca/plugins/update/sassy-v3/info';
 	protected $plugin_slug 		= SASSY_PLUGIN_SLUG;
 	protected $plugin_base 		= SASSY_PLUGIN_BASE;
 	protected $version 			= SASSY_VERSION;
@@ -31,7 +33,7 @@ class Updater {
 		if ($remote === false || !$this->cache_allowed) {
 
 			$remote = wp_remote_get(
-				$this->remote_json,
+				add_query_arg('version', $this->version, $this->remote_json),
 				[
 					'timeout' => 10,
 					'headers' => array(
