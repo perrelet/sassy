@@ -1,13 +1,14 @@
 # AGENTS.md — Sassy WordPress Plugin
 
-> **On the `style-stack` branch, [docs/style-stack-plan.md](docs/style-stack-plan.md) is
-> authoritative for all new work**, including its §8 execution protocol. This file describes the
+> **[docs/style-stack-plan.md](docs/style-stack-plan.md) is authoritative for all new work**,
+> including its §8 execution protocol. It was written for the `style-stack` branch, which became
+> `main` at the 3.0.0 release; where it says the branch name, read `main`. This file describes the
 > codebase as it currently stands. Read this to understand what exists; read the plan to know
 > what to build. Where they disagree about the future, the plan wins; where they disagree about
 > the present, this file wins — so **each phase updates this file as part of landing**, or the
 > sentence you are reading becomes a trap.
 >
-> **Phases 1 to 8 have landed, and all of it is 3.0.0, released 2026-09-16** as tag `v3.0.0` on `main`. The minors 3.1 to 3.7 they carried as they landed were collapsed into the one number on 2026-09-14, nothing having been released between. Phase 9 is still as the plan describes it. 3.0.1 followed the same day, a metadata release: the repository moved to `github.com/digitalisweb/sassy` and the Composer package is `digitalisweb/sassy`, so Packagist has a tag whose name matches. Work continues on `style-stack`; `main` fast-forwards to it at each release, and **this directory never changes branch** (plan §8).
+> **Phases 1 to 8 have landed, and all of it is 3.0.0, released 2026-09-16** as tag `v3.0.0` on `main`. The minors 3.1 to 3.7 they carried as they landed were collapsed into the one number on 2026-09-14, nothing having been released between. Phase 9 is still as the plan describes it. 3.0.1 followed the same day, a metadata release: the repository moved to `github.com/digitalisweb/sassy` and the Composer package is `digitalisweb/sassy`, so Packagist has a tag whose name matches. Work continues on `main` in this directory, which **never changes branch** (plan §8); a release is a `vX.Y.Z` tag on `main` whose number matches the header. `v1` is the 1.x maintenance line and the only other branch.
 >
 > **Starting fresh?** Plan §8 opens with what to read and the four commands to run before touching anything. Run them: this file has been wrong about the present three times, and each time the code was right.
 
@@ -74,7 +75,7 @@ sassy/
 │   ├── js/sassy.js                   # Dev surface: Live Compile, logging toggles, keybinding, the page, window.sassy
 │   └── img/                          # Cascade (portrait, full figure); the readme banners, the plugin banner and icons, all built from her by docs/hero.py; the Digitalis logo in light and dark
 ├── docs/
-│   ├── style-stack-plan.md           # The 3.0 spec of record on this branch
+│   ├── style-stack-plan.md           # The 3.0 spec of record
 │   ├── upgrading-to-3.0.md           # What breaks for third parties, appended per phase
 │   └── briefs/                       # Builder briefs, one per landed phase
 ├── tests/                            # `php tests/run.php` — no PHPUnit, no WordPress

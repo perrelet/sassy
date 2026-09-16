@@ -939,7 +939,7 @@ change to what hot-wiring feels like, so it is named rather than implied.
 | `wp sassy check` hook set | **`--hooks=all` by default**, alone among the commands — a narrower set makes every admin/editor output look orphaned |
 | Orphaned outputs | Reported as a `warning`, never auto-removed, failing `check` only under `--strict`. It is the one thing `check` cannot be certain about: a conditionally enqueued handle's output is indistinguishable from an abandoned one. `wp sassy clear` is the eraser |
 | `--strict=all` differs per engine? | **Accepted.** scssphp implements a fraction of Dart's deprecations (of four probed, only `elseif` fired), so the same source yields different sets. That is `capabilities()` working, not a defect to reconcile. Document it; do not try to normalise one engine to the other |
-| Execution | One builder at a time, in place on `style-stack` — no worktrees. The plugin works at every commit (strangler-style refactors) |
+| Execution | One builder at a time, in place on `main` (was `style-stack` until 3.0.0 shipped) — no worktrees. The plugin works at every commit (strangler-style refactors) |
 | d-pace access | Builders may edit d-pace/lattice **under `/staging/` only**, limited to the §4 breaks table |
 | Version / branch | 3.0.0 / `style-stack` |
 
@@ -982,13 +982,13 @@ Two things about this machine that no document upstream of you will mention:
   commit there.
 - 3.0.0 **is released**, tag `v3.0.0` on `main`, 2026-09-16. The feed is fenced per major (§1).
 - **This directory is a running plugin, so it never changes branch.** It moves forward on
-  `style-stack` and nothing else: no `checkout`, no `merge` into it, no `stash`. The one time a
-  merge was run here it conflicted, left conflict markers in `sassy.php`, and staging served a
-  parse error until the merge was aborted. Merges into `main` happen in a second clone, or as a
-  fast-forward of `main` to a commit this branch already has, with `git branch -f main
-  style-stack`, which touches no working tree.
+  `main` and nothing else: no `checkout`, no `merge` into it, no `stash`. The one time a merge
+  was run here it conflicted, left conflict markers in `sassy.php`, and staging served a parse
+  error until the merge was aborted. `style-stack`, the branch this plan was built on, became
+  `main` at 3.0.0 and was deleted; `v1` is the 1.x line and is touched only for a 1.x fix, from
+  another clone. A release is a tag on `main`.
 
-**One builder at a time, on `style-stack`, in place.** No worktrees, no parallel phases. The
+**One builder at a time, on `main`, in place.** No worktrees, no parallel phases. The
 phases are *mostly* serial by dependency; by §3's graph the genuinely parallelizable pairs are
 4∥5, 4∥6, 5∥6 and 8∥anything-after-1, and none are worth the coordination cost. Note one
 ordering consequence that is not a dependency: 6b's "profiler reports only intended
@@ -1050,7 +1050,7 @@ the file while the document is still parsing.
 
 **Scope fences.**
 
-- Never touch `scssphp-v2.x` or `main`.
+- Never touch `v1` from this directory, and never change branch here.
 - No composer or npm installs; no new runtime dependencies; `vendor/` is committed and stays as
   is.
 - `docs/style-stack-plan.md` is the spec of record. If building reveals it is wrong, change it —
