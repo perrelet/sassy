@@ -392,7 +392,7 @@ Two surfaces: the admin bar, pruned to actions, and the page under Tools that ca
 
 `Admin_Page` (`include/view/admin-page.class.php`) registers Tools → Sassy with capability `read` when `Policy::active()`, and the callback checks the gate again: the filter is the gate, not the capability string. It reads the model once per request through `Admin_Page::data()` and renders through `Admin_Page::html()`, a function from that array to markup, which is how the suite reads it.
 
-Cascade, `assets/img/cascade.portrait.800.webp`, sits top right of the page as a decorative `img` outside the flow, `pointer-events: none`, hidden under 1400px where she would cover the file column. The suite asserts she is there and marked decorative; that is all it can say about her.
+The page is headed by the dark readme banner, `assets/img/hero.dark.webp`, as a decorative `img` after a screen-reader-only `h1`, followed by `<hr class="wp-header-end">` so core's notices JS has somewhere to insert. The suite asserts that sequence.
 
 - **Check** — `Style_Stack::audit()`, rendered rather than exited on.
 - **Status** — `Status::rows()`, the same rows `wp sassy status` prints.

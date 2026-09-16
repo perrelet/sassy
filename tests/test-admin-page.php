@@ -124,7 +124,7 @@ check('with its surface',                        ($surfaces['script:app'] ?? nul
 check('a style has none',                        ($surfaces['style:warned'] ?? '-') === '');
 check('a shared handle is two rows',             isset($kinds['style:base']) && isset($kinds['script:base']));
 check('with a filter button and the column',    str_contains($html, 'data-sassy-filter="script"') && str_contains($html, '<tr data-kind="script">'));
-check('Cascade is on the page, decorative',    str_contains($html, 'class="sassy-cascade" src="https://example.test/wp-content/plugins/sassy/assets/img/cascade.portrait.800.webp" alt="" aria-hidden="true"'));
+check('the banner heads the page, decorative',  str_contains($html, '<h1 class="screen-reader-text">Sassy</h1><img class="sassy-hero" src="https://example.test/wp-content/plugins/sassy/assets/img/hero.dark.webp" alt="" aria-hidden="true"><hr class="wp-header-end">'));
 check('a built handle is managed',      ($kinds['warned'] ?? null) === 'managed');
 check('an unbuilt one is compilable',   ($kinds['never'] ?? null) === 'compilable');
 check('a failed one is compilable',     ($kinds['broken'] ?? null) === 'compilable', $kinds['broken'] ?? 'none');

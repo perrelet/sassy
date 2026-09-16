@@ -150,8 +150,10 @@ class Admin_Page {
     public static function html (array $data, $cleared = false) {
 
         $out  = '<div class="wrap sassy-page">';
-        $out .= '<h1>Sassy</h1>';
-        $out .= '<img class="sassy-cascade" src="' . esc_url(SASSY_URI . 'assets/img/cascade.portrait.800.webp') . '" alt="" aria-hidden="true">';
+        $out .= '<h1 class="screen-reader-text">Sassy</h1>';
+        $out .= '<img class="sassy-hero" src="' . esc_url(SASSY_URI . 'assets/img/hero.dark.webp') . '" alt="" aria-hidden="true">';
+        // Core's notices JS inserts after the first heading, or after this when the heading is hidden.
+        $out .= '<hr class="wp-header-end">';
 
         if ($cleared) $out .= '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Caches cleared. The next request rebuilds.', 'sassy') . '</p></div>';
 
