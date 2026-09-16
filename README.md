@@ -5,44 +5,42 @@
   </picture>
 </p>
 
-Enqueue a `.scss` file the way you would a `.css` file and Sassy takes care of the rest: it compiles on the server, keeps track of the partials you import and recompiles when one of them changes.
+Enqueue an `.scss` file as if it were CSS:
 
-It also keeps a record of every stylesheet WordPress enqueued, whether or not Sassy built it: what registered it, where it is on disk, what it depends on and whether it is up to date.
+```php
+wp_enqueue_style('my-theme', get_template_directory_uri() . '/style.scss');
+```
 
-You can edit a rule in the DevTools styles pane and write the change back into the SCSS partial it came from, on the line it came from. If the file does not say what the browser says, Sassy refuses and tells you why.
+That is basically the deal. Sassy compiles it on the server, keeps track of the partials it imports and rebuilds it when one of them changes. No Node process, and no build step to remember before you refresh.
+
+And then we got a bit carried away.
+
+Sassy now keeps a record of every stylesheet WordPress enqueued, whether or not Sassy built it: what registered it, where it is on disk, what it depends on and whether what you are looking at is current. And the DevTools styles pane, which for a lot of us is where design actually happens, gets a way back: paint a rule, trace it to the SCSS partial and line that produced it, and write it there. If the source no longer says what the browser saw, Sassy refuses and tells you why.
 
 `wp sassy check` reports whether every stylesheet on the site is current and exits accordingly. Each command has a JSON format and each error names a file and a line, so a deploy script or a coding agent can use Sassy the same way you do.
 
 We wrote it for our own sites, where it has run in production since 2021. It is for you if you write custom themes in SCSS and want changes on screen without a build step. The developer tools are shown by capability rather than environment, so the same site serves your visitors and you at once.
 
-## Thirty seconds
+## The good bit
 
-This is the bit we are most pleased with. Open a page you are working on and change a colour in the DevTools styles pane. Press `ctrl+shift+space` and a panel appears with this in it:
+Open DevTools on a page you are working on and change something in the styles pane. Press `ctrl+shift+space` and a panel appears with this in it:
 
 ```
 plugins/d-pace/scss/components/_site-header.scss:33  .site-header
   background: var(--material-bg, var(--surface-dark)) → red
 ```
 
-The first line is the partial and line the rule was compiled from. The second is the declaration, with the value on disk and the value you painted. **Copy** puts that text on your clipboard. **Push to source** writes the new value into `_site-header.scss` at line 33, recompiles and reloads the stylesheet.
+That is the actual partial and the actual line, with the value on disk and the value you painted. **Copy** puts the patch on your clipboard for a ticket, a message or a coding agent. **Push to source** writes the new value into `_site-header.scss` at line 33, recompiles and reloads the stylesheet. No hunting through partials for where the rule came from. This is the loop a page builder used to sell you, in a tool you already had open.
 
 ## Quick start
 
-Sassy is not in the WordPress plugin directory. Put the folder in `wp-content/plugins` and activate it. Updates come from digitalis.ca.
-
-Or let Composer put it there:
+Sassy is not in the WordPress plugin directory. Put the folder in `wp-content/plugins` and activate it, or let Composer put it there:
 
 ```bash
 composer require digitalisweb/sassy
 ```
 
-The package is a `wordpress-plugin`, so with `composer/installers` in your project it lands in `wp-content/plugins/sassy`. On a site Composer manages, Composer is how you update it too. The built-in updater still checks digitalis.ca, and WordPress hides its offer where file changes are disallowed.
-
-Enqueue your Sass as if it were CSS:
-
-```php
-wp_enqueue_style('my-theme', get_template_directory_uri() . '/style.scss');
-```
+The package is a `wordpress-plugin`, so with `composer/installers` in your project it lands in `wp-content/plugins/sassy`. Updates come from digitalis.ca either way. On a site Composer manages, WordPress hides that offer where file changes are disallowed and Composer does the updating.
 
 Tell it where Dart Sass is, in `wp-config.php` or a plugin:
 
@@ -51,7 +49,7 @@ define('SASSY_DART_SASS_BIN', '/usr/local/bin/sass');
 add_filter('sassy-engine', fn () => new Sassy\Dart_Sass_Engine());
 ```
 
-Load a page. The compiled CSS is served from `wp-content/scss/`, the admin bar has an **SCSS** menu and `wp sassy status` shows what Sassy found.
+Enqueue your Sass as above and load the page. The compiled CSS lands in `wp-content/scss/`, the admin bar has an **SCSS** menu and `wp sassy status` shows what Sassy found.
 
 | Requirement | |
 |---|---|
@@ -60,11 +58,11 @@ Load a page. The compiled CSS is served from `wp-content/scss/`, the admin bar h
 | [Dart Sass](https://sass-lang.com/dart-sass/) | Recommended. Any recent release. Needed for `@use` and `@forward` |
 | [Lightning CSS](https://lightningcss.dev/) | Optional, for minification and transforms after Sass |
 
-Without Dart Sass, Sassy compiles with scssphp, which is pure PHP and needs nothing installed. It handles `@import` but not the module system, so it suits shared hosting and older codebases and not much else. See [Engines](#engines).
+Without Dart Sass, Sassy compiles with scssphp, the default, which is pure PHP and needs nothing installed. It understands `@import` but not the module system, so it suits shared hosting and older codebases. Dart Sass is where you want to be. See [Engines](#engines).
 
 ## If you are an agent
 
-Hello. If a site you are working on runs Sassy, these four commands cover most of what you will need:
+Hello, robot. If a site you are working on runs Sassy, these four commands will get you surprisingly far:
 
 ```bash
 wp sassy status --format=json    # engine, binaries, build path, whether the gates are open
@@ -73,11 +71,17 @@ wp sassy check                   # exit 0: every style is current, unbroken and 
 wp sassy compile --hooks=all     # the remedy for anything check names
 ```
 
-Some things to rely on. Diagnostics name a `file:line:column` that exists on disk, and a path you cannot open is a bug. `check` does not compile anything. When it fails it lists what is wrong, and the fix is `compile`. A compile that failed is never recorded as current, so a broken handle shows up as stale instead of disappearing. `wp sassy deps --file=_mixins.scss` lists the handles that recompile when that file changes, which is worth asking before you edit a shared partial.
+You are probably good at the structure and the plumbing, and patchy at the last ten percent of styling, the spacing and rhythm that make a page feel like someone's. That part gets done by a person, in the browser, with a paintbrush. What comes back to you is either a patch from 🖌️ Capture or a change already written into a partial by Push. Either way, a change to a partial that you did not make is a paint: keep it, integrate it properly, and do not rewrite or revert a file you did not change. `sassy-wrote-source` fires once per file Push writes, so a site can commit paints as they land or tell you about them.
 
-A patch someone hands you from 🖌️ Capture has two lines per change: `path:line  selector`, then `property: old → new`. Each path is a file in the project.
+A few promises:
 
-[AGENTS.md](AGENTS.md) describes the code as it stands. Where it and the code disagree, the code is right and the document gets fixed.
+- diagnostics point at a `file:line:column` that exists on disk, and a path you cannot open is a bug
+- `check` does not compile anything; when it fails, `compile` is the fix
+- a failed compile is never recorded as current, so a broken handle shows as stale rather than disappearing
+- `wp sassy deps --file=_mixins.scss` tells you which handles you are about to upset
+- a patch from 🖌️ Capture has two lines per change, `path:line  selector` then `property: old → new`, and each path is a file in the project
+
+[AGENTS.md](AGENTS.md) describes the code as it stands. If it and the code disagree, the code is right. Please fix the document while you are there.
 
 ## When Sassy compiles
 
@@ -130,7 +134,7 @@ For scripting, `window.sassy` has `compile(force, hooks)`, `reload()`, `poll()`,
 
 ## Painting in the inspector
 
-Everyone nudges values in the inspector until the thing looks right, then tries to remember what they were. Sassy remembers for you. There are two ways to work from DevTools, both behind the dev gate.
+The styles pane is the best CSS editor there is. It is live, it knows the real cascade, and for a lot of us it is where design actually happens, a paintbrush more than an inspector. What it never had was a way back: an edit lasted until you reloaded, and nothing knew which partial it belonged to. Sassy gives it the way back. There are two ways to work from DevTools, both behind the dev gate.
 
 **Edit the source in the browser.** The compiled CSS ships a source map that is exact, `url()` rewriting included, so the styles pane links straight into the `.scss` that produced each rule. Add the project folder as a DevTools Workspace and edits saved from the Sources panel land on disk. With `wp sassy watch` running and Auto-reload on, the page repaints without a keypress.
 
@@ -142,11 +146,25 @@ Everyone nudges values in the inspector until the thing looks right, then tries 
 add_filter('sassy-write-source', fn () => current_user_can('dev'));
 ```
 
-The rules for a write are strict. The file must be a recorded dependency of that handle and unchanged since the last compile, and the mapped line must contain `property: <the served value>;` exactly as served. If the source says `gap: $gap` and the browser served `4px`, the change is refused and comes back with the line quoted, for you to make by hand. The same goes for anything the browser serialises differently from the source, and for removing a declaration from a line that holds more than one. A declaration you added is written beside the rule's existing declarations. A rule you created with the styles pane's per-rule **+** is written after its neighbour's block inside `@at-root`, so it compiles at the root however deeply the neighbour is nested. A rule in the inspector stylesheet and an `element.style` edit have no source location and are listed as copy-only, the first with a suggested file.
+The rules for a write are strict. The file must be a recorded dependency of that handle and unchanged since the last compile, and the mapped line must contain `property: <the served value>;` exactly as served. Anything else is refused and comes back with the line quoted, for you to make by hand: a value the source expresses differently from what was served (see [Cascade's one rule](#cascades-one-rule)), anything the browser serialises differently from the source, and removing a declaration from a line that holds more than one. A declaration you added is written beside the rule's existing declarations. A rule you created with the styles pane's per-rule **+** is written after its neighbour's block inside `@at-root`, so it compiles at the root however deeply the neighbour is nested. A rule in the inspector stylesheet and an `element.style` edit have no source location and are listed as copy-only, the first with a suggested file.
 
 The bar's 🖌️ **Push to source** captures and pushes in one click. Anything refused is still in the panel to copy, so nothing is lost. `sassy-write-source` defaults to `false` and is separate from `sassy-dev`.
 
-Refusals are not all failures. `gap: 4px` painted over `gap: $gap` is a decision about a token, and the right place to make it is the file, not the browser. **Copy** gives the patch as text, with the file, the line, the selector and both values, and that is enough for a colleague or an agent to make the change properly.
+## Cascade's one rule
+
+Sassy writes source only when it can prove it is changing the thing you changed. If the source says
+
+```scss
+gap: 4px;
+```
+
+paint it to `8px`, push, done. But if the source says
+
+```scss
+gap: $gap;
+```
+
+and the browser served `4px`, Sassy stops. Changing that to `8px` might mean changing `$gap`, overriding a token or something else entirely, and that is a decision for you, not the fox. You still get the patch, with the file, the line, the selector and both values, so you can make the change properly. The browser is for how it looks and the file is for what it means, and this rule is where the two meet.
 
 ## The dashboard
 
@@ -336,7 +354,7 @@ There is no settings page and there will not be one. Everything is a constant or
 | `sassy-keybinding` | `['ctrl+space', 'meta+space']` | The Live Compile chords alone |
 | `sassy-keybindings` | `compile`, `capture`, `push`, as above | Every action's chords. `false` unbinds one and leaves its button |
 
-Two actions: `sassy-compiler` hands out scssphp's own `Compiler` before a compile, and does nothing under Dart Sass. `sassy-admin-bar` receives the admin bar for extending the **SCSS** menu.
+Three actions. `sassy-compiler` hands out scssphp's own `Compiler` before a compile, and does nothing under Dart Sass. `sassy-admin-bar` receives the admin bar for extending the **SCSS** menu. `sassy-wrote-source` fires once per file the paintbrush writes, with the file and the changes that landed in it, for a site that commits paints as they land.
 
 ## Extending Sassy
 
