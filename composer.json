@@ -1,12 +1,12 @@
 {
-    "name": "perrelet/sassy",
+    "name": "digitalisweb/sassy",
     "description": "Compiles SCSS on the server, keeps a model of every stylesheet WordPress enqueued and writes DevTools edits back into the partial they came from.",
     "type": "wordpress-plugin",
     "license": "GPL-2.0-or-later",
-    "homepage": "https://github.com/perrelet/sassy",
+    "homepage": "https://github.com/digitalisweb/sassy",
     "authors": [
         {
-            "name": "Jamie Perrelet",
+            "name": "Digitalis Web Corp",
             "homepage": "https://digitalis.ca/"
         }
     ],

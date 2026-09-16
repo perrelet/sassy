@@ -1,15 +1,24 @@
 <?php return array(
     'root' => array(
-        'name' => 'perrelet/sassy',
+        'name' => 'digitalisweb/sassy',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => '0855fbd055d0f65ef3ba68f951a20f33edf7c8cb',
+        'reference' => '29914e6fd98dd6dd5d21bf6b92051e014f275b47',
         'type' => 'wordpress-plugin',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
         'dev' => true,
     ),
     'versions' => array(
+        'digitalisweb/sassy' => array(
+            'pretty_version' => 'dev-main',
+            'version' => 'dev-main',
+            'reference' => '29914e6fd98dd6dd5d21bf6b92051e014f275b47',
+            'type' => 'wordpress-plugin',
+            'install_path' => __DIR__ . '/../../',
+            'aliases' => array(),
+            'dev_requirement' => false,
+        ),
         'league/uri' => array(
             'pretty_version' => '7.8.0',
             'version' => '7.8.0.0',
@@ -25,15 +34,6 @@
             'reference' => 'c5c5cd056110fc8afaba29fa6b72a43ced42acd4',
             'type' => 'library',
             'install_path' => __DIR__ . '/../league/uri-interfaces',
-            'aliases' => array(),
-            'dev_requirement' => false,
-        ),
-        'perrelet/sassy' => array(
-            'pretty_version' => 'dev-main',
-            'version' => 'dev-main',
-            'reference' => '0855fbd055d0f65ef3ba68f951a20f33edf7c8cb',
-            'type' => 'wordpress-plugin',
-            'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
             'dev_requirement' => false,
         ),
