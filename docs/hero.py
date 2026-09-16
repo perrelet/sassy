@@ -1,13 +1,17 @@
 """Builds the readme banners, assets/img/hero.{light,dark}.webp, from Cascade's portrait.
 
-Run from the plugin root: python3 docs/hero.py. Needs Pillow. Fetches Manrope once into /tmp.
+Run from the plugin root: python3 docs/hero.py. Needs Pillow. Fetches the two faces once into /tmp:
+Sansita Swashed for the title, Manrope, the Digitalis brand face, for the tagline.
 """
 from PIL import Image, ImageDraw, ImageFont
 import os, urllib.request
 
-FONT = '/tmp/Manrope.ttf'
-if not os.path.exists(FONT):
-    urllib.request.urlretrieve('https://github.com/google/fonts/raw/main/ofl/manrope/Manrope%5Bwght%5D.ttf', FONT)
+FONTS = {
+    'title':   ('/tmp/SansitaSwashed.ttf', 'https://github.com/google/fonts/raw/main/ofl/sansitaswashed/SansitaSwashed%5Bwght%5D.ttf'),
+    'tagline': ('/tmp/Manrope.ttf',        'https://github.com/google/fonts/raw/main/ofl/manrope/Manrope%5Bwght%5D.ttf'),
+}
+for path, url in FONTS.values():
+    if not os.path.exists(path): urllib.request.urlretrieve(url, path)
 
 W, H = 1600, 600
 CARD_TOP = 60           # the hat pokes above the card
@@ -15,8 +19,8 @@ RADIUS = 56
 X = 96                  # left margin for the text
 GAP = 36                # between the y's descender and the tagline
 
-def font(size, weight):
-    f = ImageFont.truetype(FONT, size)
+def font(size, weight, face='tagline'):
+    f = ImageFont.truetype(FONTS[face][0], size)
     f.set_variation_by_name(weight)
     return f
 
@@ -33,10 +37,10 @@ def hero(out, card, title_col, tag_col):
     # her leftmost opaque column, so the tagline is fitted to her rather than to the box
     fox_left = fox_x + min(x for x in range(fh) if any(fox.getpixel((x, y))[3] > 40 for y in range(H - fh, fh, 8)))
 
-    title = font(200, 'ExtraBold')
+    title = font(230, 'Bold', 'title')
     tag = 'A rather saucy way of doing SCSS on WordPress.'
-    d.text((X, CARD_TOP + 96), 'Sassy', font=title, fill=title_col)
-    bottom = d.textbbox((X, CARD_TOP + 96), 'Sassy', font=title)[3]
+    d.text((X, CARD_TOP + 80), 'Sassy', font=title, fill=title_col)
+    bottom = d.textbbox((X, CARD_TOP + 80), 'Sassy', font=title)[3]
 
     size = 46
     while d.textlength(tag, font=font(size, 'SemiBold')) > fox_left - X - 48: size -= 1
