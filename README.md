@@ -382,6 +382,10 @@ Sassy was written in 2021 by Digitalis for its own sites, after the SCSS plugins
 
 Cascade, the fox in the hat, is one of the three designers of Digit++ at Foxglove Farm, Dartmoor. Her portrait was drafted years ago and finished for this release.
 
+## Licence
+
+GPL-2.0-or-later, like WordPress. See [LICENSE](LICENSE). The images of Cascade in `assets/img/` belong to Digitalis and are not covered by it.
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/img/digitalis.dark.svg">

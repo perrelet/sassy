@@ -9,6 +9,8 @@
  * Requires PHP:      8.1
  * Author:            Digitalis Web Build Co.
  * Author URI:        https://digitalis.ca/
+ * License:           GPL-2.0-or-later
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       sassy
  */
 

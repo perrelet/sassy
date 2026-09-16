@@ -3,7 +3,7 @@
         'name' => 'perrelet/sassy',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => '624ca38ac34963e6a70632d4e34c503e662b0ade',
+        'reference' => '0855fbd055d0f65ef3ba68f951a20f33edf7c8cb',
         'type' => 'wordpress-plugin',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -31,7 +31,7 @@
         'perrelet/sassy' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => '624ca38ac34963e6a70632d4e34c503e662b0ade',
+            'reference' => '0855fbd055d0f65ef3ba68f951a20f33edf7c8cb',
             'type' => 'wordpress-plugin',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
