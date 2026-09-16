@@ -1,0 +1,4 @@
+{
+    "banners": { "high": "assets/img/banner.webp" },
+    "icons":   { "1x": "assets/img/icon.128.webp", "2x": "assets/img/icon.256.webp" }
+}

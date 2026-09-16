@@ -13,14 +13,14 @@
 
 ## Overview
 
-**Sassy** is a WordPress plugin (v3.0.1, by Digitalis Web Corp) that compiles SCSS files on-demand. The core premise: enqueue `.scss` files exactly as you would `.css` files via `wp_enqueue_style`, and Sassy intercepts the URL, compiles the SCSS to CSS, writes the result to disk, and returns the compiled CSS URL to WordPress instead.
+**Sassy** is a WordPress plugin (v3.0.2, by Digitalis Web Corp) that compiles SCSS files on-demand. The core premise: enqueue `.scss` files exactly as you would `.css` files via `wp_enqueue_style`, and Sassy intercepts the URL, compiles the SCSS to CSS, writes the result to disk, and returns the compiled CSS URL to WordPress instead.
 
 ```php
 wp_enqueue_style('my-theme', get_template_directory_uri() . '/style.scss');
 // Sassy transparently serves wp-content/scss/style.css
 ```
 
-The plugin is **not** in the WordPress repository — it updates itself by polling `https://digitalis.ca/plugins/update/sassy-v3/info?version=<installed>`. One route per major: the feed resolves the newest `v3.*` tag on GitHub, and answers 404 to a caller reporting another major. The 1.x line polls `/plugins/update/sassy/` and stays there forever, since the 1.x client sends no version. Release = merge to `main`, then a `vX.Y.Z` tag whose number matches the header exactly; the feed builds from the tag and refuses a mismatch.
+The plugin is **not** in the WordPress repository — it updates itself by polling `https://digitalis.ca/plugins/update/sassy-v3/info?version=<installed>`. One route per major: the feed resolves the newest `v3.*` tag on GitHub, and answers 404 to a caller reporting another major. The feed reads `Requires at least` and `Requires PHP` from the header and banner and icon paths from `.digitalis-update.json`, all at the tagged commit; `Updater` passes `icons`, `banners`, `requires` and `requires_php` through to core's update row. The 1.x line polls `/plugins/update/sassy/` and stays there forever, since the 1.x client sends no version. Release = merge to `main`, then a `vX.Y.Z` tag whose number matches the header exactly; the feed builds from the tag and refuses a mismatch.
 
 ---
 
@@ -30,6 +30,7 @@ The plugin is **not** in the WordPress repository — it updates itself by polli
 sassy/
 ├── sassy.php                          # Plugin entry point — constants, global SASSY() helper, WP-CLI registration
 ├── uninstall.php                      # Drops every Sassy transient on every site; leaves the build directory
+├── .digitalis-update.json             # Banner and icons the update feed serves, as paths at the tagged commit
 ├── include/
 │   ├── sassy.class.php                # Main plugin class (Sassy\Sassy)
 │   ├── model/
@@ -71,7 +72,7 @@ sassy/
 ├── assets/
 │   ├── scss/sassy.scss               # Sassy's own stylesheet, compiled by Sassy; authored for scssphp
 │   ├── js/sassy.js                   # Dev surface: Live Compile, logging toggles, keybinding, the page, window.sassy
-│   └── img/                          # Cascade (portrait, full figure), the readme banners built from her by docs/hero.py, the Digitalis logo in light and dark
+│   └── img/                          # Cascade (portrait, full figure); the readme banners, the plugin banner and icons, all built from her by docs/hero.py; the Digitalis logo in light and dark
 ├── docs/
 │   ├── style-stack-plan.md           # The 3.0 spec of record on this branch
 │   ├── upgrading-to-3.0.md           # What breaks for third parties, appended per phase
@@ -588,7 +589,7 @@ Per-compile filters receive `($value, $src, $handle, $asset)`, except `sassy-com
 
 | Constant | Set in | Value |
 |---|---|---|
-| `SASSY_VERSION` | `sassy.php` | `'3.0.1'` — kept identical to the plugin header |
+| `SASSY_VERSION` | `sassy.php` | `'3.0.2'` — kept identical to the plugin header |
 | `SASSY_PATH` | `sassy.php` | Absolute path to plugin directory (trailing slash) |
 | `SASSY_URI` | `sassy.php` | URL to plugin directory (trailing slash) |
 | `SASSY_ROOT_FILE` | `sassy.php` | `__FILE__` of sassy.php |

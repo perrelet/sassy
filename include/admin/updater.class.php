@@ -66,8 +66,8 @@ class Updater {
 
 		if (!$remote = $this->request()) return $res;
 
-		if (property_exists($remote, 'sections')) $remote->sections = json_decode(json_encode($remote->sections), true); 	// obj -> array
-		if (property_exists($remote, 'banners')) $remote->banners = json_decode(json_encode($remote->banners), true);		// obj -> array
+		// Core wants these as arrays
+		foreach (['sections', 'banners', 'icons'] as $key) if (property_exists($remote, $key)) $remote->$key = json_decode(json_encode($remote->$key), true);
 
 		return $remote;
 
@@ -92,7 +92,8 @@ class Updater {
 			$res->new_version 	= $remote->version;
 			$res->package 		= $remote->download_link;
 
-			if (property_exists($remote, 'tested')) $res->tested = $remote->tested;
+			foreach (['tested', 'requires', 'requires_php'] as $key) if (property_exists($remote, $key)) $res->$key = $remote->$key;
+			foreach (['icons', 'banners'] as $key)                if (property_exists($remote, $key)) $res->$key = json_decode(json_encode($remote->$key), true);
 
 			$transient->response[$res->plugin] = $res;
 

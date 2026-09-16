@@ -1,4 +1,5 @@
-"""Builds the readme banners, assets/img/hero.{light,dark}.webp, from Cascade's portrait.
+"""Builds the readme banners, assets/img/hero.{light,dark}.webp, the WordPress plugin banner,
+assets/img/banner.webp, and the plugin icons, assets/img/icon.{128,256}.webp, from Cascade's portrait.
 
 Run from the plugin root: python3 docs/hero.py. Needs Pillow. Fetches the two faces once into /tmp:
 Sansita Swashed for the title, Manrope, the Digitalis brand face, for the tagline.
@@ -56,3 +57,36 @@ def hero(out, card, title_col, tag_col):
 
 hero('assets/img/hero.light.webp', (246, 239, 230, 255), (50, 55, 60, 255), (127, 0, 177, 255))
 hero('assets/img/hero.dark.webp',  (36, 26, 43, 255),    (246, 239, 230, 255), (199, 125, 255, 255))
+
+
+def banner(out):
+    """1544x500, what core shows at 2x in the plugin details modal. Core lays the title across the
+    bottom band from 174/250 down, so the text stays in the top two thirds and the ground is solid."""
+    W, H = 1544, 500
+    im = Image.new('RGBA', (W, H), (36, 26, 43, 255))
+    d = ImageDraw.Draw(im)
+    fox = Image.open('assets/img/cascade.portrait.800.webp').convert('RGBA').resize((H, H), Image.LANCZOS)
+    im.alpha_composite(fox, (W - H - 24, 0))
+    fox_left = W - H - 24 + min(x for x in range(H) if any(fox.getpixel((x, y))[3] > 40 for y in range(0, H, 8)))
+    title = font(190, 'Bold', 'title')
+    tag = 'A rather saucy way of doing SCSS on WordPress.'
+    size = 44
+    while d.textlength(tag, font=font(size, 'SemiBold')) > fox_left - X - 48: size -= 1
+    tagf = font(size, 'SemiBold')
+    tb = d.textbbox((0, 0), 'Sassy', font=title)
+    gb = d.textbbox((0, 0), tag, font=tagf)
+    top = 60
+    d.text((X, top - tb[1]), 'Sassy', font=title, fill=(246, 239, 230, 255))
+    d.text((X + 4, top + (tb[3] - tb[1]) + GAP - gb[1]), tag, font=tagf, fill=(199, 125, 255, 255))
+    im.convert('RGB').save(out, 'WEBP', quality=88, method=6)
+    print(out, im.size, 'text ends at', top + (tb[3] - tb[1]) + GAP + (gb[3] - gb[1]), 'of', H)
+
+def icons():
+    fox = Image.open('assets/img/cascade.portrait.800.webp').convert('RGBA')
+    for px in (128, 256):
+        out = f'assets/img/icon.{px}.webp'
+        fox.resize((px, px), Image.LANCZOS).save(out, 'WEBP', quality=90, method=6)
+        print(out)
+
+banner('assets/img/banner.webp')
+icons()
