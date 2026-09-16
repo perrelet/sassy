@@ -126,6 +126,10 @@ class Source_Writer {
             // the directory mtime the import graph watches.
             if ($dirty && file_put_contents($file, implode('', $lines), LOCK_EX) === false) {
                 foreach ($list as $i => $_) { $results[$i]['written'] = false; $results[$i]['reason'] = 'the write failed'; }
+            } elseif ($dirty) {
+                // Once per file, with what landed in it: the hook for committing paints as they land,
+                // or telling an agent working in the same tree that a line moved under it.
+                do_action('sassy-wrote-source', $file, array_values(array_intersect_key($list, array_filter($results, function ($r) { return $r['written']; }))));
             }
 
         }

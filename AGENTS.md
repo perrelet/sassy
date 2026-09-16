@@ -569,6 +569,7 @@ Per-compile filters receive `($value, $src, $handle, $asset)`, except `sassy-com
 |---|---|
 | `sassy-compiler` | Inside `Scssphp_Engine::compile()` before compilation — receives `(Compiler $compiler, Compile_Request $request)`. An engine-specific escape hatch: it hands out scssphp's own compiler and does nothing under Dart Sass |
 | `sassy-admin-bar` | Inside admin bar build — receives `$admin_bar` for extending the SCSS menu |
+| `sassy-wrote-source` | After `Source_Writer` writes a file, once per file, with `($file, $changes)` where `$changes` are the ones that landed in it. Not fired on a refusal or a failed write. The hook for committing paints as they land, or for telling an agent working in the same tree |
 
 ### Actions registered by Sassy
 

@@ -188,6 +188,17 @@ check('a property that is not a name refuses',!$r[3]['written'] && str_contains(
 check('a selector with braces refuses',       !$r[4]['written'] && str_contains($r[4]['reason'], 'brace'), (string) $r[4]['reason']);
 check('a bad name in a rule refuses',         !$r[5]['written'] && str_contains($r[5]['reason'], 'not a property name'), (string) $r[5]['reason']);
 
+section('A write is announced');
+
+$fired = [];
+$GLOBALS['action_callbacks']['sassy-wrote-source'][] = function ($file, $changes) use (&$fired) { $fired[] = [$file, $changes]; };
+fixture($card, ".card {\n  display: grid;\n  gap: 4px;\n  color: red;\n}\n");
+(new Source_Writer(graph_for($card)))->apply([change('_card.scss', 3, 'gap', '4px', '12px'), change('_card.scss', 4, 'color', 'blue', 'green')]);
+check('once per file, with only what was written', count($fired) === 1 && $fired[0][0] === $card && count($fired[0][1]) === 1 && $fired[0][1][0]['prop'] === 'gap', var_export($fired, true));
+$fired = [];
+(new Source_Writer(graph_for($card)))->apply([change('_card.scss', 4, 'color', 'blue', 'green')]);
+check('not when nothing was written',            $fired === []);
+
 section('edit() alone');
 
 check('keeps the spacing around the value',   Source_Writer::edit("    gap:   4px ;  // note\n", 'gap', '4px', '12px') === ["    gap:   12px ;  // note\n", null]);
