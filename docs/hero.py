@@ -17,7 +17,7 @@ W, H = 1600, 600
 CARD_TOP = 60           # the hat pokes above the card
 RADIUS = 56
 X = 96                  # left margin for the text
-GAP = 36                # between the y's descender and the tagline
+GAP = 22                # between the y's descender and the tagline
 
 def font(size, weight, face='tagline'):
     f = ImageFont.truetype(FONTS[face][0], size)
@@ -39,12 +39,17 @@ def hero(out, card, title_col, tag_col):
 
     title = font(230, 'Bold', 'title')
     tag = 'A rather saucy way of doing SCSS on WordPress.'
-    d.text((X, CARD_TOP + 80), 'Sassy', font=title, fill=title_col)
-    bottom = d.textbbox((X, CARD_TOP + 80), 'Sassy', font=title)[3]
-
     size = 46
     while d.textlength(tag, font=font(size, 'SemiBold')) > fox_left - X - 48: size -= 1
-    d.text((X + 4, bottom + GAP), tag, font=font(size, 'SemiBold'), fill=tag_col)
+    tagf = font(size, 'SemiBold')
+
+    # centre the ink of both lines in the card, so the space above the S equals the space below the tagline
+    tb = d.textbbox((0, 0), 'Sassy', font=title)
+    gb = d.textbbox((0, 0), tag, font=tagf)
+    block = (tb[3] - tb[1]) + GAP + (gb[3] - gb[1])
+    top = CARD_TOP + (H - CARD_TOP - block) // 2
+    d.text((X, top - tb[1]), 'Sassy', font=title, fill=title_col)
+    d.text((X + 4, top + (tb[3] - tb[1]) + GAP - gb[1]), tag, font=tagf, fill=tag_col)
 
     im.save(out, 'WEBP', quality=88, method=6)
     print(out, im.size, 'tagline', size, 'px, fox from', fox_left)
