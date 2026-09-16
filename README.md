@@ -2,7 +2,9 @@
 
 # Sassy
 
-Sassy is a WordPress plugin that compiles SCSS on the server. Enqueue a `.scss` file the way you would a `.css` file. Sassy compiles it, keeps track of the partials it imports and recompiles when one of them changes.
+*A rather saucy way of doing SCSS on WordPress.*
+
+Enqueue a `.scss` file the way you would a `.css` file and Sassy takes care of the rest: it compiles on the server, keeps track of the partials you import and recompiles when one of them changes.
 
 It also keeps a record of every stylesheet WordPress enqueued, whether or not Sassy built it: what registered it, where it is on disk, what it depends on and whether it is up to date.
 
@@ -10,13 +12,13 @@ You can edit a rule in the DevTools styles pane and write the change back into t
 
 `wp sassy check` reports whether every stylesheet on the site is current and exits accordingly. Each command has a JSON format and each error names a file and a line, so a deploy script or a coding agent can use Sassy the same way you do.
 
-Sassy is for people who write custom WordPress themes in SCSS and want changes on screen without a build step. It runs in production. The developer tools are shown by capability, so the same site serves visitors and developers at once.
+We wrote it for our own sites, where it has run in production since 2021. It is for you if you write custom themes in SCSS and want changes on screen without a build step. The developer tools are shown by capability rather than environment, so the same site serves your visitors and you at once.
 
 <br clear="all">
 
 ## Thirty seconds
 
-Open a page you are working on and change a colour in the DevTools styles pane. Press `ctrl+shift+space` and a panel appears with this in it:
+This is the bit we are most pleased with. Open a page you are working on and change a colour in the DevTools styles pane. Press `ctrl+shift+space` and a panel appears with this in it:
 
 ```
 plugins/d-pace/scss/components/_site-header.scss:33  .site-header
@@ -29,7 +31,7 @@ The first line is the partial and line the rule was compiled from. The second is
 
 Sassy is not in the WordPress plugin directory. Put the folder in `wp-content/plugins` and activate it. Updates come from digitalis.ca.
 
-Enqueue Sass as if it were CSS:
+Enqueue your Sass as if it were CSS:
 
 ```php
 wp_enqueue_style('my-theme', get_template_directory_uri() . '/style.scss');
@@ -55,7 +57,7 @@ Without Dart Sass, Sassy compiles with scssphp, which is pure PHP and needs noth
 
 ## If you are an agent
 
-If a site you are working on runs Sassy, these four commands cover most of what you need:
+Hello. If a site you are working on runs Sassy, these four commands cover most of what you will need:
 
 ```bash
 wp sassy status --format=json    # engine, binaries, build path, whether the gates are open
@@ -72,7 +74,7 @@ A patch someone hands you from 🖌️ Capture has two lines per change: `path:l
 
 ## When Sassy compiles
 
-A stylesheet is compiled on the request that needs it, when any of these is true:
+Sassy is lazy in the useful sense. Nothing compiles until a page asks for it, and then only if something changed. A stylesheet is compiled on the request that needs it, when any of these is true:
 
 1. The entry file, or any partial it pulls in through `@use`, `@forward` or `@import` at any depth, changed since the last build.
 2. A directory on the import path gained or lost a Sass file, which is exactly when a new file could shadow the one in use.
@@ -86,7 +88,7 @@ Compiled CSS and source maps land in `wp-content/scss/`, or `wp-content/scss/{bl
 
 ## Live Compile
 
-Fed up of refreshing the page to see your changes? Us too. Press `ctrl+space` and Sassy recompiles what is stale and swaps the stylesheets in place without a reload.
+Fed up of refreshing the page to see your changes? Us too. Press `ctrl+space` and Sassy recompiles what is stale and swaps the stylesheets in place without a reload. 🚀
 
 Three chords:
 
@@ -121,7 +123,7 @@ For scripting, `window.sassy` has `compile(force, hooks)`, `reload()`, `poll()`,
 
 ## Painting in the inspector
 
-Two ways to work from DevTools, both on the dev surface.
+Everyone nudges values in the inspector until the thing looks right, then tries to remember what they were. Sassy remembers for you. There are two ways to work from DevTools, both behind the dev gate.
 
 **Edit the source in the browser.** The compiled CSS ships a source map that is exact, `url()` rewriting included, so the styles pane links straight into the `.scss` that produced each rule. Add the project folder as a DevTools Workspace and edits saved from the Sources panel land on disk. With `wp sassy watch` running and Auto-reload on, the page repaints without a keypress.
 
@@ -141,7 +143,7 @@ Refusals are not all failures. `gap: 4px` painted over `gap: $gap` is a decision
 
 ## The dashboard
 
-Tools → Sassy, for anyone the dev surface is active for. It shows what `wp sassy check`, `status`, `list` and `deps` print, for a person who is not at a terminal:
+For the days you would rather not open a terminal. Tools → Sassy shows what `wp sassy check`, `status`, `list` and `deps` print, to anyone the dev gate lets in:
 
 - **Check**: is everything current, unbroken and accounted for.
 - **Status**: engine, binaries, providers, build path and whether the dev surface is active for you.
@@ -155,7 +157,7 @@ There are no settings on the page. Configuration is constants and filters.
 
 ## WP-CLI
 
-With [WP-CLI](https://wp-cli.org/) available, Sassy registers a `sassy` command.
+Everything the admin bar does and a fair bit more, from the shell. With [WP-CLI](https://wp-cli.org/) available, Sassy registers a `sassy` command.
 
 ```bash
 wp sassy status                     # engine, binaries, build path, Lightning CSS state
@@ -189,7 +191,7 @@ wp sassy compile --hooks=admin,editor    # or pick them
 
 ### Watching
 
-`wp sassy watch` recompiles the moment a file changes, so the CSS is built before you switch to the browser and Sass errors appear in the terminal you are editing in.
+If you would rather see Sass errors in your terminal than in the page footer, watch instead. `wp sassy watch` recompiles the moment a file changes, so the CSS is built before you switch to the browser and Sass errors appear in the terminal you are editing in.
 
 ```bash
 wp sassy watch                        # frontend styles, checked every second
@@ -201,7 +203,7 @@ A compile error is printed and the loop keeps going. Handles are discovered once
 
 ### Checking
 
-`wp sassy check` answers one question about the whole install and exits accordingly: is every style current, unbroken and accounted for?
+This is the one for your deploy script. `wp sassy check` asks one question of the whole install and exits accordingly: is every style current, unbroken and accounted for?
 
 ```bash
 wp sassy check              # fails on a missing source, an unbuilt or stale handle, a truncated graph
@@ -215,7 +217,7 @@ Two cases are treated differently on purpose. A truncated import graph is report
 
 ## What scripts do to your styles
 
-`wp sassy list --type=script` lists every registered script with the kinds of style mutation its text contains, counted by marker. Five categories:
+Stylesheets are only half of what styles a page. Scripts do the rest, and Sassy at least knows which ones. `wp sassy list --type=script` lists every registered script with the kinds of style mutation its text contains, counted by marker. Five categories:
 
 - scope control: `classList`, `dataset` and `data-*` attribute writes, which is how theming is usually driven
 - custom property writes: `setProperty('--…')`
@@ -226,6 +228,8 @@ Two cases are treated differently on purpose. A truncated import graph is report
 This is pattern matching over the file text, with no parsing. Reads do not count as writes. A marker inside a comment does count, since a false positive costs a glance and a miss costs the signal. `--touches=data-theme` narrows the list to scripts that touch that attribute, which is worth knowing before you rename one. Profiles are cached by file stamp, so only a changed script is read again.
 
 ## Engines
+
+There are two, and you want the first one.
 
 | | Dart Sass | scssphp |
 |---|---|---|
@@ -242,7 +246,7 @@ Both engines take a request and return CSS with diagnostics. Your own engine is 
 
 ## Variables
 
-Three variables are always defined, and the `sassy-variables` filter or a registered provider adds more:
+PHP knows things your Sass would like to know. Three variables are always defined, and the `sassy-variables` filter or a registered provider adds more:
 
 ```php
 [
@@ -273,7 +277,7 @@ A changed variable recompiles the handles that see it. `wp sassy vars` shows the
 
 ## Lightning CSS
 
-Compiled CSS can run through [Lightning CSS](https://lightningcss.dev/) for minification and modern CSS transforms. It is a registered post-processor, so it runs after the engine and after the `sassy-css` filter, and it is **off until you point Sassy at a binary**. Three ways, checked in this order:
+Optional, and off until you ask. Compiled CSS can run through [Lightning CSS](https://lightningcss.dev/) for minification and modern CSS transforms. It is a registered post-processor, so it runs after the engine and after the `sassy-css` filter, and it is **off until you point Sassy at a binary**. Three ways, checked in this order:
 
 ```php
 define('SASSY_LIGHTNINGCSS_BIN', 'npx');                 // or an absolute path to lightningcss / cli.js
@@ -295,7 +299,7 @@ The default flag is `--minify`. If the binary cannot be found or the run fails, 
 
 ## Hooks
 
-Per-compile filters receive `($value, $src, $handle, $asset)`, where `$asset` is the `Sassy\Asset` being built.
+There is no settings page and there will not be one. Everything is a constant or a filter. Per-compile filters receive `($value, $src, $handle, $asset)`, where `$asset` is the `Sassy\Asset` being built.
 
 | Hook | Default | Details |
 |---|---|---|
@@ -367,7 +371,7 @@ Each of them has been rebuilt on the extension API as a worked example in `tests
 
 ## Upgrading from 2.x
 
-3.0 renames classes, changes the engine contract and removes the builder integrations. [docs/upgrading-to-3.0.md](docs/upgrading-to-3.0.md) lists each change and what to do about it. A site that only uses the filters should need no changes.
+Some things break, and all of them are listed. 3.0 renames classes, changes the engine contract and removes the builder integrations. [docs/upgrading-to-3.0.md](docs/upgrading-to-3.0.md) lists each change and what to do about it. A site that only uses the filters should need no changes.
 
 ## Development
 
