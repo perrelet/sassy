@@ -1,8 +1,9 @@
-<img align="right" width="230" src="assets/img/cascade.portrait.800.webp" alt="Cascade, a fox in a foxglove hat, holding a paintbrush">
-
-# Sassy
-
-*A rather saucy way of doing SCSS on WordPress.*
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/img/hero.dark.webp">
+    <img src="assets/img/hero.light.webp" alt="Sassy. A rather saucy way of doing SCSS on WordPress. Cascade, a fox in a foxglove hat, holds a paintbrush.">
+  </picture>
+</p>
 
 Enqueue a `.scss` file the way you would a `.css` file and Sassy takes care of the rest: it compiles on the server, keeps track of the partials you import and recompiles when one of them changes.
 
@@ -13,8 +14,6 @@ You can edit a rule in the DevTools styles pane and write the change back into t
 `wp sassy check` reports whether every stylesheet on the site is current and exits accordingly. Each command has a JSON format and each error names a file and a line, so a deploy script or a coding agent can use Sassy the same way you do.
 
 We wrote it for our own sites, where it has run in production since 2021. It is for you if you write custom themes in SCSS and want changes on screen without a build step. The developer tools are shown by capability rather than environment, so the same site serves your visitors and you at once.
-
-<br clear="all">
 
 ## Thirty seconds
 
