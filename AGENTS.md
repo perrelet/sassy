@@ -13,7 +13,7 @@
 
 ## Overview
 
-**Sassy** is a WordPress plugin (v3.0.0, by Digitalis Web Build Co.) that compiles SCSS files on-demand. The core premise: enqueue `.scss` files exactly as you would `.css` files via `wp_enqueue_style`, and Sassy intercepts the URL, compiles the SCSS to CSS, writes the result to disk, and returns the compiled CSS URL to WordPress instead.
+**Sassy** is a WordPress plugin (v3.0.0, by Digitalis Web Corp) that compiles SCSS files on-demand. The core premise: enqueue `.scss` files exactly as you would `.css` files via `wp_enqueue_style`, and Sassy intercepts the URL, compiles the SCSS to CSS, writes the result to disk, and returns the compiled CSS URL to WordPress instead.
 
 ```php
 wp_enqueue_style('my-theme', get_template_directory_uri() . '/style.scss');
@@ -392,7 +392,7 @@ Two surfaces: the admin bar, pruned to actions, and the page under Tools that ca
 
 `Admin_Page` (`include/view/admin-page.class.php`) registers Tools → Sassy with capability `read` when `Policy::active()`, and the callback checks the gate again: the filter is the gate, not the capability string. It reads the model once per request through `Admin_Page::data()` and renders through `Admin_Page::html()`, a function from that array to markup, which is how the suite reads it.
 
-The page is headed by the dark readme banner, `assets/img/hero.dark.webp`, as a decorative `img` after a screen-reader-only `h1`, followed by `<hr class="wp-header-end">` so core's notices JS has somewhere to insert. The suite asserts that sequence.
+The page is headed by the dark readme banner, `assets/img/hero.dark.webp`, as a decorative `img` after a screen-reader-only `h1`, followed by `<hr class="wp-header-end">` so core's notices JS has somewhere to insert, and signed off by the Digitalis logo linking to digitalis.ca. The suite asserts both.
 
 - **Check** — `Style_Stack::audit()`, rendered rather than exited on.
 - **Status** — `Status::rows()`, the same rows `wp sassy status` prints.

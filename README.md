@@ -392,5 +392,5 @@ GPL-2.0-or-later, like WordPress. See [LICENSE](LICENSE). The images of Cascade 
     <img src="assets/img/digitalis.light.svg" width="220" alt="Digitalis">
   </picture>
   <br>
-  © Jamie Perrelet 2021 to 2026, <a href="https://digitalis.ca/">Digitalis Web Build Co.</a>
+  © Jamie Perrelet 2021 to 2026, <a href="https://digitalis.ca/">Digitalis Web Corp</a>
 </p>

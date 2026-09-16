@@ -170,6 +170,12 @@ $wp-success:  #00a32a;
         margin: 1em 0 1.5em;
     }
 
+    .sassy-footer {
+        margin: 3em 0 1em;
+        img { height: 26px; width: auto; opacity: 0.6; transition: opacity 0.15s; }
+        a:hover img { opacity: 1; }
+    }
+
     h2 { margin-top: 2em; }
     h3 { margin-top: 1.5em; }
 

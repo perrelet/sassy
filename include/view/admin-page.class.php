@@ -168,6 +168,7 @@ class Admin_Page {
 
         foreach ($data['handles'] as $handle => $detail) $out .= static::handle($handle, $detail);
 
+        $out .= '<p class="sassy-footer"><a href="https://digitalis.ca/"><img src="' . esc_url(SASSY_URI . 'assets/img/digitalis.light.svg') . '" alt="Digitalis"></a></p>';
         $out .= '</div>';
 
         return $out;
