@@ -161,6 +161,18 @@ $wp-info:     #72aee6;
 $wp-success:  #00a32a;
 
 .sassy-page {
+    position: relative;
+
+    // Cascade, top right, over whatever runs under her. Wide screens only: below this she
+    // would be sitting on the file column.
+    .sassy-cascade {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 340px;
+        pointer-events: none;
+        @media (max-width: 1400px) { display: none; }
+    }
 
     h2 { margin-top: 2em; }
     h3 { margin-top: 1.5em; }

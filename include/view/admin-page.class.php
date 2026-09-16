@@ -151,6 +151,7 @@ class Admin_Page {
 
         $out  = '<div class="wrap sassy-page">';
         $out .= '<h1>Sassy</h1>';
+        $out .= '<img class="sassy-cascade" src="' . esc_url(SASSY_URI . 'assets/img/cascade.portrait.800.webp') . '" alt="" aria-hidden="true">';
 
         if ($cleared) $out .= '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Caches cleared. The next request rebuilds.', 'sassy') . '</p></div>';
 

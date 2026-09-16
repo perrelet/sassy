@@ -21,6 +21,7 @@ define('ABSPATH',         $SASSY_ROOT . '/');
 define('WP_CONTENT_DIR',  $SASSY_ROOT . '/wp-content');
 define('WP_CONTENT_URL',  'http://test.local/wp-content');
 define('SASSY_PATH',      $SASSY_PLUGIN);
+define('SASSY_URI',       'https://example.test/wp-content/plugins/sassy/');
 
 $_SERVER['DOCUMENT_ROOT'] = $SASSY_ROOT;
 
