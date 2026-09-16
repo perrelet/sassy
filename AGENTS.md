@@ -7,7 +7,7 @@
 > the present, this file wins — so **each phase updates this file as part of landing**, or the
 > sentence you are reading becomes a trap.
 >
-> **Phases 1 to 8 have landed, and all of it is 3.0.0.** The minors 3.1 to 3.7 they carried as they landed were collapsed into the one number on 2026-09-14, nothing having been released between. Phase 9 is still as the plan describes it.
+> **Phases 1 to 8 have landed, and all of it is 3.0.0, released 2026-09-16** as tag `v3.0.0` on `main`. The minors 3.1 to 3.7 they carried as they landed were collapsed into the one number on 2026-09-14, nothing having been released between. Phase 9 is still as the plan describes it. Work continues on `style-stack`; `main` fast-forwards to it at each release, and **this directory never changes branch** (plan §8).
 >
 > **Starting fresh?** Plan §8 opens with what to read and the four commands to run before touching anything. Run them: this file has been wrong about the present three times, and each time the code was right.
 

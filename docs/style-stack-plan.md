@@ -75,7 +75,13 @@ were drifting unowned:
 - **The digitalis.ca update JSON is version-fenced before 3.0 publishes.** Wild consumers on 1.x
   poll it and must not be offered a breaking auto-update. This lives outside this repository, so
   no builder will trip over it and no acceptance criterion can catch it — **Jamie's, and the one
-  item here that can do damage off this machine.**
+  item here that can do damage off this machine.** Done 2026-09-16, as one route per major: the
+  1.x client sends no version, so its route resolves the newest `v1.*` tag forever; 3.x polls
+  `/plugins/update/sassy-v3/info?version=…` and the feed answers 404 to any other major.
+
+**3.0.0 was released on 2026-09-16** as tag `v3.0.0` on `main`, the merge of this branch. The feed
+builds from the tag and refuses a header that disagrees with it, so every release from here is:
+bump the header and the constant together, merge to `main`, tag `vX.Y.Z`.
 
 ---
 
@@ -974,9 +980,13 @@ Two things about this machine that no document upstream of you will mention:
   yours**, and has had throughout. Two of the modified lines in `sassy.integration.php` are the §4
   dev-gate and `wp_tempnam` changes; everything else in that tree belongs to someone else. Do not
   commit there.
-- 3.0.0 is tagged in the plugin header and is **not released**. The digitalis.ca update JSON is not
-  yet version-fenced, so publishing would offer a breaking upgrade to every 1.x install polling
-  it. That fence is Jamie's and it is not done.
+- 3.0.0 **is released**, tag `v3.0.0` on `main`, 2026-09-16. The feed is fenced per major (§1).
+- **This directory is a running plugin, so it never changes branch.** It moves forward on
+  `style-stack` and nothing else: no `checkout`, no `merge` into it, no `stash`. The one time a
+  merge was run here it conflicted, left conflict markers in `sassy.php`, and staging served a
+  parse error until the merge was aborted. Merges into `main` happen in a second clone, or as a
+  fast-forward of `main` to a commit this branch already has, with `git branch -f main
+  style-stack`, which touches no working tree.
 
 **One builder at a time, on `style-stack`, in place.** No worktrees, no parallel phases. The
 phases are *mostly* serial by dependency; by §3's graph the genuinely parallelizable pairs are
