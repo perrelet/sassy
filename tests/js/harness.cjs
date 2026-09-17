@@ -529,6 +529,30 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
     ok('a misaligned sheet withholds lines',  misaligned.patch.includes('did not align (6 blocks, 6 rules, 0 paired)'));
     front.cssRules.length = 0; front.cssRules.push(...saved);
 
+    // Chrome prints four selector forms differently from the text that made them. On a live
+    // sheet a run of five stagger rules failed to pair and stranded the 1359 rules after it.
+    const printed = [1, 2, 3, 4, 5].map(n => rule(`.stagger-tran > :nth-child(${n})`, 'opacity: 1;')).concat([
+        rule('.doc-head > .sender', 'opacity: 1;'),
+        rule('tr:nth-child(2n+1) td', 'opacity: 1;'),
+        rule('li:nth-of-type(2n)', 'opacity: 1;'),
+        { constructor: { name: 'CSSKeyframesRule' }, cssText: '@keyframes fade', cssRules: [
+            { constructor: { name: 'CSSKeyframeRule' }, cssText: '0% { opacity: 0; }', style: { cssText: 'opacity: 0;' } },
+            { constructor: { name: 'CSSKeyframeRule' }, cssText: '100% { opacity: 1; }', style: { cssText: 'opacity: 1;' } },
+        ] },
+        rule('.after', 'color: blue;'),
+    ]);
+    const written = [1, 2, 3, 4, 5].map(n => `.stagger-tran > *:nth-child(${n}){opacity:1}`).join('')
+        + '.doc-head > *.sender{opacity:1}tr:nth-child(odd) td{opacity:1}li:nth-of-type(even){opacity:1}@keyframes fade{from{opacity:0}to{opacity:1}}.after{color:blue}';
+    front.cssRules.length = 0; front.cssRules.push(...printed);
+    links[0].listeners.load();
+    printed[printed.length - 1].style.cssText = 'color: green;';
+    global.fetch = url => String(url).endsWith('.map') ? mappingFetch(url) : Promise.resolve({ ok: true, arrayBuffer: () => Promise.resolve(new TextEncoder().encode(written).buffer) });
+    const rewritten = await global.window.sassy.capture();
+    ok('every selector Chrome rewrites still pairs', !rewritten.patch.includes('did not align') && rewritten.patch.includes('color: blue → green'), rewritten.patch);
+    global.fetch = mappingFetch;
+    front.cssRules.length = 0; front.cssRules.push(...saved);
+    links[0].listeners.load();
+
     // color: inside background-color: is not the declaration. Mapped by plain indexOf, this
     // change landed on background-color's line 15 and the server refused it.
     front.cssRules[4].style.cssText = 'background-color: red; color: green;';

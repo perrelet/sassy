@@ -447,17 +447,27 @@
 
         },
 
-        /** What differs between the CSSOM's serialisation and compressed text: space, quotes, one colon or two. */
+        /**
+         * What differs between the CSSOM's serialisation and compressed text: space, quotes, one
+         * colon or two, and four rewrites Chrome makes when it prints a selector: a universal
+         * selector that only qualifies something is dropped, odd and even become 2n+1 and 2n, and
+         * keyframe offsets from and to become 0% and 100%.
+         */
         ruleKey (text) {
 
-            return String(text || '').replace(/["']/g, '').replace(/\s+/g, '').replace(/::/g, ':').toLowerCase();
+            return String(text || '').replace(/["']/g, '').replace(/\s+/g, '').replace(/::/g, ':').toLowerCase()
+                .replace(/\*(?=[.#:\[])/g, '')
+                .replace(/(:nth-(?:last-)?(?:child|of-type)\()odd\)/g, '$12n+1)')
+                .replace(/(:nth-(?:last-)?(?:child|of-type)\()even\)/g, '$12n)')
+                .split(',').map(part => part === 'from' ? '0%' : part === 'to' ? '100%' : part).join(',');
 
         },
 
         /**
          * Which block in the text each rule is, or null for a rule the text does not have. Pair
          * by key walking both lists; a block the CSSOM dropped is skipped, a rule the text lacks
-         * is new. A count is not an alignment.
+         * is new. A count is not an alignment. The window is what a run of misses costs: with
+         * four, five stagger rules the key could not match stranded every rule after them.
          */
         align (rules, blocks) {
 
@@ -466,7 +476,7 @@
 
             for (let i = 0; i < rules.length; i++) {
                 const key = this.ruleKey(this.rulePrelude(rules[i]));
-                for (let k = j; k < Math.min(blocks.length, j + 4); k++) {
+                for (let k = j; k < Math.min(blocks.length, j + 8); k++) {
                     if (this.ruleKey(blocks[k].prelude) === key) { map[i] = k; j = k + 1; break; }
                 }
             }
