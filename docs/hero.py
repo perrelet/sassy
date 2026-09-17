@@ -1,5 +1,6 @@
 """Builds the readme banners, assets/img/hero.{light,dark}.webp, the WordPress plugin banner,
-assets/img/banner.webp, and the plugin icons, assets/img/icon.{128,256}.webp, from Cascade's portrait.
+assets/img/banner.webp, the plugin icons, assets/img/icon.{128,256}.webp, and GitHub's social preview, written to /tmp/sassy-social.png
+for a one-time upload (PNG because GitHub takes no WebP, and not committed because it is 400 KB), from Cascade's portrait.
 
 Run from the plugin root: python3 docs/hero.py. Needs Pillow. Fetches the two faces once into /tmp:
 Sansita Swashed for the title, Manrope, the Digitalis brand face, for the tagline.
@@ -90,3 +91,29 @@ def icons():
 
 banner('assets/img/banner.webp')
 icons()
+
+
+def social(out):
+    """1280x640, GitHub's preferred social card. Solid ground, since the card is shown on anything."""
+    W, H = 1280, 640
+    im = Image.new('RGB', (W, H), (36, 26, 43))
+    d = ImageDraw.Draw(im)
+    fox = Image.open('assets/img/cascade.portrait.800.webp').convert('RGBA').resize((H, H), Image.LANCZOS)
+    im.paste(fox, (W - H - 8, 0), fox)
+    fox_left = W - H - 8 + min(x for x in range(H) if any(fox.getpixel((x, y))[3] > 40 for y in range(0, H, 8)))
+    title = font(200, 'Bold', 'title')
+    # Two lines: one would have to shrink to 25px to clear her.
+    tag = ['A rather saucy way of', 'doing SCSS on WordPress.']
+    tagf = font(44, 'SemiBold')
+    lead = 56
+    tb = d.textbbox((0, 0), 'Sassy', font=title)
+    block = (tb[3] - tb[1]) + GAP + lead * len(tag)
+    top = (H - block) // 2
+    d.text((72, top - tb[1]), 'Sassy', font=title, fill=(246, 239, 230))
+    for n, line in enumerate(tag):
+        d.text((76, top + (tb[3] - tb[1]) + GAP + n * lead), line, font=tagf, fill=(199, 125, 255))
+    assert max(d.textlength(l, font=tagf) for l in tag) < fox_left - 76 - 40
+    im.save(out, 'PNG', optimize=True)
+    print(out, im.size)
+
+social('/tmp/sassy-social.png')
