@@ -179,6 +179,13 @@ class Compile_Cache {
 
     }
 
+    /** Stale until the next compile, graph and diagnostics kept: needs_compile() reads a missing signature as changed. */
+    public static function mark_stale ($handle) {
+
+        delete_transient(static::VARS_KEY . $handle);
+
+    }
+
     public static function forget_handle ($handle) {
 
         delete_transient(static::GRAPH_KEY . $handle);

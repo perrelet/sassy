@@ -115,13 +115,21 @@
             this.els.title.textContent = title;
             this.els.errors.setAttribute('data-kind', kind);
             this.els.errors.querySelectorAll('.sassy-error').forEach(el => el.remove());
+            this.els.errors.querySelectorAll('.sassy-fold').forEach(el => el.remove());
             if (this.els.push) this.els.push.hidden = true;
 
             for (const block of blocks) {
                 const pre = document.createElement('pre');
                 pre.classList.add('sassy-error');
-                pre.textContent = block;
-                this.els.errors.appendChild(pre);
+                pre.textContent = typeof block === 'string' ? block : block.text;
+                if (typeof block === 'string') { this.els.errors.appendChild(pre); continue; }
+                const fold = document.createElement('details');
+                fold.classList.add('sassy-fold');
+                const summary = document.createElement('summary');
+                summary.textContent = block.summary;
+                fold.appendChild(summary);
+                fold.appendChild(pre);
+                this.els.errors.appendChild(fold);
             }
 
             this.els.errors.classList.add('show');
@@ -718,13 +726,20 @@
                 const rules = this.rulesOf(sheet);
                 rulesByHandle[handle] = rules;
                 let index = 0;
-                for (const [key, entry] of this.keyed(rules)) {
+                const current = this.keyed(rules);
+                for (const [key, entry] of current) {
                     const was      = sheet.baseline.has(key) ? sheet.baseline.get(key).declarations : {};
                     const isNew    = !sheet.baseline.has(key);
                     const selector = this.rulePrelude(entry.rule).trim();
                     const ancestors = isNew ? this.ancestorsOf(entry.rule) : [];
                     for (const change of this.diff(was, entry.declarations)) changes.push(Object.assign({ handle, index, selector, location: null, was, isNew, ancestors }, change));
                     index++;
+                }
+                // A rule the baseline had and the CSSOM no longer does was deleted in the inspector.
+                // Copy-only: its block is located, and deleting a block is a bigger write than a line.
+                for (const [key, entry] of sheet.baseline) {
+                    if (current.has(key)) continue;
+                    changes.push({ handle, index: -1, selector: this.rulePrelude(entry.rule).trim(), location: null, was: entry.declarations, isNew: false, ancestors: [], removedRule: true, key: key.replace(/#\d+$/, ''), prop: null, from: null, to: null });
                 }
             }
 
@@ -736,8 +751,15 @@
                     const align = this.align(rules, mapping.blocks);
                     const paired = align.filter(b => b !== null).length;
                     if (paired < Math.min(rules.length, mapping.blocks.length) * 0.9) { reasons[handle] = `its text and its rules did not align (${mapping.blocks.length} blocks, ${rules.length} rules, ${paired} paired), so lines are withheld rather than wrong.`; return; }
+                    const taken = new Set(align);
                     for (const change of changes) {
                         if (change.handle !== handle) continue;
+                        if (change.removedRule) {
+                            // The block the text still has for a rule the CSSOM lost: same key, paired to nothing.
+                            const b = mapping.blocks.findIndex((block, k) => !taken.has(k) && this.ruleKey(block.prelude) === change.key);
+                            if (b > -1) { taken.add(b); change.location = this.locate(mapping, mapping.blocks[b].start); }
+                            continue;
+                        }
                         const block = align[change.index];
                         if (block === null) {
                             // A rule the text does not have: Chrome's per-rule "+". The rule it was
@@ -758,7 +780,12 @@
                 const extras = this.sharpEdges();
                 const patch  = this.patch(changes, extras, reasons);
 
-                this.panel('Captured styles', [patch], 'capture');
+                // Scripts set most inline styles on a real page. Past a few they fold, and the copy still carries them.
+                const inline = extras.filter(e => e.kind === 'inline');
+                const blocks = inline.length > 3
+                    ? [this.patch(changes, extras.filter(e => e.kind !== 'inline'), reasons), { summary: `${inline.length} element.style entries, copy-only. Scripts set most of these.`, text: inline.map(e => [e.text, ...e.rows].join('\n')).join('\n') }]
+                    : [patch];
+                this.panel('Captured styles', blocks, 'capture');
                 this.lastCapture = { changes, extras };
                 if (this.els.push) this.els.push.hidden = !(this.params.write && this.applicable(changes).length);
                 this.showNotice(changes.length || extras.length ? '🖌️ Captured' : '🖌️ Nothing changed', 'success');
@@ -776,7 +803,7 @@
         /** What the server can be asked to write: anything located, and a new rule with a located neighbour. */
         applicable (changes) {
 
-            return changes.filter(c => (c.location && c.location.source) || (c.newRule && c.neighbour && c.neighbour.location && c.neighbour.location.source));
+            return changes.filter(c => !c.removedRule && ((c.location && c.location.source) || (c.newRule && c.neighbour && c.neighbour.location && c.neighbour.location.source)));
 
         },
 
@@ -916,9 +943,11 @@
                     where = 'new rule';
                     tail  = n ? `  (no source location; belongs after ${n.selector}${n.location ? ' at ' + n.location.file + ':' + n.location.line : ''})` : '  (no source location)';
                 }
-                const key   = `${c.handle}:${c.index}:${where}`;
+                if (c.removedRule) tail = '  (rule removed: copy-only, the block is yours to delete)';
+                const key   = `${c.handle}:${c.index}:${where}:${c.selector}`;
                 if (!groups.has(key)) groups.set(key, [`${where}  ${c.selector}${tail}`]);
                 const rows = groups.get(key);
+                if (c.removedRule)      { for (const [prop, value] of Object.entries(c.was)) rows.push(`  - ${prop}: ${value}`); continue; }
                 if (c.from === null)    rows.push(`  + ${c.prop}: ${c.to}`);
                 else if (c.to === null) rows.push(`  - ${c.prop}: ${c.from}`);
                 else                    rows.push(`  ${c.prop}: ${c.from} → ${c.to}`);

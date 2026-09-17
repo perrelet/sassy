@@ -560,6 +560,22 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
     ok('a property is found with a boundary before it', bounded.patch.includes('plugins/d-pace/scss/frontend.scss:16  .k') && bounded.patch.includes('color: blue → green') && !bounded.patch.includes(':15  .k'));
     front.cssRules[4].style.cssText = 'background-color: red; color: blue;';
 
+    // A rule deleted in the inspector is gone from the CSSOM and still in the baseline and the text.
+    const dropped = front.cssRules.splice(2, 1)[0];
+    const deleted = await global.window.sassy.capture();
+    ok('a deleted rule is reported, located, with what it had', /plugins\/d-pace\/scss\/frontend\.scss:\d+  \.c  \(rule removed: copy-only, the block is yours to delete\)\n  - background: var\(--x\)/.test(deleted.patch));
+    ok('and is not pushable',                                    deleted.changes.some(c => c.removedRule) && (await global.window.sassy.push()) === null);
+    front.cssRules.splice(2, 0, dropped);
+
+    // Twenty inline styles set by scripts fold in the panel and stay in the text.
+    const noise = Array.from({ length: 5 }, (_, i) => Object.assign(element({ style: `left: ${i}px` }), { tagName: 'LI' }));
+    inline.push(...noise);
+    const noisy = await global.window.sassy.capture();
+    const fold  = panel.querySelectorAll('.sassy-fold')[0];
+    ok('past three, element.style entries fold',   fold && fold.children[0].textContent === '6 element.style entries, copy-only. Scripts set most of these.', fold ? fold.children[0].textContent : 'no fold');
+    ok('the text still carries them',              noisy.patch.split('element.style on').length === 7 && fold && fold.children[1].textContent.includes('left: 4px'), noisy.patch);
+    inline.splice(inline.length - 5, 5);
+
     // A reload re-baselines: what was painted is now the sheet, so nothing is a change.
     front.cssRules.pop();
     links[0].listeners.load(); links[1].listeners.load();

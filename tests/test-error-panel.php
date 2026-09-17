@@ -98,6 +98,7 @@ check('the source is as compiled',                file_get_contents("$SCSS/good.
 $r = write_source($sassy, ['changes' => [$change]]);
 check('with all three passing, it writes',       $r['success'] && ($r['data']['results'][0]['written'] ?? false), var_export($r, true));
 check('and the file changed',                     file_get_contents("$SCSS/good.scss") === ".a { color: blue; }\n");
+check('and the handle is stale until it compiles', get_transient('sassy-vars-sig-good') === false && get_transient('sassy-filemtimes-good') !== false);
 
 $r = write_source($sassy, ['changes' => [array_merge($change, ['from' => 'blue', 'to' => 'green'])]]);
 check('a second push before a compile refuses',  !($r['data']['results'][0]['written'] ?? true) && str_contains($r['data']['results'][0]['reason'] ?? '', 'changed since the last compile'));

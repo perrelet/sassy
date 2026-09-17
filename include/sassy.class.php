@@ -294,6 +294,10 @@ class Sassy {
 
 			foreach (array_keys($list) as $k => $i) $results[$i] = $applied[$k];
 
+			// The write is proof the handle changed. Said so here, the Live Compile that follows
+			// rebuilds it even where dependency checking is off.
+			if (array_filter($applied, function ($r) { return $r['written']; })) Compile_Cache::mark_stale($handle);
+
 		}
 
 		ksort($results);
