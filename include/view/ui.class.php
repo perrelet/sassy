@@ -10,6 +10,16 @@ class UI {
 
 	}
 
+	/** The first chord bound to an action, as a key cap after the item's label; nothing when unbound. */
+	public static function chord ($action) {
+
+		$chords = Sassy::keybindings()[$action] ?? false;
+		$first  = is_array($chords) ? ($chords[0] ?? null) : $chords;
+
+		return is_string($first) && $first !== '' ? ' <kbd class="sassy-kbd">' . esc_html($first) . '</kbd>' : '';
+
+	}
+
 	public function admin_bar_menu ($admin_bar) {
 		
 		if (!Policy::active()) return;
@@ -24,7 +34,7 @@ class UI {
 		$admin_bar->add_menu([
 			'id'		=> 'sassy-live-compile',
 			'parent'	=> 'sassy',
-			'title'		=> '⚡ Live Compile',
+			'title'		=> '⚡ Live Compile' . static::chord('compile'),
 			'href'		=> '#',
 		]);
 		
@@ -41,7 +51,7 @@ class UI {
 		$admin_bar->add_menu([
 			'id'     => 'sassy-capture',
 			'parent' => 'sassy',
-			'title'  => __('🖌️ Capture', 'sassy'),
+			'title'  => __('🖌️ Capture', 'sassy') . static::chord('capture'),
 			'href'   => '#',
 		]);
 
@@ -51,7 +61,7 @@ class UI {
 			$admin_bar->add_menu([
 				'id'     => 'sassy-push',
 				'parent' => 'sassy',
-				'title'  => __('📤 Push to source', 'sassy'),
+				'title'  => __('📤 Push to source', 'sassy') . static::chord('push'),
 				'href'   => '#',
 			]);
 		}

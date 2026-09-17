@@ -122,6 +122,17 @@ $notice:  #2271b1;
     &:hover { background: rgba(255, 255, 255, 0.85); }
 }
 
+#wpadminbar .sassy-kbd {
+    float: right;
+    margin: 5px 0 0 1.5em;
+    padding: 0 5px;
+    font: 10px/16px Menlo, Consolas, monospace;
+    color: inherit;
+    opacity: 0.6;
+    border: 1px solid currentColor;
+    border-radius: 3px;
+}
+
 #wpadminbar .sassy-log-toggle {
     .sassy-toggle-box {
         display: inline-block;

@@ -114,24 +114,35 @@ class Sassy {
 		// sassy:* events, so nothing here needs to know one exists.
 		wp_enqueue_script('sassy');
 
-		$compile = apply_filters('sassy-keybinding', ['ctrl+space', 'meta+space']);
+		$keybindings = static::keybindings();
 
 		wp_localize_script('sassy', 'sass_params', [
 			'ajax_url'            => admin_url('admin-ajax.php'),
 			'sassy_compile_nonce' => wp_create_nonce('sassy_compile'),
 			'sassy_write_nonce'   => wp_create_nonce('sassy_write'),
 			'write'               => Policy::can_write_source(),
-			'keybinding'          => $compile,
-			// One map for the three actions. Space looks, X commits; push is live only with the
-			// write gate open. Each entry is modifier+key strings, or false to unbind.
-			'keybindings'         => apply_filters('sassy-keybindings', [
-				'compile' => $compile,
-				'capture' => ['ctrl+shift+space', 'meta+shift+space'],
-				'push'    => ['ctrl+shift+x', 'meta+shift+x'],
-			]),
+			'keybinding'          => $keybindings['compile'],
+			'keybindings'         => $keybindings,
 			// The block editor is an admin screen, and its sheet registers on the editor hook.
 			'context'             => is_admin() ? 'admin,editor' : 'frontend',
 		]);  
+
+	}
+
+	/**
+	 * One map for the three actions, read by the script and shown in the bar. Space looks, X
+	 * commits; push is live only with the write gate open. Each entry is modifier+key strings,
+	 * or false to unbind.
+	 */
+	public static function keybindings () {
+
+		$compile = apply_filters('sassy-keybinding', ['ctrl+space', 'meta+space']);
+
+		return apply_filters('sassy-keybindings', [
+			'compile' => $compile,
+			'capture' => ['ctrl+shift+space', 'meta+shift+space'],
+			'push'    => ['ctrl+shift+x', 'meta+shift+x'],
+		]);
 
 	}
 	

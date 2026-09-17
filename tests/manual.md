@@ -61,6 +61,7 @@ Untested surface is named rather than implied covered. If you add browser behavi
 | Check | Expected |
 |---|---|
 | Open the **SCSS** menu | Live Compile, Force Compile, 🖌️ Capture, 📤 Push to source (with the gate open), Logging with square boxes that fill with a tick when on, Dashboard. Nothing per handle: that detail is on the page |
+| The key caps | Live Compile, Capture and Push each show their first chord on the right (`ctrl+space`, `ctrl+shift+space`, `ctrl+shift+x`); an action unbound with `false` shows none |
 | Click **🤖 Force Compile** with nothing changed | Handles recompile anyway. Live Compile in the same state should report cached instead: that difference is the reason both exist |
 | Confirm what is absent | No **Log Variables**, no **Clear Cache**, no per-handle entries: `wp sassy vars`, the Logging menu and the page replace them |
 | On a wp-admin screen, edit `admin.scss` and click **⚡ Live Compile** | The admin sheet on screen updates. Before 6b the endpoint only ever discovered the frontend |
