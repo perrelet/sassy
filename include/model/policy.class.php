@@ -21,7 +21,10 @@ class Policy {
      */
     public static function can_write_source () {
 
-        return static::active() && (bool) apply_filters('sassy-write-source', false);
+        // The constant names a capability, so wp-config.php can open the gate and it still asks who.
+        $default = defined('SASSY_WRITE_SOURCE') && is_string(SASSY_WRITE_SOURCE) && SASSY_WRITE_SOURCE !== '' && current_user_can(SASSY_WRITE_SOURCE);
+
+        return static::active() && (bool) apply_filters('sassy-write-source', $default);
 
     }
 

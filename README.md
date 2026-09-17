@@ -140,10 +140,11 @@ The styles pane is the best CSS editor there is. It is live, it knows the real c
 
 **Paint, then capture.** Edit declarations in the styles pane as usual, then press 🖌️ **Capture** in the admin bar, or call `window.sassy.capture()`. Sassy diffs the page's live CSSOM against the snapshot it took when the stylesheets loaded, maps each change through the source map and shows the patch in the panel. Capture does not write anything.
 
-**Push to source** appears beside it when the site has opted in, and writes each change into the `.scss` it maps to, then recompiles:
+**Push to source** appears beside it when the site has opted in, and writes each change into the `.scss` it maps to, then recompiles. Opting in is a line of code naming who may write, a constant in `wp-config.php` or a filter:
 
 ```php
-add_filter('sassy-write-source', fn () => current_user_can('dev'));
+define('SASSY_WRITE_SOURCE', 'edit_theme_options');
+add_filter('sassy-write-source', fn () => current_user_can('dev'));   // or, for anything a constant cannot say
 ```
 
 The rules for a write are strict. The file must be a recorded dependency of that handle and unchanged since the last compile, and the mapped line must contain `property: <the served value>;` exactly as served. Anything else is refused and comes back with the line quoted, for you to make by hand: a value the source expresses differently from what was served (see [Cascade's one rule](#cascades-one-rule)), anything the browser serialises differently from the source, and removing a declaration from a line that holds more than one. A declaration you added is written beside the rule's existing declarations. A rule you created with the styles pane's per-rule **+** is written after its neighbour's block inside `@at-root`, so it compiles at the root however deeply the neighbour is nested. A rule in the inspector stylesheet and an `element.style` edit have no source location and are listed as copy-only, the first with a suggested file.
@@ -350,7 +351,7 @@ There is no settings page and there will not be one. Everything is a constant or
 | `sassy-style-queues` | `[wp_styles()]` | Style registries discovery reads. Later queues win on a duplicate handle |
 | `sassy-script-queues` | `[wp_scripts()]` | Script registries discovery reads |
 | `sassy-dev` | `current_user_can('edit_theme_options')` | Whether the dev surface is active for this request |
-| `sassy-write-source` | `false` | Whether the paintbrush may write to source. Never implied by `sassy-dev` |
+| `sassy-write-source` | `false`, or `current_user_can(SASSY_WRITE_SOURCE)` when that constant names a capability | Whether the paintbrush may write to source. Never implied by `sassy-dev` |
 | `sassy-keybinding` | `['ctrl+space', 'meta+space']` | The Live Compile chords alone |
 | `sassy-keybindings` | `compile`, `capture`, `push`, as above | Every action's chords. `false` unbinds one and leaves its button |
 

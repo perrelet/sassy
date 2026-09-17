@@ -52,6 +52,7 @@ class Status {
         // Per request, so this is all a policy can say about who sees the surface.
         $rows['dev surface'] = Policy::active() ? 'active for the current user' : 'inactive for the current user';
         $rows['sassy-dev']   = has_filter('sassy-dev') ? 'bound' : 'default (edit_theme_options)';
+        $rows['sassy-write-source'] = has_filter('sassy-write-source') ? 'bound' : (defined('SASSY_WRITE_SOURCE') ? 'default (SASSY_WRITE_SOURCE: ' . SASSY_WRITE_SOURCE . ')' : 'default (off)');
 
         foreach (['SASSY_DART_SASS_BIN', 'SASSY_LIGHTNINGCSS_BIN', 'SASSY_TOOLS_DIR'] as $constant) {
             $rows[$constant] = defined($constant) ? constant($constant) : '(undefined)';

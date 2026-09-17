@@ -60,4 +60,21 @@ check('never implied by sassy-dev being off', !Policy::can_write_source(), 'the 
 unset($GLOBALS['filter_overrides']['sassy-write-source'], $GLOBALS['filter_overrides']['sassy-dev']);
 $GLOBALS['capabilities'] = [];
 
+section('SASSY_WRITE_SOURCE names a capability, as the default');
+
+define('SASSY_WRITE_SOURCE', 'dev');
+
+$GLOBALS['capabilities'] = ['edit_theme_options'];
+check('a dev-surface user without it is out', !Policy::can_write_source());
+
+$GLOBALS['capabilities'] = ['edit_theme_options', 'dev'];
+check('a holder of it is in',                  Policy::can_write_source());
+
+$GLOBALS['capabilities'] = ['dev'];
+check('the dev gate still has to pass',        !Policy::can_write_source());
+
+$GLOBALS['capabilities'] = ['edit_theme_options', 'dev'];
+$GLOBALS['filter_overrides']['sassy-write-source'] = false;
+check('the filter still has the last word',    !Policy::can_write_source());
+
 finish();
