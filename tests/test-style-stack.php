@@ -129,7 +129,7 @@ on_action('enqueue_block_editor_assets', function () { throw new \RuntimeExcepti
 $guarded = Style_Stack::discover(Style_Stack::CONTEXTS);
 
 check('the raise is recorded',       isset($guarded->context_errors()['editor']));
-check('it carries the message',      ($guarded->context_errors()['editor'] ?? '') === 'screen missing');
+check('it carries the message and where it came from', str_starts_with($guarded->context_errors()['editor'] ?? '', 'screen missing (') && str_contains($guarded->context_errors()['editor'] ?? '', 'test-style-stack.php:'));
 check('earlier contexts still ran',  $guarded->handle('front') instanceof Asset);
 check('discovery still returned',    count($guarded->all()) > 0);
 

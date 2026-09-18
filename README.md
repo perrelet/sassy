@@ -97,6 +97,12 @@ Between compiles the check is one `stat` per dependency, under a millisecond on 
 
 Compiled CSS and source maps land in `wp-content/scss/`, or `wp-content/scss/{blog_id}/` on multisite. The [hooks](#hooks) move it.
 
+Where the web server owns that directory, compiling from your own account fails and `wp sassy status` says `build path writable NO`. Group permissions do not hold, since php-fpm's umask makes each new sheet 644 and Sassy rewrites in place. A default ACL does:
+
+```bash
+sudo setfacl -R -m u:<you>:rwX -d -m u:<you>:rwX wp-content/scss
+```
+
 ## ⚡ Live Compile
 
 Fed up of refreshing the page to see your changes? Us too. Press `ctrl+space` and Sassy recompiles what is stale and swaps the stylesheets in place without a reload. 🚀
@@ -147,7 +153,7 @@ define('SASSY_WRITE_SOURCE', 'edit_theme_options');
 add_filter('sassy-write-source', fn () => current_user_can('dev'));   // or, for anything a constant cannot say
 ```
 
-The rules for a write are strict. The file must be a recorded dependency of that handle and unchanged since the last compile, and the mapped line must contain `property: <the served value>;` exactly as served. Anything else is refused and comes back with the line quoted, for you to make by hand: a value the source expresses differently from what was served (see [Cascade's one rule](#cascades-one-rule)), anything the browser serialises differently from the source, and removing a declaration from a line that holds more than one. A declaration you added is written beside the rule's existing declarations. A rule you created with the styles pane's per-rule **+** is written after its neighbour's block inside `@at-root`, so it compiles at the root however deeply the neighbour is nested. A rule in the inspector stylesheet and an `element.style` edit have no source location and are listed as copy-only, the first with a suggested file. A rule you delete in the inspector is reported at its block's line with what it had, copy-only too: Sassy does not yet delete blocks.
+The rules for a write are strict. The file must be a recorded dependency of that handle and unchanged since the last compile, and the mapped line must contain `property: <the served value>;` exactly as served. Anything else is refused and comes back with the line quoted, for you to make by hand: a value the source expresses differently from what was served (see [Cascade's one rule](#cascades-one-rule)), anything the browser serialises differently from the source, and removing a declaration from a line that holds more than one. A declaration you added is written beside the rule's existing declarations. A rule you created with the styles pane's per-rule **+** is written after its neighbour's block inside `@at-root`, so it compiles at the root however deeply the neighbour is nested. A rule in the inspector stylesheet and an `element.style` edit have no source location and are listed as copy-only, the first with a suggested file. A rule you delete in the inspector is pushed as the deletion of its block, when the block's opening line is exactly that selector and holds no nested blocks; anything else is reported with what it had, for the copy path.
 
 The bar's 🖌️ **Push to source** captures and pushes in one click. Anything refused is still in the panel to copy, so nothing is lost. `sassy-write-source` defaults to `false` and is separate from `sassy-dev`.
 
@@ -215,6 +221,8 @@ wp sassy compile --hooks=admin,editor    # or pick them
 
 `--hooks=all` is what you want in a deploy hook, so no visitor pays for a cold compile.
 
+Two things about the CLI that look like Sassy and are not. WP-CLI includes `wp-settings.php` from inside a method, so a plugin that does `$Thing = new Thing()` at file scope and reads `global $Thing` later has null under `wp` and nothing else, which breaks discovery with an error naming that file. And a plugin whose bootstrap skips the CLI registers nothing there, so its outputs look orphaned to `check` however wide `--hooks` is.
+
 ### 👀 Watching
 
 If you would rather see Sass errors in your terminal than in the page footer, watch instead. `wp sassy watch` recompiles the moment a file changes, so the CSS is built before you switch to the browser and Sass errors appear in the terminal you are editing in.
@@ -269,6 +277,8 @@ Use Dart Sass if you can. It is the reference implementation, and Sassy runs it 
 scssphp is the default because it works with nothing installed. It is pure PHP, it compiles `@import` Sass, and it throws on `@use` and `@forward`. If your Sass is written with modules, or will be, configure Dart Sass first.
 
 Both engines take a request and return CSS with diagnostics. Your own engine is a class and a filter. See [Extending Sassy](#extending-sassy).
+
+A field data point on how close they are: on a 1388-rule production sheet compiled by both, scssphp 2.1 and Dart Sass 1.104 produced no effective differences across 3255 declarations and 83 custom properties. Dart splits a few more blocks where declarations follow nested rules, with no change to the cascade. One thing that looks like a regression and is not: legacy colour functions can make Dart emit an out-of-range `hsl()`, `hsl(163.125, 112.03%, 95.18%)` where scssphp precomputed `#e6fff8`. Browsers clamp the saturation, so the colour is the same.
 
 ## 🧮 Variables
 

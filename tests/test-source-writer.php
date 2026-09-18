@@ -188,6 +188,21 @@ check('a property that is not a name refuses',!$r[3]['written'] && str_contains(
 check('a selector with braces refuses',       !$r[4]['written'] && str_contains($r[4]['reason'], 'brace'), (string) $r[4]['reason']);
 check('a bad name in a rule refuses',         !$r[5]['written'] && str_contains($r[5]['reason'], 'not a property name'), (string) $r[5]['reason']);
 
+section('A deleted rule takes its block with it, exactly or not at all');
+
+$block = "$DIR/_block.scss";
+fixture($block, ".card {\n  gap: 4px;\n}\n\n.other {\n  color: red;\n}\n\n.parent {\n  .child {\n    gap: 1px;\n  }\n}\n\n.holder {\n  color: blue;\n  .inner { gap: 2px; }\n}\n");
+$remove = function ($line, $selector) { return ['source' => '_block.scss', 'line' => $line, 'selector' => $selector, 'remove' => true]; };
+
+$r = (new Source_Writer(graph_for($block)))->apply([$remove(1, '.card')]);
+check('the block goes, opener to closer',         $r[0]['written'] === true && str_starts_with(file_get_contents($block), ".other {\n  color: red;\n}\n\n.parent"), var_export($r[0], true) . "\n" . file_get_contents($block));
+
+$r = (new Source_Writer(graph_for($block)))->apply([$remove(6, '.parent .child'), $remove(5, '.parent'), $remove(2, '.other'), $remove(11, '.holder')]);
+check('a nested rule\'s compiled selector refuses', !$r[0]['written'] && str_contains($r[0]['reason'], 'the block is `.child`, not `.parent .child`'), (string) $r[0]['reason']);
+check('a block with nested blocks refuses',         !$r[1]['written'] && str_contains($r[1]['reason'], 'nested'), (string) $r[1]['reason']);
+check('a line that opens no block refuses',         !$r[2]['written'] && str_contains($r[2]['reason'], 'does not open a block'), (string) $r[2]['reason']);
+check('so does one holding a nested one-liner',    !$r[3]['written'] && str_contains($r[3]['reason'], 'nested'), (string) $r[3]['reason']);
+
 section('A write is announced');
 
 $fired = [];

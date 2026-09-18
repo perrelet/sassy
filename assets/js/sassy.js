@@ -736,7 +736,7 @@
                     index++;
                 }
                 // A rule the baseline had and the CSSOM no longer does was deleted in the inspector.
-                // Copy-only: its block is located, and deleting a block is a bigger write than a line.
+                // Pushable once its block is located; the server deletes the block or refuses.
                 for (const [key, entry] of sheet.baseline) {
                     if (current.has(key)) continue;
                     changes.push({ handle, index: -1, selector: this.rulePrelude(entry.rule).trim(), location: null, was: entry.declarations, isNew: false, ancestors: [], removedRule: true, key: key.replace(/#\d+$/, ''), prop: null, from: null, to: null });
@@ -803,7 +803,7 @@
         /** What the server can be asked to write: anything located, and a new rule with a located neighbour. */
         applicable (changes) {
 
-            return changes.filter(c => !c.removedRule && ((c.location && c.location.source) || (c.newRule && c.neighbour && c.neighbour.location && c.neighbour.location.source)));
+            return changes.filter(c => (c.location && c.location.source) || (c.newRule && c.neighbour && c.neighbour.location && c.neighbour.location.source));
 
         },
 
@@ -817,6 +817,10 @@
             const rules = new Map();
 
             for (const c of changes) {
+                if (c.removedRule) {
+                    items.push({ change: c, changes: [c], item: { handle: c.handle, source: c.location.source, line: c.location.line, selector: c.selector, remove: true } });
+                    continue;
+                }
                 if (!c.newRule) {
                     items.push({ change: c, changes: [c], item: { handle: c.handle, source: c.location.source, line: c.location.line, prop: c.prop, from: c.from, to: c.to } });
                     continue;
@@ -900,12 +904,14 @@
             list.forEach((entry, i) => {
                 const c     = entry.change;
                 const r     = results[i] || { written: false, reason: 'no answer' };
-                const isRule = !!entry.item.selector;
+                const isRemoval = !!entry.item.remove;
+                const isRule = !!entry.item.selector && !isRemoval;
                 const where = isRule
                     ? `${c.neighbour.location.file}:${r.line || c.neighbour.location.line}`
                     : `${c.location.file}:${c.location.line}`;
                 const decl  = isRule
                     ? `@at-root ${c.selector} { ${Object.entries(entry.item.declarations).map(([p, v]) => `${p}: ${v};`).join(' ')} }${entry.item.ancestors.length ? '  in ' + entry.item.ancestors.join(' ') : ''}`
+                    : isRemoval ? 'rule removed'
                     : (c.to === null ? `- ${c.prop}: ${c.from}` : (c.from === null ? `+ ${c.prop}: ${c.to}` : `${c.prop}: ${c.from} → ${c.to}`));
                 sent.push(...entry.changes);
                 if (r.written) lines.push(`✔ written   ${where}  ${isRule ? decl : c.selector + '  ' + decl}`);
@@ -943,7 +949,7 @@
                     where = 'new rule';
                     tail  = n ? `  (no source location; belongs after ${n.selector}${n.location ? ' at ' + n.location.file + ':' + n.location.line : ''})` : '  (no source location)';
                 }
-                if (c.removedRule) tail = '  (rule removed: copy-only, the block is yours to delete)';
+                if (c.removedRule) tail = c.location ? '  (rule removed)' : '  (rule removed: no source location)';
                 const key   = `${c.handle}:${c.index}:${where}:${c.selector}`;
                 if (!groups.has(key)) groups.set(key, [`${where}  ${c.selector}${tail}`]);
                 const rows = groups.get(key);

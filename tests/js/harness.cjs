@@ -563,9 +563,21 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
     // A rule deleted in the inspector is gone from the CSSOM and still in the baseline and the text.
     const dropped = front.cssRules.splice(2, 1)[0];
     const deleted = await global.window.sassy.capture();
-    ok('a deleted rule is reported, located, with what it had', /plugins\/d-pace\/scss\/frontend\.scss:\d+  \.c  \(rule removed: copy-only, the block is yours to delete\)\n  - background: var\(--x\)/.test(deleted.patch));
-    ok('and is not pushable',                                    deleted.changes.some(c => c.removedRule) && (await global.window.sassy.push()) === null);
+    ok('a deleted rule is reported, located, with what it had', /plugins\/d-pace\/scss\/frontend\.scss:\d+  \.c  \(rule removed\)\n  - background: var\(--x\)/.test(deleted.patch));
+    ok('and is pushable once located',                          deleted.changes.some(c => c.removedRule && c.location));
+    global.window.sass_params.write = true;
+    let removalPost = null;
+    global.fetch = (url, opts) => {
+        if (opts && opts.method === 'POST') { removalPost = JSON.parse(opts.body.get('changes')); return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true, data: { results: [{ written: true, file: '/srv/x/frontend.scss', line: 8, reason: null, text: '.c {' }] } }) }); }
+        return url.endsWith && String(url).endsWith('.map') ? mappingFetch(url) : new Promise(() => {});
+    };
+    await global.window.sassy.push();
+    ok('a deletion goes over the wire as its block',            removalPost && removalPost.length === 1 && removalPost[0].remove === true && removalPost[0].selector === '.c' && removalPost[0].source === '../plugins/d-pace/scss/frontend.scss' && removalPost[0].line === 8);
+    ok('and reports as removed',                                panel.querySelectorAll('.sassy-error').map(el => el.textContent).join('\n').includes('✔ written   plugins/d-pace/scss/frontend.scss:8  .c  rule removed'));
+    global.window.sass_params.write = false;
+    global.fetch = mappingFetch;
     front.cssRules.splice(2, 0, dropped);
+    links[0].listeners.load();
 
     // Twenty inline styles set by scripts fold in the panel and stay in the text.
     const noise = Array.from({ length: 5 }, (_, i) => Object.assign(element({ style: `left: ${i}px` }), { tagName: 'LI' }));

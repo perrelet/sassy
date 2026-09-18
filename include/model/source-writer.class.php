@@ -41,9 +41,10 @@ class Source_Writer {
 
             $results[$i]['file'] = $file;
 
-            $is_rule = isset($change['selector']) && is_array($change['declarations'] ?? null);
+            $is_rule    = isset($change['selector']) && is_array($change['declarations'] ?? null);
+            $is_removal = !empty($change['remove']) && isset($change['selector']);
 
-            if (!$is_rule && (!isset($change['prop']) || (!isset($change['from']) && !isset($change['to'])))) { $results[$i]['reason'] = 'neither an old nor a new value'; continue; }
+            if (!$is_rule && !$is_removal && (!isset($change['prop']) || (!isset($change['from']) && !isset($change['to'])))) { $results[$i]['reason'] = 'neither an old nor a new value'; continue; }
 
             // The CSSOM cannot produce these, but this is the one place that writes a file.
             if ($reason = static::malformed($change)) { $results[$i]['reason'] = $reason; continue; }
@@ -80,7 +81,22 @@ class Source_Writer {
                 $text = $lines[$n - 1];
                 $results[$i]['text'] = rtrim($text, "\r\n");
 
-                if (isset($change['selector']) && is_array($change['declarations'] ?? null)) {
+                if (!empty($change['remove']) && isset($change['selector'])) {
+
+                    // A rule deleted in the inspector: its block goes, opener to closer, only when
+                    // the opener is exactly that selector and nothing is nested inside.
+                    [$range, $reason] = static::removal($lines, $n, (string) $change['selector']);
+
+                    if ($reason !== null) { $results[$i]['reason'] = $reason; continue; }
+
+                    [$from, $to] = $range;
+                    array_splice($lines, $from - 1, $to - $from + 1);
+                    // The blank line that separated it from the block before, or led the file
+                    $at = $from - 1;
+                    if (isset($lines[$at]) && trim($lines[$at]) === '' && ($at === 0 || trim($lines[$at - 1]) === '')) array_splice($lines, $at, 1);
+                    $lines = array_values($lines);
+
+                } else if (isset($change['selector']) && is_array($change['declarations'] ?? null)) {
 
                     // A new rule goes after the block its neighbour opens, as @at-root so it
                     // compiles at the root wherever the neighbour is nested.
@@ -207,6 +223,34 @@ class Source_Writer {
         while (--$depth >= 0) $out[] = $indent . str_repeat($step, $depth) . '}' . $eol;
 
         return [[$end, $out], null];
+
+    }
+
+    /**
+     * The 1-based lines, inclusive, of the block line $n opens, when that block is exactly the
+     * compiled rule: its opener is the selector and nothing but declarations sits inside. A
+     * nested source rule compiles to a selector its opener does not carry, and refuses here.
+     *
+     * @return array{0: ?array{0: int, 1: int}, 1: ?string}
+     */
+    public static function removal (array $lines, $n, $selector) {
+
+        $opener = rtrim(preg_replace('~\s*//.*$~', '', rtrim($lines[$n - 1], "\r\n")));
+
+        if (!str_ends_with($opener, '{')) return [null, 'the line does not open a block'];
+
+        $prelude = preg_replace('/\s+/', ' ', trim(substr($opener, 0, -1)));
+        $wanted  = preg_replace('/\s+/', ' ', trim($selector));
+
+        if (strcasecmp($prelude, $wanted) !== 0) return [null, "the block is `$prelude`, not `$wanted`"];
+
+        $end = static::block_end($lines, $n);
+
+        if ($end === null) return [null, 'the block is unbalanced'];
+
+        for ($i = $n; $i < $end - 1; $i++) if (str_contains($lines[$i], '{')) return [null, 'the block holds nested blocks'];
+
+        return [[$n, $end], null];
 
     }
 

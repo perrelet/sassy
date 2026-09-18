@@ -321,7 +321,8 @@ class Style_Stack {
         try {
             $this->fire_context($context);
         } catch (\Throwable $e) {
-            $this->context_errors[$context] = $e->getMessage();
+            // Naming the file is what lets someone find the plugin whose callback raised.
+            $this->context_errors[$context] = sprintf('%s (%s:%d)', $e->getMessage(), $e->getFile(), $e->getLine());
         }
 
         while (ob_get_level() > $level) ob_end_clean();

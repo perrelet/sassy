@@ -134,10 +134,11 @@ $notice:  #2271b1;
 }
 
 #wpadminbar .sassy-kbd {
-    float: right;
-    margin: 5px 0 0 1.5em;
+    display: inline-block;
+    margin: 0 0 0 1.25em;
     padding: 0 5px;
     font: 10px/16px Menlo, Consolas, monospace;
+    vertical-align: 1px;
     color: inherit;
     opacity: 0.6;
     border: 1px solid currentColor;

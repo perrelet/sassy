@@ -66,6 +66,11 @@ class Import_Graph {
      */
     public static function stamp ($path) {
 
+        // PHP serves the last stat of a path from memory. On 8.2 that survives a write and a
+        // touch in the same process, so the writer would see the recorded stamp on a file it
+        // had just been asked about, and the "changed since the last compile" guard goes quiet.
+        clearstatcache(true, $path);
+
         $stat = @stat($path);
 
         return $stat ? [$stat['mtime'], $stat['size']] : null;

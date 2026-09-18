@@ -129,7 +129,7 @@ Tier 2 of the paintbrush. This writes to files in d-pace, whose tree carries wor
 | With the gate open, press 🖌️ **Push to source** in the bar after painting | One click: the capture happens, the push follows, the report shows. Without the gate the bar item is absent |
 | Revoke `dev` (or `add_filter('sassy-write-source', '__return_false')`), reload, Capture | No Push button; `window.sassy.push()` says "Nothing to push" |
 | Revert the pushed line in d-pace and compile | `wp sassy check` exits zero |
-| Delete a rule in the styles pane, Capture | The rule is listed at its file and line with `(rule removed: copy-only, the block is yours to delete)` and the declarations it had; Push says nothing to push |
+| Delete a rule in the styles pane, Capture, Push | The rule is listed at its file and line with `(rule removed)` and what it had; Push deletes the block from the partial when its opener is exactly that selector, else refuses with the reason and leaves it for Copy |
 | Add a rule with **+**, Push, then on a site with `sassy-check-dependencies` off | The sheet still recompiles and reloads, and the new rule then has a location |
 | A page whose scripts set many inline styles, Capture | Past three, the `element.style` entries fold under a count; Copy still includes them |
 
