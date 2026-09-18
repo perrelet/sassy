@@ -308,12 +308,13 @@ One call, one exit code, over every discovered style. It is the phase 5 delivera
 | Import graph truncated | `warning` | **always**, via the diagnostic's `fatal` flag |
 | Warnings or deprecations at last compile | as recorded | `--strict` / `--strict=all` |
 | Orphaned output | `warning` | `--strict` |
+| A context that registered no style of its own, when there are orphans | `notice` | never |
 
 **`check` never compiles.** It does not need to: a failed compile is never recorded as current (phase 2's rule), so an erroring handle arrives as stale. The remedy printed is always `wp sassy compile`.
 
 **Truncation is a warning that fails anyway**, which is what `Diagnostic::$fatal` exists for. A truncated graph makes "everything is current" *unknowable*, so it cannot be demoted to a stylistic preference. An orphan only makes the answer *noisy*.
 
-**Orphan detection is scoped.** Dotfiles and directories are skipped, because the Dart engine's own `.sassy-tmp` lives in the build directory and reporting Sassy's own working directory on a first run is how a tool teaches people to ignore it. It stays a warning however well it is scoped: a handle enqueued only on some template is discovered by no hook set at all, and its output is indistinguishable from an abandoned one.
+**Orphan detection is scoped.** Dotfiles and directories are skipped, because the Dart engine's own `.sassy-tmp` lives in the build directory and reporting Sassy's own working directory on a first run is how a tool teaches people to ignore it. It stays a warning however well it is scoped: a handle enqueued only on some template is discovered by no hook set at all, and its output is indistinguishable from an abandoned one. What `check` can say is that a context registered nothing (`Style_Stack::quiet_contexts()`, counted in `fire()` against the copied registry, Sassy's own handle excluded): a plugin whose bootstrap returns early under `WP_CLI` looks exactly like that, so the notice sits beside the orphans rather than claiming to explain them.
 
 **`check` defaults to `--hooks=all`**, alone among the commands, for the same reason.
 

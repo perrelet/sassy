@@ -247,7 +247,7 @@ wp sassy check --strict=all # and on deprecations from the last compile
 
 It does not compile anything. A handle that failed to compile is never recorded as current, so it shows up as stale, and the fix is `wp sassy compile`.
 
-Two cases are treated differently on purpose. A truncated import graph is reported as a warning but fails the check anyway, because without the full graph the question cannot be answered. An orphaned output, a built file that no registered handle claims, is a warning that fails only under `--strict`, because a stylesheet enqueued on one template looks the same as one that was deleted.
+Two cases are treated differently on purpose. A truncated import graph is reported as a warning but fails the check anyway, because without the full graph the question cannot be answered. An orphaned output, a built file that no registered handle claims, is a warning that fails only under `--strict`, because a stylesheet enqueued on one template looks the same as one that was deleted. Beside any orphan, `check` also notes a context that registered no styles of its own, since a plugin whose bootstrap skips the CLI looks exactly like that and its outputs look orphaned.
 
 ## 📜 What scripts do to your styles
 

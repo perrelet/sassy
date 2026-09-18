@@ -89,6 +89,11 @@ check('the temp directory is not',  !in_array("$BUILD/.sassy-tmp", $orphans, tru
 check('nor a dotfile',              !in_array("$BUILD/.hidden.css", $orphans, true));
 check('nor anything claimed',       !in_array("$BUILD/a.css", $orphans, true));
 
+// Nothing here hooks the editor, which is what a plugin skipping the CLI looks like from Sassy.
+$quiet  = Style_Stack::discover(['editor']);
+$notice = array_values(array_filter($quiet->audit(), function ($d) { return $d->severity === 'notice' && str_contains($d->message, "Context 'editor' registered no styles"); }));
+check('a quiet context is noted beside the orphans', $quiet->quiet_contexts() === ['editor'] && count($notice) === 1, var_export($quiet->quiet_contexts(), true));
+
 $audit   = $stack->audit();
 $flagged = array_values(array_filter($audit, function ($d) { return str_contains($d->message, 'Orphaned'); }));
 

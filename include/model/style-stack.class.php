@@ -19,6 +19,9 @@ class Style_Stack {
     protected $scripts = [];
     protected $context_errors = [];
 
+    /** Contexts that registered no style of their own: what a bootstrap that skips this process looks like. */
+    protected $quiet_contexts = [];
+
     /**
      * Fire the given enqueue contexts, then read every registered style.
      *
@@ -203,8 +206,17 @@ class Style_Stack {
 
         }
 
-        foreach ($this->orphaned_outputs() as $path) {
+        $orphans = $this->orphaned_outputs();
+
+        foreach ($orphans as $path) {
             $found[] = static::finding(Diagnostic::WARNING, basename($path), 'Orphaned output: no registered handle builds this.', $path);
+        }
+
+        // An orphan and a context that registered nothing are one story more often than two.
+        if ($orphans) {
+            foreach ($this->quiet_contexts as $context) {
+                $found[] = static::finding(Diagnostic::NOTICE, $context, sprintf("Context '%s' registered no styles of its own here. A plugin whose bootstrap skips this process looks like this, and its outputs look orphaned.", $context));
+            }
         }
 
         return $found;
@@ -265,6 +277,13 @@ class Style_Stack {
     /**
      * @return array<string, string> context => message, for contexts that raised.
      */
+    /** @return string[] Contexts fired that registered no style of their own. */
+    public function quiet_contexts () {
+
+        return $this->quiet_contexts;
+
+    }
+
     public function context_errors () {
 
         return $this->context_errors;
@@ -318,8 +337,12 @@ class Style_Stack {
 
         ob_start();
 
+        $before = isset($GLOBALS['wp_styles']->registered) ? array_keys($GLOBALS['wp_styles']->registered) : [];
+
         try {
             $this->fire_context($context);
+            $added = array_diff(isset($GLOBALS['wp_styles']->registered) ? array_keys($GLOBALS['wp_styles']->registered) : [], $before, ['sassy']);
+            if (!$added) $this->quiet_contexts[] = $context;
         } catch (\Throwable $e) {
             // Naming the file is what lets someone find the plugin whose callback raised.
             $this->context_errors[$context] = sprintf('%s (%s:%d)', $e->getMessage(), $e->getFile(), $e->getLine());
